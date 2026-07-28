@@ -4,7 +4,7 @@ import zhCN from 'antd/locale/zh_CN';
 import { GlobalSearchBar } from './components/GlobalSearchBar';
 import { ProjectSelector } from './components/ProjectSelector';
 import { WatcherStatusIndicator } from './components/WatcherStatusIndicator';
-import { SessionsPane } from './components/SessionsPane';
+import { SessionsPane } from './modules/sessions/SessionsModule';
 
 const { Header, Sider, Content } = Layout;
 
