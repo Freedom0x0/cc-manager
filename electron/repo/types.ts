@@ -39,5 +39,5 @@ export interface ProjectTreeNode {
   name: string;
   path: string;
   sessionCount: number;
-  children: ProjectTreeNode[];
+  children?: ProjectTreeNode[]; // optional for backward-compat with mocks
 }

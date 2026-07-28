@@ -10,7 +10,6 @@ interface Props {
   onSoftDelete: (id: string) => void;
   onRestore?: (id: string) => void;
   onPermanentDelete?: (id: string) => void;
-  breadcrumbFor?: (session: SessionRow) => string | null; // optional top/sub path
 }
 
 const formatTime = (ms: number) => new Date(ms).toLocaleString();
@@ -22,7 +21,6 @@ export const SessionList: React.FC<Props> = ({
   onSoftDelete,
   onRestore,
   onPermanentDelete,
-  breadcrumbFor,
 }) => {
   if (sessions.length === 0) {
     return (
@@ -59,11 +57,6 @@ export const SessionList: React.FC<Props> = ({
                 <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>
                   {s.title || s.firstUserMessage?.slice(0, 50) || '(无标题)'}
                 </div>
-                {breadcrumbFor && breadcrumbFor(s) && (
-                  <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>
-                    {breadcrumbFor(s)}
-                  </div>
-                )}
                 <div style={{ fontSize: 11, color: '#6b7280' }}>
                   {formatTime(s.lastMessageAt)} · {s.messageCount} 条消息
                 </div>

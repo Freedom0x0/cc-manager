@@ -43,16 +43,8 @@ function App() {
     (async () => {
       const t = await api.listProjectTree();
       setTree(t);
-      // Flatten for project filter dropdown
-      const flat: { id: number; name: string }[] = [];
-      function walk(nodes: ProjectTreeNode[]) {
-        for (const n of nodes) {
-          flat.push({ id: n.id, name: n.name });
-          walk(n.children);
-        }
-      }
-      walk(t);
-      setFlatProjects(flat);
+      // Flat list — every project is a peer; no children to walk.
+      setFlatProjects(t.map((n) => ({ id: n.id, name: n.name })));
     })();
   }, [refreshKey]);
 
@@ -73,21 +65,6 @@ function App() {
   }, [selectedSessionId]);
 
   const refresh = () => setRefreshKey((k) => k + 1);
-
-  // Build breadcrumb helper for session list
-  const breadcrumbFor = (s: SessionRow): string | null => {
-    function findPath(nodes: ProjectTreeNode[], targetId: number, path: string[]): string[] | null {
-      for (const n of nodes) {
-        if (n.id === targetId) return [...path, n.name];
-        const r = findPath(n.children, targetId, [...path, n.name]);
-        if (r) return r;
-      }
-      return null;
-    }
-    const path = findPath(tree, s.projectId, []);
-    if (!path || path.length < 2) return null;
-    return path.join(' / ');
-  };
 
   return (
     <div
@@ -126,19 +103,15 @@ function App() {
       ) : (
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
           <ProjectTree
-            tree={tree}
+            projects={tree}
             selectedProjectId={selectedProjectId}
             onSelect={setSelectedProjectId}
-            expandProjectId={selectedProjectId}
-            defaultExpandedKeys={[]}
           />
           {query.trim() ? (
             <SearchResultsPane
               hits={hits}
               searched={searched}
-              tree={tree}
               onPick={(hit) => {
-                // Jump: set project → load sessions → open session → highlight message
                 setSelectedProjectId(hit.projectId);
                 setSelectedSessionId(hit.message.sessionId);
                 setHighlightedMessageId(hit.message.uuid);
@@ -152,7 +125,6 @@ function App() {
                 selectedSessionId={selectedSessionId}
                 onSelect={(id) => { setSelectedSessionId(id); setHighlightedMessageId(null); }}
                 onSoftDelete={setConfirmSoft}
-                breadcrumbFor={breadcrumbFor}
               />
               <MessageView
                 messages={messages}
@@ -205,22 +177,8 @@ function App() {
 const SearchResultsPane: React.FC<{
   hits: SearchHit[];
   searched: boolean;
-  tree: ProjectTreeNode[];
   onPick: (hit: SearchHit) => void;
-}> = ({ hits, searched, tree, onPick }) => {
-  function breadcrumb(h: SearchHit): string {
-    function findPath(nodes: ProjectTreeNode[], targetId: number, path: string[]): string[] | null {
-      for (const n of nodes) {
-        if (n.id === targetId) return [...path, n.name];
-        const r = findPath(n.children, targetId, [...path, n.name]);
-        if (r) return r;
-      }
-      return null;
-    }
-    const path = findPath(tree, h.projectId, []);
-    return (path || [h.projectName]).join(' / ');
-  }
-
+}> = ({ hits, searched, onPick }) => {
   if (searched && hits.length === 0) {
     return (
       <div style={{ width: 400, borderRight: '1px solid #e5e7eb', padding: 16, background: '#fff' }}>
@@ -256,7 +214,7 @@ const SearchResultsPane: React.FC<{
           style={{ margin: 8, cursor: 'pointer' }}
         >
           <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>
-            <Tag color="blue">{breadcrumb(h)}</Tag>
+            <Tag color="blue">{h.projectName}</Tag>
             <span style={{ marginLeft: 4 }}>{h.sessionTitle || '(无标题)'}</span>
           </div>
           <div

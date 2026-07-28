@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-07-27T16:52:48.198Z",
+  "updatedAt": "2026-07-28T01:30:00.000Z",
   "hot": {
     "feedback": [],
     "decision": [],
@@ -10,7 +10,15 @@
     "lesson": []
   },
   "warm": {
-    "project": [],
+    "project": [
+      {
+        "id": "2026-07-28-cc-session-manager-v1-v2-v3",
+        "title": "cc-session-manager 项目历程（v1 → v2 → v3）",
+        "path": "2026-07-28-cc-session-manager-v1-v2-v3.md",
+        "tags": ["project-history", "electron", "antd", "fts5"],
+        "summary": "Tauri→Electron 切换、聚类算法 3 次迭代、UI 重构、坑修复；用户认知 vs 算法教训"
+      }
+    ],
     "reference": []
   }
 }

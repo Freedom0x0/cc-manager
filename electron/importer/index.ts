@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import { DB } from '../db/connection';
 import { parseLine } from './parser';
 import { clusterPath, topPath } from './cluster';
+import * as path from 'path';
 
 export { scanSourceDir } from './scanner';
 export { parseLine } from './parser';
@@ -49,13 +50,9 @@ export function importFile(db: DB, filePath: string): ImportStats {
 
       let projectId = projectCache.get(msg.projectPath);
       if (!projectId) {
-        const { topName, subName } = clusterPath(msg.projectPath);
-        const topId = ensureProject(db, topPath(topName), topName, null);
-        // The leaf project is the one the session row points at
-        const leafId = topName === subName
-          ? topId
-          : ensureProject(db, msg.projectPath, subName, topId);
-        projectId = leafId;
+        // Simple flat clustering: every cwd = one project, named by last dir segment.
+        const { subName } = clusterPath(msg.projectPath);
+        projectId = ensureProject(db, msg.projectPath, subName, null);
         projectCache.set(msg.projectPath, projectId);
       }
 

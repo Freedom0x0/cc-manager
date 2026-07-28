@@ -1,7 +1,7 @@
 // Rich fixture data for the browser mock — covers 3 projects with varied sessions
 // so the UI is visually informative in screenshots.
 
-import type { SessionRow } from './types';
+import type { SessionRow, ProjectTreeNode } from './types';
 
 export const testProjects = [
   { id: 1, path: 'C:/Users/15532/Desktop/prompt', name: 'prompt', sessionCount: 3 },
@@ -9,35 +9,12 @@ export const testProjects = [
   { id: 3, path: 'C:/Users/15532/Desktop/xj/peaks-loop', name: 'peaks-loop', sessionCount: 4 },
 ];
 
-export const testProjectTree = [
-  {
-    id: 100,
-    name: 'prompt',
-    path: '<top:prompt>',
-    sessionCount: 0,
-    children: [
-      { id: 11, name: 'boss-prompts-manager', path: 'C:/Users/15532/Desktop/prompt/boss-prompts-manager', sessionCount: 0, children: [] },
-      { id: 12, name: 'docs', path: 'C:/Users/15532/Desktop/prompt/docs', sessionCount: 0, children: [] },
-      { id: 13, name: 'react-prompt-editor', path: 'C:/Users/15532/Desktop/prompt/react-prompt-editor', sessionCount: 2, children: [] },
-    ],
-  },
-  {
-    id: 200,
-    name: 'cc-session-manager',
-    path: '<top:cc-session-manager>',
-    sessionCount: 2,
-    children: [],
-  },
-  {
-    id: 300,
-    name: 'peaks-loop',
-    path: '<top:peaks-loop>',
-    sessionCount: 0,
-    children: [
-      { id: 31, name: 'peaks-code', path: 'C:/Users/15532/Desktop/xj/peaks-loop/peaks-code', sessionCount: 1, children: [] },
-      { id: 32, name: 'peaks-content', path: 'C:/Users/15532/Desktop/xj/peaks-loop/peaks-content', sessionCount: 0, children: [] },
-    ],
-  },
+export const testProjectTree: ProjectTreeNode[] = [
+  { id: 100, name: 'react-prompt-editor', path: 'C:/Users/15532/Desktop/prompt/react-prompt-editor', sessionCount: 2 },
+  { id: 101, name: 'boss-prompts-manager', path: 'C:/Users/15532/Desktop/prompt/boss-prompts-manager', sessionCount: 0 },
+  { id: 200, name: 'cc-session-manager', path: 'C:/Users/15532/Desktop/cc-session-manager', sessionCount: 2 },
+  { id: 300, name: 'peaks-loop', path: 'C:/Users/15532/Desktop/xj/peaks-loop', sessionCount: 1 },
+  { id: 301, name: 'peaks-code', path: 'C:/Users/15532/Desktop/xj/peaks-loop/peaks-code', sessionCount: 0 },
 ];
 
 export type TestSession = SessionRow & { isDeleted?: 0 | 1 };

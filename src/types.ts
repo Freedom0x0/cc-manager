@@ -3,7 +3,7 @@ export interface ProjectTreeNode {
   name: string;
   path: string;
   sessionCount: number;
-  children: ProjectTreeNode[];
+  children?: ProjectTreeNode[]; // optional; flat model used in v3
 }
 
 export interface ProjectRow {
