@@ -4,6 +4,9 @@ import * as path from 'path';
 
 export type DB = Database.Database;
 
+// Schema 故意不建 is_archived 索引:老库可能没 is_archived 列,
+// CREATE INDEX IF NOT EXISTS 在不存在的列上会抛 'no such column'。
+// 所有索引(包括 v4 新加的)统一在 initDB 末尾 migrate 阶段建,保证列先存在。
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS projects (
   id INTEGER PRIMARY KEY,
@@ -12,11 +15,8 @@ CREATE TABLE IF NOT EXISTS projects (
   cwd TEXT,
   parent_project_id INTEGER REFERENCES projects(id),
   imported_at INTEGER NOT NULL,
-  is_archived INTEGER NOT NULL DEFAULT 0
+  is_archived INTEGER DEFAULT 0
 );
-
-CREATE INDEX IF NOT EXISTS idx_projects_parent ON projects(parent_project_id);
-CREATE INDEX IF NOT EXISTS idx_projects_archived ON projects(is_archived);
 
 CREATE TABLE IF NOT EXISTS sessions (
   id INTEGER PRIMARY KEY,
@@ -33,10 +33,6 @@ CREATE TABLE IF NOT EXISTS sessions (
   FOREIGN KEY (project_id) REFERENCES projects(id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_id);
-CREATE INDEX IF NOT EXISTS idx_sessions_deleted ON sessions(is_deleted);
-CREATE INDEX IF NOT EXISTS idx_sessions_last_msg ON sessions(last_message_at DESC);
-
 CREATE TABLE IF NOT EXISTS messages (
   id INTEGER PRIMARY KEY,
   uuid TEXT UNIQUE NOT NULL,
@@ -47,6 +43,10 @@ CREATE TABLE IF NOT EXISTS messages (
   created_at INTEGER NOT NULL
 );
 
+CREATE INDEX IF NOT EXISTS idx_projects_parent ON projects(parent_project_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_deleted ON sessions(is_deleted);
+CREATE INDEX IF NOT EXISTS idx_sessions_last_msg ON sessions(last_message_at DESC);
 CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id);
 
 CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
@@ -76,33 +76,35 @@ export function initDB(dbPath: string): DB {
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
   db.exec(SCHEMA);
-  // Migration: add parent_project_id to old DBs that pre-date this column
-  const cols = db.prepare("PRAGMA table_info(projects)").all() as { name: string }[];
-  if (!cols.some((c) => c.name === 'parent_project_id')) {
+
+  // v1 → v2 migration: parent_project_id
+  const projCols = db.prepare("PRAGMA table_info(projects)").all() as { name: string }[];
+  if (!projCols.some((c) => c.name === 'parent_project_id')) {
     db.exec("ALTER TABLE projects ADD COLUMN parent_project_id INTEGER REFERENCES projects(id)");
-    db.exec("CREATE INDEX IF NOT EXISTS idx_projects_parent ON projects(parent_project_id)");
   }
-  // Migration: add cwd to sessions for v4 (resumer needs session's actual cwd, not the folder)
+  // v4 migration: projects.cwd(真实路径)+ is_archived(老库假 project 隐藏)
+  if (!projCols.some((c) => c.name === 'cwd')) {
+    db.exec("ALTER TABLE projects ADD COLUMN cwd TEXT");
+  }
+  if (!projCols.some((c) => c.name === 'is_archived')) {
+    // 老表加列不能 NOT NULL DEFAULT 0(SQLite 老版本限制),
+    // 加成可空 + 应用层确保 0/1
+    db.exec("ALTER TABLE projects ADD COLUMN is_archived INTEGER");
+    db.exec("UPDATE projects SET is_archived = 0 WHERE is_archived IS NULL");
+  }
+  // v4 migration: sessions.cwd(resumer 用)
   const sessCols = db.prepare("PRAGMA table_info(sessions)").all() as { name: string }[];
   if (!sessCols.some((c) => c.name === 'cwd')) {
     db.exec("ALTER TABLE sessions ADD COLUMN cwd TEXT");
   }
-  // Migration: add is_archived to projects for v4 (hide pre-v4 fake projects whose path
-  // is a cwd, not a ~/.claude/projects/<folder> entry)
-  const projCols = db.prepare("PRAGMA table_info(projects)").all() as { name: string }[];
-  if (!projCols.some((c) => c.name === 'is_archived')) {
-    db.exec("ALTER TABLE projects ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0");
-    db.exec("CREATE INDEX IF NOT EXISTS idx_projects_archived ON projects(is_archived)");
-  }
-  // Migration: add cwd to projects for v4 (real display name = basename(cwd))
-  if (!projCols.some((c) => c.name === 'cwd')) {
-    db.exec("ALTER TABLE projects ADD COLUMN cwd TEXT");
-  }
-  // Migration: add content_blocks to messages for v4 (preserve tool_use / tool_result / thinking)
+  // v4 migration: messages.content_blocks(JSON)
   const msgCols = db.prepare("PRAGMA table_info(messages)").all() as { name: string }[];
   if (!msgCols.some((c) => c.name === 'content_blocks')) {
     db.exec("ALTER TABLE messages ADD COLUMN content_blocks TEXT");
   }
+
+  // 所有列都存在后,再建新索引(列存在性 + 索引 IF NOT EXISTS 一起保证幂等)
+  db.exec("CREATE INDEX IF NOT EXISTS idx_projects_archived ON projects(is_archived)");
   return db;
 }
 
