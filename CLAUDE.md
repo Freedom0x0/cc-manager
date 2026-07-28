@@ -1,6 +1,8 @@
 # CLAUDE.md
 
 > 我是这个项目的唯一全栈开发工程师。**任何对前端的修改都必须同步检查后端是否需要改，反之亦然。** 没有"只动前端"或"只动后端"的小修改 —— 改一处前，永远先想一遍三层链路（IPC contract / 数据模型 / 业务规则）。
+>
+> **平台策略**：Windows 优先（v2.0 / v2.1 / v3.0 三波全部产出 Windows installer）。macOS 适配延后到 v4.0（详见 `docs/superpowers/specs/2026-07-28-cc-manager-modules-design.md` §15）。开发模式（`npm run dev`）跨平台可用。
 
 ---
 
@@ -145,6 +147,17 @@ cc-session-manager/
 - **2026-07-28 v4** ：项目以 `~/.claude/projects/<folder>` 为单位入库（scanner 扫 folder 一级，不再递归 jsonl）；project.name 走 `path.basename(cwd)` 单源；新增 `projects.cwd` / `projects.is_archived` / `sessions.cwd` / `messages.content_blocks` 4 列；启动时一次性 migrate 把 v1-v3 误入库的 cwd-style 假 project 标 `is_archived=1`
 - **2026-07-28 v4** ：parser 同时返回纯文本 + 结构化 `ContentBlock[]`（text/tool_use/tool_result/thinking/unknown），MessageView 按 block type 渲染
 - **2026-07-28 v4** ：resumer 改为返回 `ResumeCommand { command, cwd? }` 字符串，spawn 代码 `// [停用]` 注释保留；UI 用 `ResumeCommandCard`（navigator.clipboard + execCommand 降级）展示可复制命令
+- **2026-07-28 v5**：单一真相 = 原文件；metadata 是缓存，watcher 是唯一写入路径
+- **2026-07-28 v5**：模块化目录结构（src/modules/ + electron/repo/<module>/）
+- **2026-07-28 v5**：文件 watch 走 chokidar 事件驱动，无 polling（学 VS Code `files.usePolling: false`）
+- **2026-07-28 v5**：App.tsx 改为导航壳子，业务逻辑全部下放到 modules/
+- **2026-07-28 v5**：3 波节奏（v2.0 / v2.1 / v3.0），每波结束 npm run package
+- **2026-07-28 v5 amendment**：平台策略改为 **Windows 优先**，macOS 适配延后到 v4.0（spec §15）。理由：当前开发机 + CI 是 Windows；macOS 适配涉及 Apple 签名 / notarization / native menu，单独留一整版本处理更稳
+- **2026-07-28 v5 D8**：跨平台代码用 `process.platform` 运行时检测 + `os.homedir()` 取 `~/.claude`（OS 中性，无需特判）
+- **2026-07-28 v5 D9**：electron-builder 配置**预留** `mac.target: ["dmg", "zip"]`，v4.0 启用 `--mac`，v2.0-v3.0 只跑 `--win`
+- **2026-07-28 v5 D10**：测试 fixture 路径改 `os.tmpdir()` 而非硬编码 Windows 风格（防止 v4.0 macOS runner 跑挂）
+- **2026-07-28 v5 D11**：macOS 签名 v4.0 起步**未签名**（Gatekeeper 警告 + 右键打开），Developer ID / notarization 不在 v4.0 范围
+- **2026-07-28 v5 D12**：v3.0 → v4.0 过渡期 macOS 本地可 dev 但不可 package（预期行为）
 
 ## 14. 用户语言
 

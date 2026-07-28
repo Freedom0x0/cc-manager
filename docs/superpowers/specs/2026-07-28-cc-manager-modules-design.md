@@ -24,6 +24,7 @@ v4 完成 28/28 测试 + NSIS/Portable 双产物发布。用户反馈："现在�
 - **8 个模块**：会话管理增强 + MCP + Skills + Commands + Sub-Agents + Hooks + 插件 + 配置 Profiles
 - **3 大基础设施**：文件 watch（chokidar）+ 顶部全局搜索 + 用量分析仪表盘
 - **3 波交付**：每波结束 = 可安装包 + npm test 全绿
+- **平台策略**：**Windows 优先**（v2.0 / v2.1 / v3.0 三波全部产出 Windows installer），**macOS 适配延后到 v4.0**（详见 §16）
 
 每个模块最小切片 = **能配置 + 能查看/列表 + 能搜索**（三件套），不堆自动化推荐。
 
@@ -549,7 +550,7 @@ SELECT 'project', name, id, NULL, 1 FROM projects WHERE is_archived = 0 AND name
 - ❌ Profile 云同步 / 团队共享（本地单用户）
 - ❌ 智能推荐（"你的 MCP 有 3 个没启用，要不要看看"）
 - ❌ 新手引导 / 模板市场（用户是 A：重度玩家）
-- ❌ macOS / Linux 打包（CLAUDE.md 已限 Windows）
+- ❌ macOS / Linux 打包（**v2.0 / v2.1 / v3.0 阶段限制**；macOS 适配延后到 v4.0，详见 §16）
 - ❌ MCP / Skills / Commands 的语义搜索（仅 LIKE 匹配 + 名称搜索）
 - ❌ 用量预测 / 成本优化建议（只展示数据，不建议）
 
@@ -559,15 +560,68 @@ SELECT 'project', name, id, NULL, 1 FROM projects WHERE is_archived = 0 AND name
 - Sub-Agent 调试器（看 subagent 的 prompt/output）
 - Hook 实时日志面板（捕获 hooks 触发日志）
 - 配置文件 diff 可视化（vscode 风格的 split view）
+- **macOS 适配（v4.0）** — 详见 §16
+- Linux 适配（v4.x，仅当用户需求明确时）
+
+## 15. macOS 适配 spec（v4.0 详细计划）
+
+> **Status**: 延期到 v4.0；v2.0 / v2.1 / v3.0 仍 Windows-only。本节是预留的工程契约，避免后续返工。
+
+### 15.1 平台策略（继承 v5 D8-D12）
+
+- **构建时**：electron-builder 配置文件已包含 `mac.target: ["dmg", "zip"]`，v4.0 启用 `--mac`
+- **运行时**：`process.platform === 'darwin'` 走 macOS 路径分支
+- **数据目录**：`~/.claude/` 跨平台一致（用 `os.homedir()`，无需特判）
+- **签名**：v4.0 起步阶段**未签名**（Gatekeeper 警告需用户右键打开）；后续视需要加 Developer ID
+
+### 15.2 关键改动清单（v4.0 任务）
+
+| 任务 | 工作量 | 风险 |
+|---|---|---|
+| `electron-builder.json` 启用 `mac.target` | 0.5h | 低 |
+| 加 `build/icon.icns` 资源 | 1h | 低（设计师出图） |
+| `process.env.APPDATA` fallback（macOS 用 `~/.config/cc-session-manager`） | 2h | 中（影响所有 IPC handler 的 dataDir） |
+| `ResumeCommand` 跨平台路径 + shell escape | 3h | 中（Windows cmd.exe vs macOS bash 完全不同） |
+| 测试 fixture 改 `os.tmpdir()` 而非硬编码 `C:\\Users\\...` | 2h | 低 |
+| CI 加 macOS runner（GitHub Actions `macos-latest`） | 2h | 中（首次跑可能要修 native binding） |
+| macOS menu bar（native menu 替代 window 内 menu） | 4h | 中 |
+| ⌘ 快捷键映射 | 2h | 低（antd 大部分自动适配） |
+| DMG 拖拽安装测试 + ZIP 绿色版测试 | 3h | 中（需 macOS 真机） |
+| README 加 macOS 安装说明 | 1h | 低 |
+| **合计** | **~3-4 天** | |
+
+### 15.3 v4.0 验收
+
+- [ ] `npm run package --mac` 在 macOS runner 上产出 `.dmg` 和 `.zip`
+- [ ] DMG 拖拽到 Applications 后能正常启动（未签名，右键打开确认 Gatekeeper）
+- [ ] 所有现有 85+ 测试在 macOS runner 上 PASS
+- [ ] `process.platform === 'darwin'` 分支代码路径被单测覆盖
+- [ ] macOS native menu 显示 File / Edit / View 等标准菜单
+- [ ] README 提供 macOS 安装指南
+
+### 15.4 不在 v4.0 范围
+
+- ❌ Apple Developer ID 签名（成本 $99/年 + Apple Developer Program 申请流程）
+- ❌ Mac App Store 上架
+- ❌ Notarization（公证）
+- ❌ iCloud 同步
+- ❌ Touch Bar 支持
+- ❌ Linux 适配（独立 v4.x 评估）
+
+### 15.5 v3.0 → v4.0 过渡期预期行为
+
+- macOS 本地开发：`npm run dev` **可工作**（Vite + Electron 都跨平台）
+- macOS 打包：`npm run package` 会**失败**或出错版本（预期，等 v4.0 修复）
+- 用户使用 macOS：能跑 dev 模式，但拿不到 installer；等 v4.0 发布
 - macOS / Linux 打包（如有需求）
 
-## 15. 验收标准
+## 16. 验收标准
 
 每波结束必须满足：
 
 - [ ] `npm test` 全绿（用例数 ≥ 当前阶段预期）
 - [ ] `npm run typecheck` 全绿
-- [ ] `npm run package` 出 NSIS + Portable 双产物
+- [ ] `npm run package` 出 NSIS + Portable 双产物（**Windows-only**，macOS 见 §15）
 - [ ] 安装包能正常打开、能完成该波所有模块的核心三件套（配置/查看/搜索）
 - [ ] CLAUDE.md §13 决策记录已追加
 - [ ] CHANGELOG.md 已追加该波变更
