@@ -71,34 +71,6 @@ app.whenReady().then(() => {
   db = initDB(dbPath);
   log('DB ready at', dbPath);
 
-  // Trigger first-run import (background, non-blocking)
-  setTimeout(() => {
-    try {
-      const home = os.homedir();
-      const sourceDir = path.join(home, '.claude', 'projects');
-      // v4 migration: hide pre-v4 fake projects (path is a cwd, not a ~/.claude/projects/ folder)
-      const archived = archiveLegacyFakeProjects(db, sourceDir);
-      if (archived > 0) log('archived', archived, 'legacy fake projects');
-      log('scanning', sourceDir);
-      const folders = scanProjectFolders(sourceDir);
-      log('found', folders.length, 'project folders');
-      let ok = 0, fail = 0;
-      for (const folder of folders) {
-        try {
-          importProjectFolder(db, folder);
-          ok++;
-          if (ok % 5 === 0) log('imported', ok, '/', folders.length, 'folders');
-        } catch (e) {
-          fail++;
-          log('import FAIL', folder.folderPath, e instanceof Error ? e.message : String(e));
-        }
-      }
-      log('import done. ok=' + ok + ' fail=' + fail);
-    } catch (e) {
-      log('Import error', e instanceof Error ? e.stack : String(e));
-    }
-  }, 1500);
-
   ipcMain.handle('list_projects', () => projectsRepo.listWithCounts(db));
   ipcMain.handle('list_project_tree', () => treeRepo.listProjectTree(db));
   ipcMain.handle('list_sessions', (_e, projectId: number, includeDeleted: boolean) =>
@@ -135,7 +107,39 @@ app.whenReady().then(() => {
     return buildResumeCommand(sessionId, cwd);
   });
 
-  createWindow();
+  const win = createWindow();
+
+  // 延迟触发首次导入（非阻塞）。导入完成后推 import_done 事件通知渲染进程刷新项目列表。
+  setTimeout(() => {
+    try {
+      const home = os.homedir();
+      const sourceDir = path.join(home, '.claude', 'projects');
+      // v4 migration: hide pre-v4 fake projects (path is a cwd, not a ~/.claude/projects/ folder)
+      const archived = archiveLegacyFakeProjects(db, sourceDir);
+      if (archived > 0) log('archived', archived, 'legacy fake projects');
+      log('scanning', sourceDir);
+      const folders = scanProjectFolders(sourceDir);
+      log('found', folders.length, 'project folders');
+      let ok = 0, fail = 0;
+      for (const folder of folders) {
+        try {
+          importProjectFolder(db, folder);
+          ok++;
+          if (ok % 5 === 0) log('imported', ok, '/', folders.length, 'folders');
+        } catch (e) {
+          fail++;
+          log('import FAIL', folder.folderPath, e instanceof Error ? e.message : String(e));
+        }
+      }
+      log('import done. ok=' + ok + ' fail=' + fail);
+      // 导入完成：通知渲染进程刷新项目列表
+      if (win && !win.isDestroyed()) {
+        win.webContents.send('import_done');
+      }
+    } catch (e) {
+      log('Import error', e instanceof Error ? e.stack : String(e));
+    }
+  }, 1500);
 });
 
 app.on('window-all-closed', () => {

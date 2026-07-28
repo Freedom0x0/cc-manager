@@ -70,6 +70,11 @@ function App() {
     })();
   }, [refreshKey]);
 
+  // 首次导入完成后主进程推送 import_done，触发刷新（只在 Electron 中有效）
+  useEffect(() => {
+    window.api.onImportDone(() => setRefreshKey((k) => k + 1));
+  }, []);
+
   useEffect(() => {
     if (selectedProjectId === null) {
       setSessions([]);

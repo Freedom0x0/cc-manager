@@ -20,6 +20,8 @@ export type Api = {
   restoreSession(sessionId: string): Promise<void>;
   permanentDeleteSession(sessionId: string): Promise<void>;
   resumeSession(sessionId: string): Promise<ResumeCommand | null>;
+  /** 主进程推送：首次导入完成后触发。浏览器 mock 模式下为 noop。 */
+  onImportDone(cb: () => void): void;
 };
 
 declare global {
@@ -28,4 +30,5 @@ declare global {
   }
 }
 export {};
+
 

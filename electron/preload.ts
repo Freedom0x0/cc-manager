@@ -18,4 +18,7 @@ contextBridge.exposeInMainWorld('api', {
   permanentDeleteSession: (sessionId: string) =>
     ipcRenderer.invoke('permanent_delete_session', sessionId),
   resumeSession: (sessionId: string) => ipcRenderer.invoke('resume_session', sessionId),
+  // 主进程推送：首次导入完成后触发，渲染进程用于刷新项目列表
+  onImportDone: (cb: () => void) => ipcRenderer.on('import_done', cb),
 });
+

@@ -43,7 +43,9 @@ if (typeof window !== 'undefined' && !window.api) {
       return ok(undefined);
     },
     resumeSession: (sessionId) =>
-      ok({ command: `claude --resume ${sessionId}`, cwd: 'C:/Users/15532/Desktop' }),
+      ok({ command: `claude --resume ${sessionId}`, cwd: '/Users/user/project' }),
+    // 浏览器 mock 模式不会有真正的导入事件，noop 实现以满足类型契约
+    onImportDone: (_cb) => {},
   };
   console.log('[mock] window.api stub installed (browser dev mode)');
 }
