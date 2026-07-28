@@ -18,15 +18,24 @@ import {
   ReloadOutlined,
 } from '@ant-design/icons';
 import { api } from '../../api';
-import type { McpServer, McpCreateInput } from '../../types';
+import type { McpServer } from '../../types';
+
+// Form value shape:user 在 <Input> 里输入的是逗号分隔的字符串,
+// 提交时再 split 成 McpCreateInput.args: string[]
+interface McpFormValues {
+  name: string;
+  command: string;
+  args?: string;
+  description?: string;
+}
 
 export const McpManager: React.FC = () => {
   const [servers, setServers] = useState<McpServer[]>([]);
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState<McpServer | null>(null);
   const [creating, setCreating] = useState(false);
-  const [editForm] = Form.useForm<McpCreateInput>();
-  const [createForm] = Form.useForm<McpCreateInput>();
+  const [editForm] = Form.useForm<McpFormValues>();
+  const [createForm] = Form.useForm<McpFormValues>();
 
   const load = async () => {
     setLoading(true);
