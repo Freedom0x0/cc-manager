@@ -1,7 +1,7 @@
 import React from 'react';
 import { List, Card, Button, Tooltip, Empty, Tag } from 'antd';
 import { DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
-import type { SessionRow } from '../types';
+import type { SessionRow } from '../../types';
 
 interface Props {
   sessions: SessionRow[];

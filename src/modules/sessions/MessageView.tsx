@@ -8,7 +8,7 @@ import {
   BulbOutlined,
   QuestionCircleOutlined,
 } from '@ant-design/icons';
-import type { MessageRow, ContentBlock } from '../types';
+import type { MessageRow, ContentBlock } from '../../types';
 
 interface Props {
   messages: MessageRow[];
@@ -82,7 +82,7 @@ function renderMessageBody(m: MessageRow): React.ReactNode | null {
     );
   }
   // 有 blocks:过滤掉空 text 和 unknown(没信息量的),只渲染有可视化的块
-  const meaningful = m.blocks.filter((b) => {
+  const meaningful = m.blocks.filter((b: ContentBlock) => {
     if (b.type === 'text') return b.text.trim().length > 0;
     if (b.type === 'tool_use') return true; // 工具调用总有 name,值得展示
     if (b.type === 'tool_result') return true; // 工具结果至少有个占位
@@ -92,7 +92,7 @@ function renderMessageBody(m: MessageRow): React.ReactNode | null {
   if (meaningful.length === 0) return null;
   return (
     <div>
-      {meaningful.map((b, i) => (
+      {meaningful.map((b: ContentBlock, i: number) => (
         <BlockRenderer key={i} block={b} />
       ))}
     </div>

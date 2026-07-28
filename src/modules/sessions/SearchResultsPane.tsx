@@ -1,6 +1,6 @@
 import React from 'react';
 import { Empty, Tag, Card } from 'antd';
-import type { SearchHit } from '../types';
+import type { SearchHit } from '../../types';
 
 export const SearchResultsPane: React.FC<{
   hits: SearchHit[];

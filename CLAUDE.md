@@ -158,6 +158,11 @@ cc-session-manager/
 - **2026-07-28 v5 D10**：测试 fixture 路径改 `os.tmpdir()` 而非硬编码 Windows 风格（防止 v4.0 macOS runner 跑挂）
 - **2026-07-28 v5 D11**：macOS 签名 v4.0 起步**未签名**（Gatekeeper 警告 + 右键打开），Developer ID / notarization 不在 v4.0 范围
 - **2026-07-28 v5 D12**：v3.0 → v4.0 过渡期 macOS 本地可 dev 但不可 package（预期行为）
+- **2026-07-28 v5 D1**：watcher_state 表用 3 列 KV 模型（key PRIMARY KEY + value + updated_at），故意偏离 RD §4 模板的 5 列 — Simplicity First
+- **2026-07-28 v5 D2**：chokidar 5.0.0 在 Electron 32 + Node 22 ABI 兼容，真实事件触发稳定；`usePolling: false` 显式声明
+- **2026-07-28 v5 D3**：模块化目录 = `src/modules/` + `electron/repo/<module>/`（SessionsModule.tsx re-export 入口减少 import 噪音）
+- **2026-07-28 v5 D4**：App.tsx 改导航壳子，业务逻辑全部下放到 modules/（本 wave-0 抽出 SessionsPane 181 行 + SearchResultsPane 55 行让 App.tsx 压到 99 行）
+- **2026-07-28 v5 D5**：`ProjectList.tsx` 全代码库 0 引用孤儿组件，`git rm` 删（不留死代码）
 
 ## 14. 用户语言
 

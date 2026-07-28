@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Card, Button, Typography, Space, message } from 'antd';
 import { CopyOutlined, CheckOutlined, PlayCircleOutlined } from '@ant-design/icons';
-import type { ResumeCommand } from '../types';
+import type { ResumeCommand } from '../../types';
 
 interface Props {
   sessionId: string | null;

@@ -1,13 +1,13 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Empty, Tag, Card } from 'antd';
-import { api } from '../api';
+import { api } from '../../api';
 import type {
   ProjectTreeNode,
   SessionRow,
   MessageRow,
   SearchHit,
   ResumeCommand,
-} from '../types';
+} from '../../types';
 import { SearchBar } from './SearchBar';
 import { ProjectTree } from './ProjectTree';
 import { SessionList } from './SessionList';
@@ -16,7 +16,7 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { RecycleBinView } from './RecycleBinView';
 import { ResumeCommandCard } from './ResumeCommandCard';
 import { SearchResultsPane } from './SearchResultsPane';
-import { useSearch, type TimeRange } from '../hooks/useSearch';
+import { useSearch, type TimeRange } from '../../hooks/useSearch';
 
 export const SessionsPane: React.FC = () => {
   const [tree, setTree] = useState<ProjectTreeNode[]>([]);
@@ -60,7 +60,7 @@ export const SessionsPane: React.FC = () => {
     (async () => {
       const t = await api.listProjectTree();
       setTree(t);
-      setFlatProjects(t.map((n) => ({ id: n.id, name: n.name })));
+      setFlatProjects(t.map((n: ProjectTreeNode) => ({ id: n.id, name: n.name })));
     })();
   }, [refreshKey]);
 

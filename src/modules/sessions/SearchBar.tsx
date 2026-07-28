@@ -1,7 +1,7 @@
 import React from 'react';
 import { Input, Select, Button, Space } from 'antd';
 import { SearchOutlined, DeleteOutlined } from '@ant-design/icons';
-import type { TimeRange } from '../hooks/useSearch';
+import type { TimeRange } from '../../hooks/useSearch';
 
 interface Props {
   query: string;

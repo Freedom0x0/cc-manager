@@ -1,6 +1,6 @@
 import React from 'react';
 import { List, Empty } from 'antd';
-import type { ProjectTreeNode } from '../types';
+import type { ProjectTreeNode } from '../../types';
 
 interface Props {
   projects: ProjectTreeNode[];
