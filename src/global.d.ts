@@ -14,6 +14,9 @@ import type {
   McpServer,
   McpCreateInput,
   McpUpdatePatch,
+  Skill,
+  SkillCreateInput,
+  SkillUpdatePatch,
 } from './types';
 
 export type Api = {
@@ -42,6 +45,13 @@ export type Api = {
   mcpUpdate(name: string, patch: McpUpdatePatch): Promise<void>;
   mcpDelete(name: string): Promise<void>;
   mcpToggleEnabled(name: string, enabled: boolean): Promise<void>;
+  // v5 wave-1 Skills 模块 — 6 IPC channel
+  skillList(): Promise<Skill[]>;
+  skillGet(name: string): Promise<Skill | null>;
+  skillCreate(input: SkillCreateInput): Promise<void>;
+  skillUpdate(name: string, patch: SkillUpdatePatch): Promise<void>;
+  skillDelete(name: string): Promise<void>;
+  skillToggleEnabled(name: string, enabled: boolean): Promise<void>;
 };
 
 declare global {

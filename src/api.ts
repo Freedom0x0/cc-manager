@@ -10,6 +10,9 @@ import type {
   McpServer,
   McpCreateInput,
   McpUpdatePatch,
+  Skill,
+  SkillCreateInput,
+  SkillUpdatePatch,
 } from './types';
 
 export const api = {
@@ -44,4 +47,13 @@ export const api = {
   mcpDelete: (name: string): Promise<void> => window.api.mcpDelete(name),
   mcpToggleEnabled: (name: string, enabled: boolean): Promise<void> =>
     window.api.mcpToggleEnabled(name, enabled),
+  // v5 wave-1 Skills 模块 — 6 IPC 包装
+  skillList: (): Promise<Skill[]> => window.api.skillList(),
+  skillGet: (name: string): Promise<Skill | null> => window.api.skillGet(name),
+  skillCreate: (input: SkillCreateInput): Promise<void> => window.api.skillCreate(input),
+  skillUpdate: (name: string, patch: SkillUpdatePatch): Promise<void> =>
+    window.api.skillUpdate(name, patch),
+  skillDelete: (name: string): Promise<void> => window.api.skillDelete(name),
+  skillToggleEnabled: (name: string, enabled: boolean): Promise<void> =>
+    window.api.skillToggleEnabled(name, enabled),
 };

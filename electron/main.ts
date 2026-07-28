@@ -11,6 +11,7 @@ import * as searchRepo from './repo/search';
 import * as treeRepo from './repo/tree';
 import * as watcherStateRepo from './repo/watcher-state';
 import * as mcpRepo from './repo/mcp';
+import * as skillsRepo from './repo/skills';
 import { buildResumeCommand } from './resumer';
 import { startWatcher } from './watcher';
 
@@ -160,6 +161,21 @@ app.whenReady().then(() => {
   ipcMain.handle('mcp_delete', (_e, name: string) => mcpRepo.deleteMcpServer(name));
   ipcMain.handle('mcp_toggle_enabled', (_e, name: string, enabled: boolean) => {
     mcpRepo.setEnabled(db, name, enabled);
+  });
+
+  // v5 wave-1 Skills 模块 — 6 IPC channel。create/update/delete 改
+  // ~/.claude/skills/<name>/SKILL.md(原子写);list/get 注入 enabled 状态
+  // (从 mcp_server_state KV 表读,key 前缀 'skill:enabled:<name>');
+  // toggle_enabled 写 KV 表(不污染原文件 — D6 决策延伸)。
+  ipcMain.handle('skill_list', () => skillsRepo.listSkills(db));
+  ipcMain.handle('skill_get', (_e, name: string) => skillsRepo.getSkill(db, name));
+  ipcMain.handle('skill_create', (_e, input) => skillsRepo.createSkill(input));
+  ipcMain.handle('skill_update', (_e, name: string, patch) =>
+    skillsRepo.updateSkill(name, patch)
+  );
+  ipcMain.handle('skill_delete', (_e, name: string) => skillsRepo.deleteSkill(name));
+  ipcMain.handle('skill_toggle_enabled', (_e, name: string, enabled: boolean) => {
+    skillsRepo.setEnabled(db, name, enabled);
   });
 
   createWindow();

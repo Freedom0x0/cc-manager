@@ -3,7 +3,7 @@
 // and take screenshots. The real Electron IPC is unaffected.
 
 import { testProjects, testSessions, testMessages, testSearchHits, testProjectTree } from './mock-data';
-import type { McpServer } from './types';
+import type { McpServer, Skill } from './types';
 
 // v5 wave-1 MCP 模块 fixture。浏览器 dev 模式(纯 vite serve)用,
 const testMcpServers: McpServer[] = [
@@ -23,6 +23,27 @@ const testMcpServers: McpServer[] = [
     description: 'GitHub integration',
     enabled: false,
     source: 'global',
+  },
+];
+
+// v5 wave-1 Skills 模块 fixture。浏览器 dev 模式(纯 vite serve)用,
+const testSkills: Skill[] = [
+  {
+    name: 'commit-helper',
+    path: 'C:/Users/15532/.claude/skills/commit-helper',
+    description: 'Generate commit message from staged diff',
+    allowedTools: ['Bash', 'Read'],
+    enabled: true,
+    version: '1.0.0',
+    body: 'When the user asks to commit, generate a message following Conventional Commits.',
+  },
+  {
+    name: 'code-review',
+    path: 'C:/Users/15532/.claude/skills/code-review',
+    description: 'Review code for style and bugs',
+    allowedTools: ['Read', 'Grep'],
+    enabled: false,
+    body: 'Review the code in the current directory.',
   },
 ];
 
@@ -103,6 +124,33 @@ if (typeof window !== 'undefined' && !window.api) {
     mcpToggleEnabled: (name, enabled) => {
       const idx = testMcpServers.findIndex((s) => s.name === name);
       if (idx >= 0) testMcpServers[idx] = { ...testMcpServers[idx], enabled };
+      return ok(undefined);
+    },
+    // v5 wave-1 Skills 模块 — 6 mock(浏览器 dev 用,内存 fixture)
+    skillList: () => ok(testSkills),
+    skillGet: (name) => ok(testSkills.find((s) => s.name === name) ?? null),
+    skillCreate: (input) => {
+      testSkills.push({
+        ...input,
+        path: `C:/Users/15532/.claude/skills/${input.name}`,
+        enabled: true,
+        body: input.body ?? '',
+      });
+      return ok(undefined);
+    },
+    skillUpdate: (name, patch) => {
+      const idx = testSkills.findIndex((s) => s.name === name);
+      if (idx >= 0) testSkills[idx] = { ...testSkills[idx], ...patch };
+      return ok(undefined);
+    },
+    skillDelete: (name) => {
+      const idx = testSkills.findIndex((s) => s.name === name);
+      if (idx >= 0) testSkills.splice(idx, 1);
+      return ok(undefined);
+    },
+    skillToggleEnabled: (name, enabled) => {
+      const idx = testSkills.findIndex((s) => s.name === name);
+      if (idx >= 0) testSkills[idx] = { ...testSkills[idx], enabled };
       return ok(undefined);
     },
   };

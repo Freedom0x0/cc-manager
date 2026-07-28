@@ -103,3 +103,38 @@ export interface McpUpdatePatch {
   env?: Record<string, string>;
   description?: string;
 }
+
+/**
+ * Skill — 跨层共享类型(CLAUDE.md §5)
+ *
+ * 与 electron/repo/skills/types.ts 中的 Skill **同形**(字段名 + 类型一致)。
+ * 双修:任何字段重命名都要同步改 electron 侧。
+ *
+ * v5 wave-1 Skills 模块:从 ~/.claude/skills/<name>/SKILL.md 读 frontmatter
+ * → 注入 enabled(KV 表 key 前缀 'skill:enabled:<name>')→ UI 渲染。
+ * createSkill 接收 SkillCreateInput;updateSkill 接收 SkillUpdatePatch。
+ */
+export interface Skill {
+  name: string;
+  path: string;
+  description: string;
+  allowedTools?: string[];
+  enabled: boolean;
+  version?: string;
+  body: string;
+}
+
+export interface SkillCreateInput {
+  name: string;
+  description: string;
+  body?: string;
+  allowedTools?: string[];
+  version?: string;
+}
+
+export interface SkillUpdatePatch {
+  description?: string;
+  allowedTools?: string[];
+  version?: string;
+  body?: string;
+}

@@ -30,4 +30,12 @@ contextBridge.exposeInMainWorld('api', {
   mcpDelete: (name: string) => ipcRenderer.invoke('mcp_delete', name),
   mcpToggleEnabled: (name: string, enabled: boolean) =>
     ipcRenderer.invoke('mcp_toggle_enabled', name, enabled),
+  // v5 wave-1 Skills 模块 — 6 IPC invoke
+  skillList: () => ipcRenderer.invoke('skill_list'),
+  skillGet: (name: string) => ipcRenderer.invoke('skill_get', name),
+  skillCreate: (input) => ipcRenderer.invoke('skill_create', input),
+  skillUpdate: (name: string, patch) => ipcRenderer.invoke('skill_update', name, patch),
+  skillDelete: (name: string) => ipcRenderer.invoke('skill_delete', name),
+  skillToggleEnabled: (name: string, enabled: boolean) =>
+    ipcRenderer.invoke('skill_toggle_enabled', name, enabled),
 });
