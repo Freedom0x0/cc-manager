@@ -4,17 +4,17 @@
 import type { SessionRow, ProjectTreeNode } from './types';
 
 export const testProjects = [
-  { id: 1, path: 'C:/Users/15532/Desktop/prompt', name: 'prompt', sessionCount: 3 },
-  { id: 2, path: 'C:/Users/15532/Desktop/cc-session-manager', name: 'cc-session-manager', sessionCount: 2 },
-  { id: 3, path: 'C:/Users/15532/Desktop/xj/peaks-loop', name: 'peaks-loop', sessionCount: 4 },
+  { id: 1, path: 'C:/Users/15532/.claude/projects/C--Users-15532-Desktop-prompt', name: 'prompt', sessionCount: 3 },
+  { id: 2, path: 'C:/Users/15532/.claude/projects/C--Users-15532-Desktop-cc-session-manager', name: 'cc-session-manager', sessionCount: 2 },
+  { id: 3, path: 'C:/Users/15532/.claude/projects/C--Users-15532-Desktop-xj-peaks-loop', name: 'peaks-loop', sessionCount: 4 },
 ];
 
 export const testProjectTree: ProjectTreeNode[] = [
-  { id: 100, name: 'react-prompt-editor', path: 'C:/Users/15532/Desktop/prompt/react-prompt-editor', sessionCount: 2 },
-  { id: 101, name: 'boss-prompts-manager', path: 'C:/Users/15532/Desktop/prompt/boss-prompts-manager', sessionCount: 0 },
-  { id: 200, name: 'cc-session-manager', path: 'C:/Users/15532/Desktop/cc-session-manager', sessionCount: 2 },
-  { id: 300, name: 'peaks-loop', path: 'C:/Users/15532/Desktop/xj/peaks-loop', sessionCount: 1 },
-  { id: 301, name: 'peaks-code', path: 'C:/Users/15532/Desktop/xj/peaks-loop/peaks-code', sessionCount: 0 },
+  { id: 100, name: 'react-prompt-editor', path: 'C:/Users/15532/.claude/projects/C--Users-15532-Desktop-prompt-react-prompt-editor', sessionCount: 2 },
+  { id: 101, name: 'boss-prompts-manager', path: 'C:/Users/15532/.claude/projects/C--Users-15532-Desktop-prompt-boss-prompts-manager', sessionCount: 0 },
+  { id: 200, name: 'cc-session-manager', path: 'C:/Users/15532/.claude/projects/C--Users-15532-Desktop-cc-session-manager', sessionCount: 2 },
+  { id: 300, name: 'peaks-loop', path: 'C:/Users/15532/.claude/projects/C--Users-15532-Desktop-xj-peaks-loop', sessionCount: 1 },
+  { id: 301, name: 'peaks-code', path: 'C:/Users/15532/.claude/projects/C--Users-15532-Desktop-xj-peaks-loop-peaks-code', sessionCount: 0 },
 ];
 
 export type TestSession = SessionRow & { isDeleted?: 0 | 1 };
@@ -30,6 +30,7 @@ export const testSessions: TestSession[] = [
     messageCount: 8,
     sourceFile: 'C:/Users/15532/Desktop/prompt/sess-prompt-1.jsonl',
     firstUserMessage: '用 claude code 改写登录 token 过期逻辑',
+    cwd: 'C:/Users/15532/Desktop/prompt',
   },
   {
     id: 2,
@@ -41,6 +42,7 @@ export const testSessions: TestSession[] = [
     messageCount: 12,
     sourceFile: 'C:/Users/15532/Desktop/prompt/sess-prompt-2.jsonl',
     firstUserMessage: '新增 /api/users 路由',
+    cwd: 'C:/Users/15532/Desktop/prompt',
   },
   {
     id: 3,
@@ -52,6 +54,7 @@ export const testSessions: TestSession[] = [
     messageCount: 5,
     sourceFile: 'C:/Users/15532/Desktop/prompt/sess-prompt-3.jsonl',
     firstUserMessage: '修复 react-prompt-editor 选区 bug',
+    cwd: 'C:/Users/15532/Desktop/prompt/react-prompt-editor',
   },
   {
     id: 4,
@@ -63,6 +66,7 @@ export const testSessions: TestSession[] = [
     messageCount: 6,
     sourceFile: 'C:/Users/15532/Desktop/cc-session-manager/sess-ccsm-1.jsonl',
     firstUserMessage: '目前我在用claude code做开发，但是我发现会话很难管理',
+    cwd: 'C:/Users/15532/Desktop/cc-session-manager',
   },
   {
     id: 5,
@@ -74,6 +78,7 @@ export const testSessions: TestSession[] = [
     messageCount: 4,
     sourceFile: 'C:/Users/15532/Desktop/cc-session-manager/sess-ccsm-2.jsonl',
     firstUserMessage: 'Tauri 还是 Electron',
+    cwd: 'C:/Users/15532/Desktop/cc-session-manager',
   },
   {
     id: 6,
@@ -85,6 +90,7 @@ export const testSessions: TestSession[] = [
     messageCount: 10,
     sourceFile: 'C:/Users/15532/Desktop/xj/peaks-loop/sess-peaks-1.jsonl',
     firstUserMessage: 'peaks-loop 子代理调度',
+    cwd: 'C:/Users/15532/Desktop/xj/peaks-loop',
   },
   {
     id: 7,
@@ -96,6 +102,7 @@ export const testSessions: TestSession[] = [
     messageCount: 14,
     sourceFile: 'C:/Users/15532/Desktop/xj/peaks-loop/sess-peaks-2.jsonl',
     firstUserMessage: 'Karpathy 4 准则落地',
+    cwd: 'C:/Users/15532/Desktop/xj/peaks-loop',
   },
   {
     id: 8,
@@ -107,6 +114,7 @@ export const testSessions: TestSession[] = [
     messageCount: 7,
     sourceFile: 'C:/Users/15532/Desktop/xj/peaks-loop/sess-peaks-3.jsonl',
     firstUserMessage: 'brainstorming skill 触发条件',
+    cwd: 'C:/Users/15532/Desktop/xj/peaks-loop',
   },
   {
     id: 9,
@@ -118,6 +126,7 @@ export const testSessions: TestSession[] = [
     messageCount: 9,
     sourceFile: 'C:/Users/15532/Desktop/xj/peaks-loop/sess-peaks-4.jsonl',
     firstUserMessage: 'session checkpoint 上下文溢出处理',
+    cwd: 'C:/Users/15532/Desktop/xj/peaks-loop',
     isDeleted: 1, // demo: one session already in recycle bin
   },
 ];

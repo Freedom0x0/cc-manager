@@ -9,17 +9,21 @@ CREATE TABLE IF NOT EXISTS projects (
   id INTEGER PRIMARY KEY,
   project_path TEXT UNIQUE NOT NULL,
   name TEXT NOT NULL,
+  cwd TEXT,
   parent_project_id INTEGER REFERENCES projects(id),
-  imported_at INTEGER NOT NULL
+  imported_at INTEGER NOT NULL,
+  is_archived INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_projects_parent ON projects(parent_project_id);
+CREATE INDEX IF NOT EXISTS idx_projects_archived ON projects(is_archived);
 
 CREATE TABLE IF NOT EXISTS sessions (
   id INTEGER PRIMARY KEY,
   session_id TEXT UNIQUE NOT NULL,
   project_id INTEGER NOT NULL,
   title TEXT,
+  cwd TEXT,
   started_at INTEGER NOT NULL,
   last_message_at INTEGER NOT NULL,
   message_count INTEGER NOT NULL,
@@ -76,6 +80,22 @@ export function initDB(dbPath: string): DB {
   if (!cols.some((c) => c.name === 'parent_project_id')) {
     db.exec("ALTER TABLE projects ADD COLUMN parent_project_id INTEGER REFERENCES projects(id)");
     db.exec("CREATE INDEX IF NOT EXISTS idx_projects_parent ON projects(parent_project_id)");
+  }
+  // Migration: add cwd to sessions for v4 (resumer needs session's actual cwd, not the folder)
+  const sessCols = db.prepare("PRAGMA table_info(sessions)").all() as { name: string }[];
+  if (!sessCols.some((c) => c.name === 'cwd')) {
+    db.exec("ALTER TABLE sessions ADD COLUMN cwd TEXT");
+  }
+  // Migration: add is_archived to projects for v4 (hide pre-v4 fake projects whose path
+  // is a cwd, not a ~/.claude/projects/<folder> entry)
+  const projCols = db.prepare("PRAGMA table_info(projects)").all() as { name: string }[];
+  if (!projCols.some((c) => c.name === 'is_archived')) {
+    db.exec("ALTER TABLE projects ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0");
+    db.exec("CREATE INDEX IF NOT EXISTS idx_projects_archived ON projects(is_archived)");
+  }
+  // Migration: add cwd to projects for v4 (real display name = basename(cwd))
+  if (!projCols.some((c) => c.name === 'cwd')) {
+    db.exec("ALTER TABLE projects ADD COLUMN cwd TEXT");
   }
   return db;
 }

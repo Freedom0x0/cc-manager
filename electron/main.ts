@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
 import { initDB, DB } from './db/connection';
-import { scanSourceDir, importFile } from './importer';
+import { scanProjectFolders, importProjectFolder, importFile, archiveLegacyFakeProjects } from './importer';
 import * as projectsRepo from './repo/projects';
 import * as sessionsRepo from './repo/sessions';
 import * as messagesRepo from './repo/messages';
@@ -65,18 +65,21 @@ app.whenReady().then(() => {
     try {
       const home = os.homedir();
       const sourceDir = path.join(home, '.claude', 'projects');
+      // v4 migration: hide pre-v4 fake projects (path is a cwd, not a ~/.claude/projects/ folder)
+      const archived = archiveLegacyFakeProjects(db, sourceDir);
+      if (archived > 0) log('archived', archived, 'legacy fake projects');
       log('scanning', sourceDir);
-      const files = scanSourceDir(sourceDir);
-      log('found', files.length, 'jsonl files');
+      const folders = scanProjectFolders(sourceDir);
+      log('found', folders.length, 'project folders');
       let ok = 0, fail = 0;
-      for (const file of files) {
+      for (const folder of folders) {
         try {
-          const s = importFile(db, file);
+          importProjectFolder(db, folder);
           ok++;
-          if (ok % 20 === 0) log('imported', ok, '/', files.length);
+          if (ok % 5 === 0) log('imported', ok, '/', folders.length, 'folders');
         } catch (e) {
           fail++;
-          log('import FAIL', file, e instanceof Error ? e.message : String(e));
+          log('import FAIL', folder.folderPath, e instanceof Error ? e.message : String(e));
         }
       }
       log('import done. ok=' + ok + ' fail=' + fail);

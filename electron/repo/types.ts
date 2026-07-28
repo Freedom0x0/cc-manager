@@ -10,6 +10,7 @@ export interface SessionRow {
   sessionId: string;
   projectId: number;
   title: string | null;
+  cwd: string | null;
   startedAt: number;
   lastMessageAt: number;
   messageCount: number;

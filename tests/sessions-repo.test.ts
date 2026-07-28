@@ -49,3 +49,11 @@ test('permanent delete removes messages', () => {
   closeDB(db);
   assert.strictEqual(count, 0);
 });
+
+test('v4: get() returns cwd from sessions table', () => {
+  const { db } = setup();
+  const s = get(db, 'sess-1');
+  closeDB(db);
+  assert.ok(s);
+  assert.strictEqual(s!.cwd, 'C:/Users/test/prompt/react-prompt-editor');
+});

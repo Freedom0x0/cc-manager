@@ -14,6 +14,7 @@ export function listProjectTree(db: DB): ProjectTreeNode[] {
          WHERE is_deleted = 0
          GROUP BY project_id
        ) c ON c.project_id = p.id
+       WHERE p.is_archived = 0
        ORDER BY p.name`
     )
     .all() as ProjectTreeNode[];

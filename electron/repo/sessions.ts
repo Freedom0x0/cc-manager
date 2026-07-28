@@ -2,7 +2,7 @@ import { DB } from '../db/connection';
 import { SessionRow } from './types';
 
 const SELECT_FIELDS = `
-  s.id, s.session_id AS sessionId, s.project_id AS projectId, s.title,
+  s.id, s.session_id AS sessionId, s.project_id AS projectId, s.title, s.cwd,
   s.started_at AS startedAt, s.last_message_at AS lastMessageAt,
   s.message_count AS messageCount, s.source_file AS sourceFile,
   (SELECT content FROM messages WHERE session_id = s.session_id AND role = 'user' ORDER BY created_at ASC LIMIT 1) AS firstUserMessage
