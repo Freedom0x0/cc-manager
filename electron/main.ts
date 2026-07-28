@@ -13,6 +13,7 @@ import * as watcherStateRepo from './repo/watcher-state';
 import * as mcpRepo from './repo/mcp';
 import * as skillsRepo from './repo/skills';
 import * as commandsRepo from './repo/commands';
+import * as subAgentsRepo from './repo/sub-agents';
 import { buildResumeCommand } from './resumer';
 import { startWatcher } from './watcher';
 
@@ -192,6 +193,21 @@ app.whenReady().then(() => {
   ipcMain.handle('command_delete', (_e, name: string) => commandsRepo.deleteCommand(name));
   ipcMain.handle('command_toggle_enabled', (_e, name: string, enabled: boolean) => {
     commandsRepo.setEnabled(db, name, enabled);
+  });
+
+  // v5 wave-2 Sub-Agents 模块 — 6 IPC channel。create/update/delete 改
+  // ~/.claude/agents/<name>.md 单文件(原子写);list/get 注入 enabled 状态
+  // (从 mcp_server_state KV 表读,key 前缀 'agent:enabled:<name>');
+  // toggle_enabled 写 KV 表(不污染原文件 — D6 决策延伸)。
+  ipcMain.handle('subagent_list', () => subAgentsRepo.listSubAgents(db));
+  ipcMain.handle('subagent_get', (_e, name: string) => subAgentsRepo.getSubAgent(db, name));
+  ipcMain.handle('subagent_create', (_e, input) => subAgentsRepo.createSubAgent(input));
+  ipcMain.handle('subagent_update', (_e, name: string, patch) =>
+    subAgentsRepo.updateSubAgent(name, patch)
+  );
+  ipcMain.handle('subagent_delete', (_e, name: string) => subAgentsRepo.deleteSubAgent(name));
+  ipcMain.handle('subagent_toggle_enabled', (_e, name: string, enabled: boolean) => {
+    subAgentsRepo.setEnabled(db, name, enabled);
   });
 
   createWindow();

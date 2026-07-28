@@ -3,7 +3,7 @@
 // and take screenshots. The real Electron IPC is unaffected.
 
 import { testProjects, testSessions, testMessages, testSearchHits, testProjectTree } from './mock-data';
-import type { McpServer, Skill, Command } from './types';
+import type { McpServer, Skill, Command, SubAgent } from './types';
 
 // v5 wave-1 MCP 模块 fixture。浏览器 dev 模式(纯 vite serve)用,
 const testMcpServers: McpServer[] = [
@@ -63,6 +63,26 @@ const testSkills: Skill[] = [
     allowedTools: ['Read', 'Grep'],
     enabled: false,
     body: 'Review the code in the current directory.',
+  },
+];
+
+// v5 wave-2 Sub-Agents 模块 fixture。浏览器 dev 模式(纯 vite serve)用,
+// 同 commands/skills 结构但存 ~/.claude/agents/<name>.md 单文件。
+const testSubAgents: SubAgent[] = [
+  {
+    name: 'explore',
+    path: 'C:/Users/15532/.claude/agents/explore.md',
+    description: 'Read-only code exploration agent',
+    argumentHint: '<path>',
+    enabled: true,
+    body: 'Use Glob/Grep/Read to explore the codebase without modifying files.',
+  },
+  {
+    name: 'plan',
+    path: 'C:/Users/15532/.claude/agents/plan.md',
+    description: 'Plan a multi-step implementation',
+    enabled: false,
+    body: 'Analyze requirements and propose a phased plan before code changes.',
   },
 ];
 
@@ -197,6 +217,33 @@ if (typeof window !== 'undefined' && !window.api) {
     commandToggleEnabled: (name, enabled) => {
       const idx = testCommands.findIndex((c) => c.name === name);
       if (idx >= 0) testCommands[idx] = { ...testCommands[idx], enabled };
+      return ok(undefined);
+    },
+    // v5 wave-2 Sub-Agents 模块 — 6 mock(浏览器 dev 用,内存 fixture)
+    subagentList: () => ok(testSubAgents),
+    subagentGet: (name) => ok(testSubAgents.find((a) => a.name === name) ?? null),
+    subagentCreate: (input) => {
+      testSubAgents.push({
+        ...input,
+        path: `C:/Users/15532/.claude/agents/${input.name}.md`,
+        enabled: true,
+        body: input.body ?? '',
+      });
+      return ok(undefined);
+    },
+    subagentUpdate: (name, patch) => {
+      const idx = testSubAgents.findIndex((a) => a.name === name);
+      if (idx >= 0) testSubAgents[idx] = { ...testSubAgents[idx], ...patch };
+      return ok(undefined);
+    },
+    subagentDelete: (name) => {
+      const idx = testSubAgents.findIndex((a) => a.name === name);
+      if (idx >= 0) testSubAgents.splice(idx, 1);
+      return ok(undefined);
+    },
+    subagentToggleEnabled: (name, enabled) => {
+      const idx = testSubAgents.findIndex((a) => a.name === name);
+      if (idx >= 0) testSubAgents[idx] = { ...testSubAgents[idx], enabled };
       return ok(undefined);
     },
   };

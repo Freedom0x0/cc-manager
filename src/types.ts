@@ -172,3 +172,37 @@ export interface CommandUpdatePatch {
   argumentHint?: string;
   body?: string;
 }
+
+/**
+ * SubAgent — 跨层共享类型(CLAUDE.md §5)
+ *
+ * 与 electron/repo/sub-agents/types.ts 中的 SubAgent **同形**(字段名 + 类型一致)。
+ * 双修:任何字段重命名都要同步改 electron 侧。
+ *
+ * v5 wave-2 Sub-Agents 模块:从 ~/.claude/agents/<name>.md 单文件读 frontmatter
+ * → 注入 enabled(KV 表 key 前缀 'agent:enabled:<name>')→ UI 渲染。
+ * createSubAgent 接收 SubAgentCreateInput;updateSubAgent 接收 SubAgentUpdatePatch。
+ *
+ * 与 Command 同结构:都是**单文件**而非目录,frontmatter + body 格式相同。
+ */
+export interface SubAgent {
+  name: string;
+  path: string;
+  description: string;
+  argumentHint?: string;
+  enabled: boolean;
+  body: string;
+}
+
+export interface SubAgentCreateInput {
+  name: string;
+  description: string;
+  body?: string;
+  argumentHint?: string;
+}
+
+export interface SubAgentUpdatePatch {
+  description?: string;
+  argumentHint?: string;
+  body?: string;
+}

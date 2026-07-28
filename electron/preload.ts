@@ -40,6 +40,17 @@ interface CommandUpdatePatch {
   argumentHint?: string;
   body?: string;
 }
+interface SubAgentCreateInput {
+  name: string;
+  description: string;
+  body?: string;
+  argumentHint?: string;
+}
+interface SubAgentUpdatePatch {
+  description?: string;
+  argumentHint?: string;
+  body?: string;
+}
 
 contextBridge.exposeInMainWorld('api', {
   listProjects: () => ipcRenderer.invoke('list_projects'),
@@ -87,4 +98,12 @@ contextBridge.exposeInMainWorld('api', {
   commandDelete: (name: string) => ipcRenderer.invoke('command_delete', name),
   commandToggleEnabled: (name: string, enabled: boolean) =>
     ipcRenderer.invoke('command_toggle_enabled', name, enabled),
+  // v5 wave-2 Sub-Agents 模块 — 6 IPC invoke
+  subagentList: () => ipcRenderer.invoke('subagent_list'),
+  subagentGet: (name: string) => ipcRenderer.invoke('subagent_get', name),
+  subagentCreate: (input: SubAgentCreateInput) => ipcRenderer.invoke('subagent_create', input),
+  subagentUpdate: (name: string, patch: SubAgentUpdatePatch) => ipcRenderer.invoke('subagent_update', name, patch),
+  subagentDelete: (name: string) => ipcRenderer.invoke('subagent_delete', name),
+  subagentToggleEnabled: (name: string, enabled: boolean) =>
+    ipcRenderer.invoke('subagent_toggle_enabled', name, enabled),
 });

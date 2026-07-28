@@ -20,6 +20,9 @@ import type {
   Command,
   CommandCreateInput,
   CommandUpdatePatch,
+  SubAgent,
+  SubAgentCreateInput,
+  SubAgentUpdatePatch,
 } from './types';
 
 export type Api = {
@@ -62,6 +65,13 @@ export type Api = {
   commandUpdate(name: string, patch: CommandUpdatePatch): Promise<void>;
   commandDelete(name: string): Promise<void>;
   commandToggleEnabled(name: string, enabled: boolean): Promise<void>;
+  // v5 wave-2 Sub-Agents 模块 — 6 IPC channel
+  subagentList(): Promise<SubAgent[]>;
+  subagentGet(name: string): Promise<SubAgent | null>;
+  subagentCreate(input: SubAgentCreateInput): Promise<void>;
+  subagentUpdate(name: string, patch: SubAgentUpdatePatch): Promise<void>;
+  subagentDelete(name: string): Promise<void>;
+  subagentToggleEnabled(name: string, enabled: boolean): Promise<void>;
 };
 
 declare global {

@@ -16,6 +16,9 @@ import type {
   Command,
   CommandCreateInput,
   CommandUpdatePatch,
+  SubAgent,
+  SubAgentCreateInput,
+  SubAgentUpdatePatch,
 } from './types';
 
 export const api = {
@@ -68,4 +71,13 @@ export const api = {
   commandDelete: (name: string): Promise<void> => window.api.commandDelete(name),
   commandToggleEnabled: (name: string, enabled: boolean): Promise<void> =>
     window.api.commandToggleEnabled(name, enabled),
+  // v5 wave-2 Sub-Agents 模块 — 6 IPC 包装
+  subagentList: (): Promise<SubAgent[]> => window.api.subagentList(),
+  subagentGet: (name: string): Promise<SubAgent | null> => window.api.subagentGet(name),
+  subagentCreate: (input: SubAgentCreateInput): Promise<void> => window.api.subagentCreate(input),
+  subagentUpdate: (name: string, patch: SubAgentUpdatePatch): Promise<void> =>
+    window.api.subagentUpdate(name, patch),
+  subagentDelete: (name: string): Promise<void> => window.api.subagentDelete(name),
+  subagentToggleEnabled: (name: string, enabled: boolean): Promise<void> =>
+    window.api.subagentToggleEnabled(name, enabled),
 };
