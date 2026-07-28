@@ -51,6 +51,19 @@ export interface SearchHit {
   projectId: number;
 }
 
+export interface GlobalSearchHit {
+  id: string;
+  kind: 'project' | 'session' | 'message';
+  title: string;
+  subtitle?: string;
+}
+
+export interface WatcherStatus {
+  status: 'starting' | 'idle' | 'error';
+  lastEvent?: string;
+  lastError?: string;
+}
+
 export interface ResumeCommand {
   command: string;
   cwd?: string;

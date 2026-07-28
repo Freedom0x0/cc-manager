@@ -1,4 +1,13 @@
-import type { ProjectRow, ProjectTreeNode, SessionRow, MessageRow, SearchHit, ResumeCommand } from './types';
+import type {
+  ProjectRow,
+  ProjectTreeNode,
+  SessionRow,
+  MessageRow,
+  SearchHit,
+  ResumeCommand,
+  GlobalSearchHit,
+  WatcherStatus,
+} from './types';
 
 export const api = {
   listProjects: (): Promise<ProjectRow[]> => window.api.listProjects(),
@@ -13,6 +22,10 @@ export const api = {
     fromMs: number | null,
     toMs: number | null
   ): Promise<SearchHit[]> => window.api.searchMessages(query, projectIds, fromMs, toMs),
+  globalSearch: (query: string, limit: number): Promise<GlobalSearchHit[]> =>
+    window.api.globalSearch(query, limit),
+  watcherRescanAll: (): Promise<{ ok: true }> => window.api.watcherRescanAll(),
+  watcherGetStatus: (): Promise<WatcherStatus> => window.api.watcherGetStatus(),
   softDeleteSession: (sessionId: string): Promise<void> => window.api.softDeleteSession(sessionId),
   restoreSession: (sessionId: string): Promise<void> => window.api.restoreSession(sessionId),
   permanentDeleteSession: (sessionId: string): Promise<void> =>

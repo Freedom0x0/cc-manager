@@ -9,6 +9,7 @@ import * as sessionsRepo from './repo/sessions';
 import * as messagesRepo from './repo/messages';
 import * as searchRepo from './repo/search';
 import * as treeRepo from './repo/tree';
+import * as watcherStateRepo from './repo/watcher-state';
 import { buildResumeCommand } from './resumer';
 
 let db: DB;
@@ -107,6 +108,20 @@ app.whenReady().then(() => {
         fromMs !== null && toMs !== null ? { from: fromMs, to: toMs } : null
       )
   );
+  ipcMain.handle('global_search', (_e, query: string, limit: number) =>
+    searchRepo.globalSearch(db, query, limit)
+  );
+  ipcMain.handle('watcher_rescan_all', () => ({ ok: true }));
+  ipcMain.handle('watcher_get_status', () => {
+    const status = watcherStateRepo.getState(db, 'status') as 'starting' | 'idle' | 'error' | null;
+    const lastEvent = watcherStateRepo.getState(db, 'last_event');
+    const lastError = watcherStateRepo.getState(db, 'last_error');
+    return {
+      status: status ?? 'starting',
+      ...(lastEvent !== null ? { lastEvent } : {}),
+      ...(lastError !== null ? { lastError } : {}),
+    };
+  });
   ipcMain.handle('soft_delete_session', (_e, sessionId: string) =>
     sessionsRepo.softDelete(db, sessionId)
   );
