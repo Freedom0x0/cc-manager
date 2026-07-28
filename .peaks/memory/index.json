@@ -17,6 +17,13 @@
         "path": "2026-07-28-cc-session-manager-v1-v2-v3.md",
         "tags": ["project-history", "electron", "antd", "fts5"],
         "summary": "Tauri→Electron 切换、聚类算法 3 次迭代、UI 重构、坑修复；用户认知 vs 算法教训"
+      },
+      {
+        "id": "2026-07-28-cc-session-manager-v4",
+        "title": "cc-session-manager v4 修复",
+        "path": "2026-07-28-cc-session-manager-v4.md",
+        "tags": ["v4", "folder-semantics", "content-blocks", "resume-command"],
+        "summary": "folder 语义、content blocks 保留、resumer 改返回命令字符串、3 个 commit a806f43/50f0428/5901b6c"
       }
     ],
     "reference": []

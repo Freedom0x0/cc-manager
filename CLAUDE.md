@@ -141,6 +141,10 @@ cc-session-manager/
 - **2026-07-28** ：项目聚类采用"剥路径前缀"算法，最后 2 段 = top/sub；顶层有数字/短名（≤4 字符）作为个人命名空间时继续剥
 - **2026-07-28** ：UI 用 antd 6 全量引入，不按需（开发速度优先，体积非瓶颈）
 - **2026-07-28** ：Tree 默认折叠，用户可主动展开（v1 全展开体验过重）
+- **2026-07-28 v3** ：聚类简化为 `path.basename(cwd)`，单层扁平（v2 父子折叠用户嫌复杂）；删除 antd `Tree`，改用 `List`；删除 breadcrumb
+- **2026-07-28 v4** ：项目以 `~/.claude/projects/<folder>` 为单位入库（scanner 扫 folder 一级，不再递归 jsonl）；project.name 走 `path.basename(cwd)` 单源；新增 `projects.cwd` / `projects.is_archived` / `sessions.cwd` / `messages.content_blocks` 4 列；启动时一次性 migrate 把 v1-v3 误入库的 cwd-style 假 project 标 `is_archived=1`
+- **2026-07-28 v4** ：parser 同时返回纯文本 + 结构化 `ContentBlock[]`（text/tool_use/tool_result/thinking/unknown），MessageView 按 block type 渲染
+- **2026-07-28 v4** ：resumer 改为返回 `ResumeCommand { command, cwd? }` 字符串，spawn 代码 `// [停用]` 注释保留；UI 用 `ResumeCommandCard`（navigator.clipboard + execCommand 降级）展示可复制命令
 
 ## 14. 用户语言
 

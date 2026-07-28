@@ -3,7 +3,13 @@
   "mode": "full-auto",
   "gate": "startup",
   "sessionId": "2026-07-28-session-7a1223",
-  "outerSessionId": "fa507c55-7936-4a6a-be38-7caeb15ffba9",
-  "setAt": "2026-07-27T16:52:48.183Z",
-  "lastHeartbeat": "2026-07-27T16:52:48.183Z"
+  "outerSessionId": "81385428-a25a-4a70-956b-2ecd0977c4df",
+  "setAt": "2026-07-28T03:44:39.539Z",
+  "lastHeartbeat": "2026-07-28T03:44:39.539Z",
+  "outerSessionMismatch": {
+    "previous": "fa507c55-7936-4a6a-be38-7caeb15ffba9",
+    "current": "81385428-a25a-4a70-956b-2ecd0977c4df",
+    "boundSessionId": "2026-07-28-session-7a1223",
+    "boundOuterSessionId": "fa507c55-7936-4a6a-be38-7caeb15ffba9"
+  }
 }
