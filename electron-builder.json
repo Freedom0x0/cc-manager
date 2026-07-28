@@ -1,7 +1,38 @@
 {
-  "appId": "com.ccsessionmanager.app",
-  "productName": "cc-session-manager",
-  "directories": { "output": "release" },
-  "files": ["dist/**/*", "dist-electron/**/*", "package.json"],
-  "win": { "target": "nsis" }
+  "appId": "com.freedom0x0.cc-manager",
+  "productName": "CC Manager",
+  "copyright": "Copyright © 2026 Freedom0x0",
+  "directories": {
+    "output": "release",
+    "buildResources": "build"
+  },
+  "files": [
+    "dist/**/*",
+    "dist-electron/**/*",
+    "package.json"
+  ],
+  "win": {
+    "target": [
+      { "target": "nsis", "arch": ["x64"] },
+      { "target": "portable", "arch": ["x64"] }
+    ],
+    "icon": "build/icon.ico",
+    "artifactName": "${productName}-${version}-${arch}.${ext}"
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "CC Manager"
+  },
+  "portable": {
+    "artifactName": "${productName}-${version}-portable.${ext}"
+  },
+  "publish": {
+    "provider": "github",
+    "owner": "Freedom0x0",
+    "repo": "cc-manager"
+  }
 }
