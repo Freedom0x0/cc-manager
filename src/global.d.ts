@@ -11,6 +11,9 @@ import type {
   ResumeCommand,
   GlobalSearchHit,
   WatcherStatus,
+  McpServer,
+  McpCreateInput,
+  McpUpdatePatch,
 } from './types';
 
 export type Api = {
@@ -32,6 +35,12 @@ export type Api = {
   restoreSession(sessionId: string): Promise<void>;
   permanentDeleteSession(sessionId: string): Promise<void>;
   resumeSession(sessionId: string): Promise<ResumeCommand | null>;
+  // v5 wave-1 MCP 模块 — 5 IPC channel
+  mcpList(): Promise<McpServer[]>;
+  mcpGet(name: string): Promise<McpServer | null>;
+  mcpCreate(input: McpCreateInput): Promise<void>;
+  mcpUpdate(name: string, patch: McpUpdatePatch): Promise<void>;
+  mcpDelete(name: string): Promise<void>;
 };
 
 declare global {

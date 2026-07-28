@@ -22,4 +22,10 @@ contextBridge.exposeInMainWorld('api', {
   permanentDeleteSession: (sessionId: string) =>
     ipcRenderer.invoke('permanent_delete_session', sessionId),
   resumeSession: (sessionId: string) => ipcRenderer.invoke('resume_session', sessionId),
+  // v5 wave-1 MCP 模块 — 5 IPC invoke
+  mcpList: () => ipcRenderer.invoke('mcp_list'),
+  mcpGet: (name: string) => ipcRenderer.invoke('mcp_get', name),
+  mcpCreate: (input) => ipcRenderer.invoke('mcp_create', input),
+  mcpUpdate: (name: string, patch) => ipcRenderer.invoke('mcp_update', name, patch),
+  mcpDelete: (name: string) => ipcRenderer.invoke('mcp_delete', name),
 });

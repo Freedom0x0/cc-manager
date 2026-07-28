@@ -78,6 +78,18 @@ CREATE TABLE IF NOT EXISTS watcher_state (
   value TEXT,
   updated_at INTEGER NOT NULL
 );
+
+-- v5 wave-1 MCP 模块:enabled 状态 + last_modified 时间戳的 KV 表。
+-- 与 watcher_state 共用 3 列 KV 模型(key PRIMARY KEY / value / updated_at)— Simplicity First。
+-- key 约定:
+--   'enabled:<server-name>'        → 'true' / 'false'(用户 toggle 的启用状态,独立于原文件 ~/.claude.json)
+--   'last_modified:<server-name>'  → ISO timestamp(原文件 mcpServers[name] 的 mtime 字符串)
+-- 本表故意**不**存真实 mcpServers 配置:那是 scanner 读 ~/.claude.json 的事(D6 决策)。
+CREATE TABLE IF NOT EXISTS mcp_server_state (
+  key TEXT PRIMARY KEY,
+  value TEXT,
+  updated_at INTEGER NOT NULL
+);
 `;
 
 export function initDB(dbPath: string): DB {

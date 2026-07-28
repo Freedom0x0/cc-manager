@@ -7,6 +7,9 @@ import type {
   ResumeCommand,
   GlobalSearchHit,
   WatcherStatus,
+  McpServer,
+  McpCreateInput,
+  McpUpdatePatch,
 } from './types';
 
 export const api = {
@@ -32,4 +35,11 @@ export const api = {
     window.api.permanentDeleteSession(sessionId),
   resumeSession: (sessionId: string): Promise<ResumeCommand | null> =>
     window.api.resumeSession(sessionId),
+  // v5 wave-1 MCP 模块 — 5 IPC 包装
+  mcpList: (): Promise<McpServer[]> => window.api.mcpList(),
+  mcpGet: (name: string): Promise<McpServer | null> => window.api.mcpGet(name),
+  mcpCreate: (input: McpCreateInput): Promise<void> => window.api.mcpCreate(input),
+  mcpUpdate: (name: string, patch: McpUpdatePatch): Promise<void> =>
+    window.api.mcpUpdate(name, patch),
+  mcpDelete: (name: string): Promise<void> => window.api.mcpDelete(name),
 };

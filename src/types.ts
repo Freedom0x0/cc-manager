@@ -68,3 +68,38 @@ export interface ResumeCommand {
   command: string;
   cwd?: string;
 }
+
+/**
+ * McpServer — 跨层共享类型(CLAUDE.md §5)
+ *
+ * 与 electron/repo/mcp/types.ts 中的 McpServer **同形**(字段名 + 类型一致)。
+ * 双修:任何字段重命名都要同步改 electron 侧。
+ *
+ * v5 wave-1 MCP 模块:从 ~/.claude.json 读 mcpServers → 注入 enabled(KV 表)
+ * → UI 渲染。createMcpServer 接收的输入是 McpCreateInput(electron 侧定义);
+ * updateMcpServer 接收 McpUpdatePatch。
+ */
+export interface McpServer {
+  name: string;
+  command: string;
+  args: string[];
+  env?: Record<string, string>;
+  enabled: boolean;
+  description?: string;
+  source: 'global';
+}
+
+export interface McpCreateInput {
+  name: string;
+  command: string;
+  args: string[];
+  env?: Record<string, string>;
+  description?: string;
+}
+
+export interface McpUpdatePatch {
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  description?: string;
+}

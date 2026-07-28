@@ -10,6 +10,7 @@ import * as messagesRepo from './repo/messages';
 import * as searchRepo from './repo/search';
 import * as treeRepo from './repo/tree';
 import * as watcherStateRepo from './repo/watcher-state';
+import * as mcpRepo from './repo/mcp';
 import { buildResumeCommand } from './resumer';
 import { startWatcher } from './watcher';
 
@@ -148,6 +149,14 @@ app.whenReady().then(() => {
     const cwd = session.cwd || path.dirname(session.sourceFile);
     return buildResumeCommand(sessionId, cwd);
   });
+
+  // v5 wave-1 MCP 模块 — 5 IPC channel。create/update/delete 改 ~/.claude.json
+  // (原子写);list/get 注入 enabled 状态(从 mcp_server_state KV 表读)。
+  ipcMain.handle('mcp_list', () => mcpRepo.listMcpServers(db));
+  ipcMain.handle('mcp_get', (_e, name: string) => mcpRepo.getMcpServer(db, name));
+  ipcMain.handle('mcp_create', (_e, input) => mcpRepo.createMcpServer(input));
+  ipcMain.handle('mcp_update', (_e, name: string, patch) => mcpRepo.updateMcpServer(name, patch));
+  ipcMain.handle('mcp_delete', (_e, name: string) => mcpRepo.deleteMcpServer(name));
 
   createWindow();
 });

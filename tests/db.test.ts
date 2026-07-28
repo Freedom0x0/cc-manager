@@ -126,3 +126,47 @@ test('initDB creates watcher_state table for chokidar event tracking (v5 wave-0)
   closeDB(db);
 });
 
+test('initDB creates mcp_server_state table for MCP server enabled-state KV (v5 wave-1)', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ccsm-mcp-'));
+  const dbPath = path.join(tmp, 'app.db');
+  const db = initDB(dbPath);
+
+  // 表存在
+  const tableRows = db
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='mcp_server_state'")
+    .all() as { name: string }[];
+  assert.strictEqual(tableRows.length, 1, 'mcp_server_state table should exist after initDB');
+
+  // 3 列 KV 模型,与 watcher_state 同形(D1 Simplicity First:不偏离 KV 模型用 5 列模板)
+  const cols = db.prepare("PRAGMA table_info(mcp_server_state)").all() as { name: string }[];
+  const colNames = cols.map((c) => c.name).sort();
+  assert.deepStrictEqual(
+    colNames,
+    ['key', 'updated_at', 'value'],
+    'mcp_server_state should have key/value/updated_at columns (KV 模型)'
+  );
+  assert.strictEqual(cols.length, 3, 'mcp_server_state 应该精确 3 列(KV 模型)');
+
+  // KV 可读写,key 约定 'enabled:<name>' / 'last_modified:<name>'
+  db.prepare("INSERT INTO mcp_server_state (key, value, updated_at) VALUES (?, ?, ?)").run(
+    'enabled:filesystem',
+    'true',
+    Date.now()
+  );
+  db.prepare("INSERT INTO mcp_server_state (key, value, updated_at) VALUES (?, ?, ?)").run(
+    'last_modified:filesystem',
+    new Date().toISOString(),
+    Date.now()
+  );
+  const enabled = db
+    .prepare("SELECT value FROM mcp_server_state WHERE key = 'enabled:filesystem'")
+    .get() as { value: string };
+  const modified = db
+    .prepare("SELECT value FROM mcp_server_state WHERE key = 'last_modified:filesystem'")
+    .get() as { value: string };
+  assert.strictEqual(enabled.value, 'true', 'mcp_server_state enabled KV should round-trip');
+  assert.ok(modified.value.length > 0, 'mcp_server_state last_modified KV should round-trip');
+
+  closeDB(db);
+});
+
