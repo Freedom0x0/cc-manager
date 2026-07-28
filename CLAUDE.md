@@ -163,6 +163,7 @@ cc-session-manager/
 - **2026-07-28 v5 D3**：模块化目录 = `src/modules/` + `electron/repo/<module>/`（SessionsModule.tsx re-export 入口减少 import 噪音）
 - **2026-07-28 v5 D4**：App.tsx 改导航壳子，业务逻辑全部下放到 modules/（本 wave-0 抽出 SessionsPane 181 行 + SearchResultsPane 55 行让 App.tsx 压到 99 行）
 - **2026-07-28 v5 D5**：`ProjectList.tsx` 全代码库 0 引用孤儿组件，`git rm` 删（不留死代码）
+- **2026-07-28 v5 D6**：enabled 状态走 KV 表（`mcp_server_state.enabled:<name>` 或 `skill:` / `cmd:` 前缀），不复用原文件（避免污染 `~/.claude.json` / SKILL.md / commands/*.md 的语义）。这是 wave-1 v2.0 的核心约束 — 用户 toggle 不破坏原文件结构
 
 ## 14. 用户语言
 

@@ -26,3 +26,14 @@
 - 删孤儿组件 `ProjectList.tsx`(v3 残留,全代码库 0 引用,违反 D5)
 - 测试 28 → 44(基线 30 + 14 新 case,RD §4 估 28 偏旧)
 - npm test: 44 passed / 0 failed
+
+## v2.0 — 业务模块上线 (2026-07-29)
+
+- MCP 模块:扫描 `~/.claude.json` 的 mcpServers,看 / 改 / 删 / 启停 5 个 IPC(`mcp_list` / `mcp_get` / `mcp_create` / `mcp_update` / `mcp_delete` + `mcp_toggle_enabled`)
+- Skills 模块:扫描 `~/.claude/skills/<name>/SKILL.md`,看 / 改 / 删 / 启停 5 个 IPC(`skill_*` + `skill_toggle_enabled`)
+- Commands 模块:扫描 `~/.claude/commands/<name>.md`,看 / 改 / 删 / 启停 5 个 IPC(`command_*` + `command_toggle_enabled`)
+- 18 个新 IPC channel,每个模块 6 个(共 18 覆盖 3 模块)
+- enabled 状态写 `mcp_server_state` KV 表(D6 决策,不复用原文件,避免污染 ~/.claude.json)
+- McpManager / SkillsManager / CommandsManager 三个 UI 完整实装(各 ~150-330 行),antd List + Switch + Modal + Form
+- 测试 44 → 69(基线 30 + 14 wave-0 + 5 + 3 + 5 + 3 + 5 + 3 = 69)
+- npm test: 69 passed / 0 failed
