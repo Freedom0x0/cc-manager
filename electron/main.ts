@@ -11,6 +11,7 @@ import * as searchRepo from './repo/search';
 import * as treeRepo from './repo/tree';
 import * as watcherStateRepo from './repo/watcher-state';
 import { buildResumeCommand } from './resumer';
+import { startWatcher } from './watcher';
 
 let db: DB;
 
@@ -60,6 +61,15 @@ app.whenReady().then(() => {
   const dbPath = path.join(dataDir, 'app.db');
   db = initDB(dbPath);
   log('DB ready at', dbPath);
+
+  try {
+    const home = os.homedir();
+    const sourceDir = path.join(home, '.claude', 'projects');
+    startWatcher(db, sourceDir).catch((e) => log('startWatcher failed', e?.stack || String(e)));
+    log('watcher started on', sourceDir);
+  } catch (e) {
+    log('startWatcher init error', e instanceof Error ? e.stack : String(e));
+  }
 
   // Trigger first-run import (background, non-blocking)
   setTimeout(() => {
