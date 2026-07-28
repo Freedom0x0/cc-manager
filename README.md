@@ -163,8 +163,8 @@ cc-manager/
 
 ## 🙏 致谢
 
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) — Anthropic 的 CLI 工具，本项目读取它的 session 存储
-- [cc_switch](https://github.com/) — 灵感来源（本项目解决它的搜索弱问题）
+- [Claude Code](https://code.claude.com/docs/en/overview) — Anthropic 的 AI 编程工具，本项目读取它的 session 存储
+- [cc-switch-cli](https://github.com/SaladDay/cc-switch-cli) — 灵感来源（本项目解决它的搜索弱问题）
 - [Ant Design](https://ant.design/) — UI 组件库
 - [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) — 同步 SQLite 绑定
 - [electron-builder](https://www.electron.build/) — 打包工具
