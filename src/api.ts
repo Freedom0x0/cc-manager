@@ -13,6 +13,9 @@ import type {
   Skill,
   SkillCreateInput,
   SkillUpdatePatch,
+  Command,
+  CommandCreateInput,
+  CommandUpdatePatch,
 } from './types';
 
 export const api = {
@@ -56,4 +59,13 @@ export const api = {
   skillDelete: (name: string): Promise<void> => window.api.skillDelete(name),
   skillToggleEnabled: (name: string, enabled: boolean): Promise<void> =>
     window.api.skillToggleEnabled(name, enabled),
+  // v5 wave-1 Commands 模块 — 6 IPC 包装
+  commandList: (): Promise<Command[]> => window.api.commandList(),
+  commandGet: (name: string): Promise<Command | null> => window.api.commandGet(name),
+  commandCreate: (input: CommandCreateInput): Promise<void> => window.api.commandCreate(input),
+  commandUpdate: (name: string, patch: CommandUpdatePatch): Promise<void> =>
+    window.api.commandUpdate(name, patch),
+  commandDelete: (name: string): Promise<void> => window.api.commandDelete(name),
+  commandToggleEnabled: (name: string, enabled: boolean): Promise<void> =>
+    window.api.commandToggleEnabled(name, enabled),
 };

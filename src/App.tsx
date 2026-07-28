@@ -8,6 +8,7 @@ import { ComingSoon } from './components/ComingSoon';
 import { SessionsPane } from './modules/sessions/SessionsModule';
 import { McpManager } from './modules/mcp/McpManager';
 import { SkillsManager } from './modules/skills/SkillsManager';
+import { CommandsManager } from './modules/commands/CommandsManager';
 
 const { Header, Sider, Content } = Layout;
 
@@ -100,6 +101,8 @@ function App() {
             <McpManager />
           ) : activeTab === 'skills' ? (
             <SkillsManager />
+          ) : activeTab === 'commands' ? (
+            <CommandsManager />
           ) : (
             <ComingSoon label={TAB_LABELS[activeTab]} wave={TAB_WAVES[activeTab]} />
           )}

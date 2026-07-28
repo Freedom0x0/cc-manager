@@ -12,6 +12,7 @@ import * as treeRepo from './repo/tree';
 import * as watcherStateRepo from './repo/watcher-state';
 import * as mcpRepo from './repo/mcp';
 import * as skillsRepo from './repo/skills';
+import * as commandsRepo from './repo/commands';
 import { buildResumeCommand } from './resumer';
 import { startWatcher } from './watcher';
 
@@ -176,6 +177,21 @@ app.whenReady().then(() => {
   ipcMain.handle('skill_delete', (_e, name: string) => skillsRepo.deleteSkill(name));
   ipcMain.handle('skill_toggle_enabled', (_e, name: string, enabled: boolean) => {
     skillsRepo.setEnabled(db, name, enabled);
+  });
+
+  // v5 wave-1 Commands 模块 — 6 IPC channel。create/update/delete 改
+  // ~/.claude/commands/<name>.md 单文件(原子写);list/get 注入 enabled 状态
+  // (从 mcp_server_state KV 表读,key 前缀 'cmd:enabled:<name>');
+  // toggle_enabled 写 KV 表(不污染原文件 — D6 决策延伸)。
+  ipcMain.handle('command_list', () => commandsRepo.listCommands(db));
+  ipcMain.handle('command_get', (_e, name: string) => commandsRepo.getCommand(db, name));
+  ipcMain.handle('command_create', (_e, input) => commandsRepo.createCommand(input));
+  ipcMain.handle('command_update', (_e, name: string, patch) =>
+    commandsRepo.updateCommand(name, patch)
+  );
+  ipcMain.handle('command_delete', (_e, name: string) => commandsRepo.deleteCommand(name));
+  ipcMain.handle('command_toggle_enabled', (_e, name: string, enabled: boolean) => {
+    commandsRepo.setEnabled(db, name, enabled);
   });
 
   createWindow();

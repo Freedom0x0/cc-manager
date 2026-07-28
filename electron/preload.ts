@@ -38,4 +38,12 @@ contextBridge.exposeInMainWorld('api', {
   skillDelete: (name: string) => ipcRenderer.invoke('skill_delete', name),
   skillToggleEnabled: (name: string, enabled: boolean) =>
     ipcRenderer.invoke('skill_toggle_enabled', name, enabled),
+  // v5 wave-1 Commands 模块 — 6 IPC invoke
+  commandList: () => ipcRenderer.invoke('command_list'),
+  commandGet: (name: string) => ipcRenderer.invoke('command_get', name),
+  commandCreate: (input) => ipcRenderer.invoke('command_create', input),
+  commandUpdate: (name: string, patch) => ipcRenderer.invoke('command_update', name, patch),
+  commandDelete: (name: string) => ipcRenderer.invoke('command_delete', name),
+  commandToggleEnabled: (name: string, enabled: boolean) =>
+    ipcRenderer.invoke('command_toggle_enabled', name, enabled),
 });

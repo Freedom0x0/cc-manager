@@ -3,7 +3,7 @@
 // and take screenshots. The real Electron IPC is unaffected.
 
 import { testProjects, testSessions, testMessages, testSearchHits, testProjectTree } from './mock-data';
-import type { McpServer, Skill } from './types';
+import type { McpServer, Skill, Command } from './types';
 
 // v5 wave-1 MCP 模块 fixture。浏览器 dev 模式(纯 vite serve)用,
 const testMcpServers: McpServer[] = [
@@ -23,6 +23,25 @@ const testMcpServers: McpServer[] = [
     description: 'GitHub integration',
     enabled: false,
     source: 'global',
+  },
+];
+
+// v5 wave-1 Commands 模块 fixture。浏览器 dev 模式(纯 vite serve)用,
+const testCommands: Command[] = [
+  {
+    name: 'review',
+    path: 'C:/Users/15532/.claude/commands/review.md',
+    description: 'Review changed files in the current branch',
+    argumentHint: '[path]',
+    enabled: true,
+    body: 'Run git diff and review each change for correctness and style.',
+  },
+  {
+    name: 'release',
+    path: 'C:/Users/15532/.claude/commands/release.md',
+    description: 'Bump version, tag, and push release commit',
+    enabled: false,
+    body: 'Increment version, update changelog, git tag and push.',
   },
 ];
 
@@ -151,6 +170,33 @@ if (typeof window !== 'undefined' && !window.api) {
     skillToggleEnabled: (name, enabled) => {
       const idx = testSkills.findIndex((s) => s.name === name);
       if (idx >= 0) testSkills[idx] = { ...testSkills[idx], enabled };
+      return ok(undefined);
+    },
+    // v5 wave-1 Commands 模块 — 6 mock(浏览器 dev 用,内存 fixture)
+    commandList: () => ok(testCommands),
+    commandGet: (name) => ok(testCommands.find((c) => c.name === name) ?? null),
+    commandCreate: (input) => {
+      testCommands.push({
+        ...input,
+        path: `C:/Users/15532/.claude/commands/${input.name}.md`,
+        enabled: true,
+        body: input.body ?? '',
+      });
+      return ok(undefined);
+    },
+    commandUpdate: (name, patch) => {
+      const idx = testCommands.findIndex((c) => c.name === name);
+      if (idx >= 0) testCommands[idx] = { ...testCommands[idx], ...patch };
+      return ok(undefined);
+    },
+    commandDelete: (name) => {
+      const idx = testCommands.findIndex((c) => c.name === name);
+      if (idx >= 0) testCommands.splice(idx, 1);
+      return ok(undefined);
+    },
+    commandToggleEnabled: (name, enabled) => {
+      const idx = testCommands.findIndex((c) => c.name === name);
+      if (idx >= 0) testCommands[idx] = { ...testCommands[idx], enabled };
       return ok(undefined);
     },
   };

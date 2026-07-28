@@ -17,6 +17,9 @@ import type {
   Skill,
   SkillCreateInput,
   SkillUpdatePatch,
+  Command,
+  CommandCreateInput,
+  CommandUpdatePatch,
 } from './types';
 
 export type Api = {
@@ -52,6 +55,13 @@ export type Api = {
   skillUpdate(name: string, patch: SkillUpdatePatch): Promise<void>;
   skillDelete(name: string): Promise<void>;
   skillToggleEnabled(name: string, enabled: boolean): Promise<void>;
+  // v5 wave-1 Commands 模块 — 6 IPC channel
+  commandList(): Promise<Command[]>;
+  commandGet(name: string): Promise<Command | null>;
+  commandCreate(input: CommandCreateInput): Promise<void>;
+  commandUpdate(name: string, patch: CommandUpdatePatch): Promise<void>;
+  commandDelete(name: string): Promise<void>;
+  commandToggleEnabled(name: string, enabled: boolean): Promise<void>;
 };
 
 declare global {

@@ -138,3 +138,37 @@ export interface SkillUpdatePatch {
   version?: string;
   body?: string;
 }
+
+/**
+ * Command — 跨层共享类型(CLAUDE.md §5)
+ *
+ * 与 electron/repo/commands/types.ts 中的 Command **同形**(字段名 + 类型一致)。
+ * 双修:任何字段重命名都要同步改 electron 侧。
+ *
+ * v5 wave-1 Commands 模块:从 ~/.claude/commands/<name>.md 单文件读 frontmatter
+ * → 注入 enabled(KV 表 key 前缀 'cmd:enabled:<name>')→ UI 渲染。
+ * createCommand 接收 CommandCreateInput;updateCommand 接收 CommandUpdatePatch。
+ *
+ * 与 Skill 不同:Command 用**单文件**而非目录,frontmatter + body 格式同 SKILL.md。
+ */
+export interface Command {
+  name: string;
+  path: string;
+  description: string;
+  argumentHint?: string;
+  enabled: boolean;
+  body: string;
+}
+
+export interface CommandCreateInput {
+  name: string;
+  description: string;
+  body?: string;
+  argumentHint?: string;
+}
+
+export interface CommandUpdatePatch {
+  description?: string;
+  argumentHint?: string;
+  body?: string;
+}
