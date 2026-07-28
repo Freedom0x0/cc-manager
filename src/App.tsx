@@ -10,6 +10,7 @@ import { McpManager } from './modules/mcp/McpManager';
 import { SkillsManager } from './modules/skills/SkillsManager';
 import { CommandsManager } from './modules/commands/CommandsManager';
 import { SubAgentsManager } from './modules/sub_agents/SubAgentsManager';
+import { HooksManager } from './modules/hooks/HooksManager';
 
 const { Header, Sider, Content } = Layout;
 
@@ -106,6 +107,8 @@ function App() {
             <CommandsManager />
           ) : activeTab === 'sub-agents' ? (
             <SubAgentsManager />
+          ) : activeTab === 'hooks' ? (
+            <HooksManager />
           ) : (
             <ComingSoon label={TAB_LABELS[activeTab]} wave={TAB_WAVES[activeTab]} />
           )}

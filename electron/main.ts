@@ -14,6 +14,7 @@ import * as mcpRepo from './repo/mcp';
 import * as skillsRepo from './repo/skills';
 import * as commandsRepo from './repo/commands';
 import * as subAgentsRepo from './repo/sub-agents';
+import * as hooksRepo from './repo/hooks';
 import { buildResumeCommand } from './resumer';
 import { startWatcher } from './watcher';
 
@@ -208,6 +209,25 @@ app.whenReady().then(() => {
   ipcMain.handle('subagent_delete', (_e, name: string) => subAgentsRepo.deleteSubAgent(name));
   ipcMain.handle('subagent_toggle_enabled', (_e, name: string, enabled: boolean) => {
     subAgentsRepo.setEnabled(db, name, enabled);
+  });
+
+  // v5 wave-2 Hooks 模块 — 6 IPC channel。create/update/delete 改
+  // ~/.claude/settings.json 的 hooks 字段(**不是**新建单文件 — D2 决策)。
+  // 原子写:tmp + rename(CLAUDE.md §7 + 本任务硬规则),失败不破坏 settings.json
+  // 的其他字段(mcpServers / permissions / ...)— AC-13 / D7 决策。
+  // list/get 注入 enabled 状态(从 mcp_server_state KV 表读,key 前缀
+  // 'hook:enabled:<id>');toggle_enabled 写 KV 表(不污染原文件 — D6 决策延伸)。
+  ipcMain.handle('hook_list', () => hooksRepo.listHooks(db));
+  ipcMain.handle('hook_get', (_e, id: string) => hooksRepo.getHook(db, id));
+  ipcMain.handle('hook_create', (_e, input) => hooksRepo.createHook(input));
+  ipcMain.handle('hook_update', (_e, id: string, patch) =>
+    hooksRepo.updateHook(id, patch, hooksRepo.HOOK_EVENTS)
+  );
+  ipcMain.handle('hook_delete', (_e, id: string) =>
+    hooksRepo.deleteHook(id, hooksRepo.HOOK_EVENTS)
+  );
+  ipcMain.handle('hook_toggle_enabled', (_e, id: string, enabled: boolean) => {
+    hooksRepo.setEnabled(db, id, enabled);
   });
 
   createWindow();

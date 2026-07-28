@@ -206,3 +206,41 @@ export interface SubAgentUpdatePatch {
   argumentHint?: string;
   body?: string;
 }
+
+/**
+ * Hook — 跨层共享类型(CLAUDE.md §5)
+ *
+ * 与 electron/repo/hooks/types.ts 中的 Hook **同形**(字段名 + 类型一致)。
+ * 双修:任何字段重命名都要同步改 electron 侧。
+ *
+ * v5 wave-2 Hooks 模块:从 ~/.claude/settings.json 的 hooks 字段读各 event
+ * 数组 → 扁平化 + 注入 enabled(KV 表 key 前缀 'hook:enabled:<id>')→ UI
+ * 渲染。id 字段 = `${event}-${index}`,由 scanner 拼装。
+ *
+ * 与 SubAgent / Skill 不同:Hook **改 settings.json**(嵌套 JSON)而非单文件。
+ */
+export interface Hook {
+  id: string;
+  event:
+    | 'PreToolUse'
+    | 'PostToolUse'
+    | 'Stop'
+    | 'SubagentStop'
+    | 'Notification'
+    | 'UserPromptSubmit';
+  matcher?: string;
+  command: string;
+  enabled: boolean;
+  scope: 'global';
+}
+
+export interface HookCreateInput {
+  event: Hook['event'];
+  matcher?: string;
+  command: string;
+}
+
+export interface HookUpdatePatch {
+  matcher?: string;
+  command?: string;
+}

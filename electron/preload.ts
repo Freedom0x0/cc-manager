@@ -51,6 +51,22 @@ interface SubAgentUpdatePatch {
   argumentHint?: string;
   body?: string;
 }
+type HookEvent =
+  | 'PreToolUse'
+  | 'PostToolUse'
+  | 'Stop'
+  | 'SubagentStop'
+  | 'Notification'
+  | 'UserPromptSubmit';
+interface HookCreateInput {
+  event: HookEvent;
+  matcher?: string;
+  command: string;
+}
+interface HookUpdatePatch {
+  matcher?: string;
+  command?: string;
+}
 
 contextBridge.exposeInMainWorld('api', {
   listProjects: () => ipcRenderer.invoke('list_projects'),
@@ -106,4 +122,13 @@ contextBridge.exposeInMainWorld('api', {
   subagentDelete: (name: string) => ipcRenderer.invoke('subagent_delete', name),
   subagentToggleEnabled: (name: string, enabled: boolean) =>
     ipcRenderer.invoke('subagent_toggle_enabled', name, enabled),
+  // v5 wave-2 Hooks 模块 — 6 IPC invoke
+  hookList: () => ipcRenderer.invoke('hook_list'),
+  hookGet: (id: string) => ipcRenderer.invoke('hook_get', id),
+  hookCreate: (input: HookCreateInput) => ipcRenderer.invoke('hook_create', input),
+  hookUpdate: (id: string, patch: HookUpdatePatch) =>
+    ipcRenderer.invoke('hook_update', id, patch),
+  hookDelete: (id: string) => ipcRenderer.invoke('hook_delete', id),
+  hookToggleEnabled: (id: string, enabled: boolean) =>
+    ipcRenderer.invoke('hook_toggle_enabled', id, enabled),
 });

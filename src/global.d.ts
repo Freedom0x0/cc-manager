@@ -23,6 +23,9 @@ import type {
   SubAgent,
   SubAgentCreateInput,
   SubAgentUpdatePatch,
+  Hook,
+  HookCreateInput,
+  HookUpdatePatch,
 } from './types';
 
 export type Api = {
@@ -72,6 +75,13 @@ export type Api = {
   subagentUpdate(name: string, patch: SubAgentUpdatePatch): Promise<void>;
   subagentDelete(name: string): Promise<void>;
   subagentToggleEnabled(name: string, enabled: boolean): Promise<void>;
+  // v5 wave-2 Hooks 模块 — 6 IPC channel
+  hookList(): Promise<Hook[]>;
+  hookGet(id: string): Promise<Hook | null>;
+  hookCreate(input: HookCreateInput): Promise<void>;
+  hookUpdate(id: string, patch: HookUpdatePatch): Promise<void>;
+  hookDelete(id: string): Promise<void>;
+  hookToggleEnabled(id: string, enabled: boolean): Promise<void>;
 };
 
 declare global {

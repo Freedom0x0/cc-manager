@@ -19,6 +19,9 @@ import type {
   SubAgent,
   SubAgentCreateInput,
   SubAgentUpdatePatch,
+  Hook,
+  HookCreateInput,
+  HookUpdatePatch,
 } from './types';
 
 export const api = {
@@ -44,7 +47,7 @@ export const api = {
     window.api.permanentDeleteSession(sessionId),
   resumeSession: (sessionId: string): Promise<ResumeCommand | null> =>
     window.api.resumeSession(sessionId),
-  // v5 wave-1 MCP 模块 — 6 IPC 包装
+  // v5 wave-1 MCP module — 6 IPC wrappers
   mcpList: (): Promise<McpServer[]> => window.api.mcpList(),
   mcpGet: (name: string): Promise<McpServer | null> => window.api.mcpGet(name),
   mcpCreate: (input: McpCreateInput): Promise<void> => window.api.mcpCreate(input),
@@ -53,7 +56,7 @@ export const api = {
   mcpDelete: (name: string): Promise<void> => window.api.mcpDelete(name),
   mcpToggleEnabled: (name: string, enabled: boolean): Promise<void> =>
     window.api.mcpToggleEnabled(name, enabled),
-  // v5 wave-1 Skills 模块 — 6 IPC 包装
+  // v5 wave-1 Skills module — 6 IPC wrappers
   skillList: (): Promise<Skill[]> => window.api.skillList(),
   skillGet: (name: string): Promise<Skill | null> => window.api.skillGet(name),
   skillCreate: (input: SkillCreateInput): Promise<void> => window.api.skillCreate(input),
@@ -62,7 +65,7 @@ export const api = {
   skillDelete: (name: string): Promise<void> => window.api.skillDelete(name),
   skillToggleEnabled: (name: string, enabled: boolean): Promise<void> =>
     window.api.skillToggleEnabled(name, enabled),
-  // v5 wave-1 Commands 模块 — 6 IPC 包装
+  // v5 wave-1 Commands module — 6 IPC wrappers
   commandList: (): Promise<Command[]> => window.api.commandList(),
   commandGet: (name: string): Promise<Command | null> => window.api.commandGet(name),
   commandCreate: (input: CommandCreateInput): Promise<void> => window.api.commandCreate(input),
@@ -71,13 +74,23 @@ export const api = {
   commandDelete: (name: string): Promise<void> => window.api.commandDelete(name),
   commandToggleEnabled: (name: string, enabled: boolean): Promise<void> =>
     window.api.commandToggleEnabled(name, enabled),
-  // v5 wave-2 Sub-Agents 模块 — 6 IPC 包装
+  // v5 wave-2 Sub-Agents module — 6 IPC wrappers
   subagentList: (): Promise<SubAgent[]> => window.api.subagentList(),
   subagentGet: (name: string): Promise<SubAgent | null> => window.api.subagentGet(name),
-  subagentCreate: (input: SubAgentCreateInput): Promise<void> => window.api.subagentCreate(input),
+  subagentCreate: (input: SubAgentCreateInput): Promise<void> =>
+    window.api.subagentCreate(input),
   subagentUpdate: (name: string, patch: SubAgentUpdatePatch): Promise<void> =>
     window.api.subagentUpdate(name, patch),
   subagentDelete: (name: string): Promise<void> => window.api.subagentDelete(name),
   subagentToggleEnabled: (name: string, enabled: boolean): Promise<void> =>
     window.api.subagentToggleEnabled(name, enabled),
+  // v5 wave-2 Hooks module — 6 IPC wrappers
+  hookList: (): Promise<Hook[]> => window.api.hookList(),
+  hookGet: (id: string): Promise<Hook | null> => window.api.hookGet(id),
+  hookCreate: (input: HookCreateInput): Promise<void> => window.api.hookCreate(input),
+  hookUpdate: (id: string, patch: HookUpdatePatch): Promise<void> =>
+    window.api.hookUpdate(id, patch),
+  hookDelete: (id: string): Promise<void> => window.api.hookDelete(id),
+  hookToggleEnabled: (id: string, enabled: boolean): Promise<void> =>
+    window.api.hookToggleEnabled(id, enabled),
 };

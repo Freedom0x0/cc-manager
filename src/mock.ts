@@ -3,7 +3,7 @@
 // and take screenshots. The real Electron IPC is unaffected.
 
 import { testProjects, testSessions, testMessages, testSearchHits, testProjectTree } from './mock-data';
-import type { McpServer, Skill, Command, SubAgent } from './types';
+import type { McpServer, Skill, Command, SubAgent, Hook } from './types';
 
 // v5 wave-1 MCP 模块 fixture。浏览器 dev 模式(纯 vite serve)用,
 const testMcpServers: McpServer[] = [
@@ -83,6 +83,34 @@ const testSubAgents: SubAgent[] = [
     description: 'Plan a multi-step implementation',
     enabled: false,
     body: 'Analyze requirements and propose a phased plan before code changes.',
+  },
+];
+
+// v5 wave-2 Hooks 模块 fixture。浏览器 dev 模式(纯 vite serve)用,
+// 数据来源是 ~/.claude/settings.json 的 hooks 字段嵌套数组(扁平化为 Hook)。
+const testHooks: Hook[] = [
+  {
+    id: 'PreToolUse-0',
+    event: 'PreToolUse',
+    matcher: 'Bash',
+    command: 'echo "before bash tool"',
+    enabled: true,
+    scope: 'global',
+  },
+  {
+    id: 'PostToolUse-0',
+    event: 'PostToolUse',
+    command: 'echo "after tool"',
+    enabled: true,
+    scope: 'global',
+  },
+  {
+    id: 'Stop-0',
+    event: 'Stop',
+    matcher: '*',
+    command: 'echo "on stop"',
+    enabled: false,
+    scope: 'global',
   },
 ];
 
@@ -244,6 +272,38 @@ if (typeof window !== 'undefined' && !window.api) {
     subagentToggleEnabled: (name, enabled) => {
       const idx = testSubAgents.findIndex((a) => a.name === name);
       if (idx >= 0) testSubAgents[idx] = { ...testSubAgents[idx], enabled };
+      return ok(undefined);
+    },
+    // v5 wave-2 Hooks 模块 — 6 mock(浏览器 dev 用,内存 fixture)
+    hookList: () => ok(testHooks),
+    hookGet: (id) => ok(testHooks.find((h) => h.id === id) ?? null),
+    hookCreate: (input) => {
+      // id 自动分配:`${event}-${nextIndex}` — 简化,匹配后端 ${event}-${index}
+      const existing = testHooks.filter((h) => h.event === input.event);
+      const id = `${input.event}-${existing.length}`;
+      testHooks.push({
+        id,
+        event: input.event,
+        matcher: input.matcher,
+        command: input.command,
+        enabled: true,
+        scope: 'global',
+      });
+      return ok(undefined);
+    },
+    hookUpdate: (id, patch) => {
+      const idx = testHooks.findIndex((h) => h.id === id);
+      if (idx >= 0) testHooks[idx] = { ...testHooks[idx], ...patch };
+      return ok(undefined);
+    },
+    hookDelete: (id) => {
+      const idx = testHooks.findIndex((h) => h.id === id);
+      if (idx >= 0) testHooks.splice(idx, 1);
+      return ok(undefined);
+    },
+    hookToggleEnabled: (id, enabled) => {
+      const idx = testHooks.findIndex((h) => h.id === id);
+      if (idx >= 0) testHooks[idx] = { ...testHooks[idx], enabled };
       return ok(undefined);
     },
   };
