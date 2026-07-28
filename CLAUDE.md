@@ -21,7 +21,7 @@ cc-session-manager/
 │   ├── db/connection.ts            # schema + 兼容 ALTER
 │   ├── importer/{parser,scanner,cluster,index}.ts
 │   ├── repo/{projects,sessions,messages,search,tree,types}.ts
-│   └── resumer.ts                  # spawn claude.cmd --resume
+│   └── resumer.ts                  # 生成 claude --resume 命令字符串（返回给前端复制）
 ├── src/                            # React 渲染进程
 │   ├── main.tsx / App.tsx
 │   ├── global.d.ts                 # window.api 类型
@@ -110,6 +110,20 @@ cc-session-manager/
 ## 10. 已知陷阱
 
 - **better-sqlite3 ABI**：用 Node 22 跑测试会报 `NODE_MODULE_VERSION` 错。**必须**用 `ELECTRON_RUN_AS_NODE=1 electron` 跑测试，package.json 已配。
+- **Mac 首次安装（或切换平台后）**：系统 Node.js 版本与 Electron 内置 Node ABI 不同，`npm install` 会因 node-gyp 编译 better-sqlite3 失败而退出。正确流程：
+  ```bash
+  npm install --ignore-scripts            # 跳过 native 编译
+  node node_modules/electron/install.js   # 下载 Electron 二进制
+  # 然后用 Electron 的 headers 编译 better-sqlite3：
+  HOME=~/.electron-gyp node_modules/.bin/node-gyp rebuild \
+    --target=$(cat node_modules/electron/dist/version) \
+    --arch=arm64 \  # x64 机器改为 x64
+    --dist-url=https://electronjs.org/headers \
+    --module-name=better_sqlite3 \
+    --module-path=build/Release \
+    2>&1  # 在 node_modules/better-sqlite3/ 目录内执行
+  ```
+  或者直接用封装好的脚本：`npm run rebuild:sqlite`（内部调 electron-rebuild，Node v26 下可能不兼容，见上）。
 - **`rootDir: "electron"`** 才能输出 `dist-electron/main.js`（不是 `dist-electron/electron/main.js`）
 - **FTS5 中文分词**：`unicode61 remove_diacritics 2` 是当前方案，按词切分；够用就别动
 - **soft delete + FTS**：FTS5 触发器自动同步 `INSERT/DELETE/UPDATE messages`，所以 `is_deleted=1` 的会话消息**不删**，搜索自动不返回

@@ -13,10 +13,26 @@ import { buildResumeCommand } from './resumer';
 
 let db: DB;
 
+/**
+ * 返回应用数据目录（跨平台）：
+ *   macOS:   ~/Library/Application Support/cc-session-manager
+ *   Windows: %APPDATA%\cc-session-manager
+ *   Linux:   ~/.config/cc-session-manager
+ */
+function getDataDir(): string {
+  const home = os.homedir();
+  switch (process.platform) {
+    case 'darwin':
+      return path.join(home, 'Library', 'Application Support', 'cc-session-manager');
+    case 'win32':
+      return path.join(process.env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'cc-session-manager');
+    default:
+      return path.join(process.env.XDG_CONFIG_HOME || path.join(home, '.config'), 'cc-session-manager');
+  }
+}
+
 function logFile(): string {
-  const dataDir = process.env.APPDATA
-    ? path.join(process.env.APPDATA, 'cc-session-manager')
-    : path.join(os.homedir(), '.cc-session-manager');
+  const dataDir = getDataDir();
   fs.mkdirSync(dataDir, { recursive: true });
   return path.join(dataDir, 'app.log');
 }
@@ -28,11 +44,6 @@ function log(...args: unknown[]) {
 
 process.on('uncaughtException', (e) => log('UNCAUGHT', e?.stack || String(e)));
 process.on('unhandledRejection', (e) => log('UNHANDLED', e instanceof Error ? e.stack : String(e)));
-
-function getDataDir(): string {
-  const appData = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
-  return path.join(appData, 'cc-session-manager');
-}
 
 function createWindow() {
   const win = new BrowserWindow({
