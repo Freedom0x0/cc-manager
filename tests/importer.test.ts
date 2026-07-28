@@ -104,3 +104,32 @@ test('v4: sessions.cwd is set per-session from first message cwd', () => {
   assert.strictEqual(byId.get('sess-1'), 'C:/Users/test/prompt/react-prompt-editor');
   assert.strictEqual(byId.get('sess-2'), 'C:/Users/test/prompt/boss-prompts-manager');
 });
+
+test('v4: reimport reassigns session from legacy cwd-style project to folder project', () => {
+  // 模拟场景:DB 里已有一条老 v1-v3 session 关联到 cwd-style 假 project
+  // v4 importProjectFolder 应把它接管到新 folder project
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ccsm-imp6-'));
+  const db = initDB(path.join(tmp, 'app.db'));
+  // 直接建一个 cwd-style 假 project + 一条 sessionId='sess-1' 的 session
+  const fakeProjId = (db
+    .prepare("INSERT INTO projects (project_path, name, imported_at) VALUES (?, ?, ?)")
+    .run('C:/Users/old/prompt', 'prompt', Date.now()).lastInsertRowid) as number;
+  db.prepare(
+    "INSERT INTO sessions (session_id, project_id, started_at, last_message_at, message_count, source_file) VALUES (?, ?, ?, ?, 0, ?)"
+  ).run('sess-1', fakeProjId, Date.now(), Date.now(), 'C:/old/sess-1.jsonl');
+
+  // 现在 v4 import 一个 folder,里面包含 sess-1 的真实 jsonl
+  const folder = {
+    folderPath: path.resolve('tests/fixtures/proj-a'),
+    jsonlFiles: [path.resolve('tests/fixtures/proj-a/sess-1.jsonl')],
+  };
+  importProjectFolder(db, folder);
+
+  // sess-1 应该被接管到新的 folder project,不再指 fakeProjId
+  const sess = db
+    .prepare("SELECT project_id, cwd FROM sessions WHERE session_id = 'sess-1'")
+    .get() as { project_id: number; cwd: string | null };
+  closeDB(db);
+  assert.notStrictEqual(sess.project_id, fakeProjId, 'sess-1 should be reassigned to new folder project');
+  assert.strictEqual(sess.cwd, 'C:/Users/test/prompt/react-prompt-editor');
+});

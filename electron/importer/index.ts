@@ -90,7 +90,10 @@ export function importProjectFolder(db: DB, folder: ProjectFolder): ImportStats 
   let messagesAdded = 0;
   let firstCwd: string | null = null;
 
-  const findSession = db.prepare('SELECT id, cwd, source_file FROM sessions WHERE session_id = ?');
+  const findSession = db.prepare('SELECT id, cwd, source_file, project_id FROM sessions WHERE session_id = ?');
+  const reassignSession = db.prepare(
+    'UPDATE sessions SET project_id = ? WHERE session_id = ? AND project_id != ?'
+  );
   const insertSession = db.prepare(
     'INSERT INTO sessions (session_id, project_id, title, cwd, started_at, last_message_at, message_count, source_file) VALUES (?, ?, ?, ?, ?, ?, 0, ?)'
   );
@@ -125,7 +128,7 @@ export function importProjectFolder(db: DB, folder: ProjectFolder): ImportStats 
         }
 
         const existing = findSession.get(msg.sessionId) as
-          | { id: number; cwd: string | null; source_file: string | null }
+          | { id: number; cwd: string | null; source_file: string | null; project_id: number }
           | undefined;
         if (!existing) {
           const title = msg.role === 'user' ? msg.content.slice(0, 50) : null;
@@ -140,6 +143,9 @@ export function importProjectFolder(db: DB, folder: ProjectFolder): ImportStats 
           );
           sessionsAdded++;
         } else {
+          // v4:如果老 session 关联到 v1-v3 假 project(archived=1 且 path 是 cwd-style),
+          // 接管到当前 folder project
+          reassignSession.run(projectId, msg.sessionId, projectId);
           updateSessionCwd.run(msg.projectPath, msg.sessionId);
           updateSessionSource.run(file, msg.sessionId);
         }

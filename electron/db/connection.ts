@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS projects (
   cwd TEXT,
   parent_project_id INTEGER REFERENCES projects(id),
   imported_at INTEGER NOT NULL,
-  is_archived INTEGER DEFAULT 0
+  is_archived INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS sessions (

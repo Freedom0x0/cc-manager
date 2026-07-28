@@ -71,18 +71,28 @@ export const MessageView: React.FC<Props> = ({ messages, highlightedMessageId })
   );
 };
 
-function renderMessageBody(m: MessageRow): React.ReactNode {
-  // 没 blocks → 走老路径:直接渲染 content(空 content 渲染占位)
+function renderMessageBody(m: MessageRow): React.ReactNode | null {
+  // 没 blocks → 走老路径:直接渲染 content(空 content → 不渲染,只保留 header)
   if (!m.blocks || m.blocks.length === 0) {
+    if (!m.content) return null;
     return (
       <div style={{ whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.6 }}>
-        {m.content || <EmptyContentPlaceholder />}
+        {m.content}
       </div>
     );
   }
+  // 有 blocks:过滤掉空 text 和 unknown(没信息量的),只渲染有可视化的块
+  const meaningful = m.blocks.filter((b) => {
+    if (b.type === 'text') return b.text.trim().length > 0;
+    if (b.type === 'tool_use') return true; // 工具调用总有 name,值得展示
+    if (b.type === 'tool_result') return true; // 工具结果至少有个占位
+    if (b.type === 'thinking') return b.thinking.trim().length > 0;
+    return false; // unknown / 其他 → 不渲染
+  });
+  if (meaningful.length === 0) return null;
   return (
     <div>
-      {m.blocks.map((b, i) => (
+      {meaningful.map((b, i) => (
         <BlockRenderer key={i} block={b} />
       ))}
     </div>
@@ -92,7 +102,7 @@ function renderMessageBody(m: MessageRow): React.ReactNode {
 function BlockRenderer({ block }: { block: ContentBlock }): React.ReactNode {
   switch (block.type) {
     case 'text': {
-      if (!block.text) return <EmptyContentPlaceholder />;
+      // 已在 renderMessageBody 过滤空 text,这里 block.text 必非空
       return (
         <div style={{ whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.6, marginBottom: 6 }}>
           {block.text}
@@ -185,24 +195,6 @@ function BlockRenderer({ block }: { block: ContentBlock }): React.ReactNode {
         </div>
       );
   }
-}
-
-function EmptyContentPlaceholder(): React.ReactNode {
-  return (
-    <span
-      style={{
-        fontSize: 12,
-        color: '#9ca3af',
-        fontStyle: 'italic',
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 4,
-      }}
-    >
-      <QuestionCircleOutlined />
-      (空内容,可能为纯工具调用或思考块)
-    </span>
-  );
 }
 
 function summarizeInput(input: unknown): string {
