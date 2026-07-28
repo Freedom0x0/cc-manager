@@ -1,0 +1,2 @@
+{"type":"user","uuid":"u-1","sessionId":"sess-1","timestamp":"2026-07-28T10:00:00.000Z","cwd":"C:/Users/test/prompt/react-prompt-editor","message":{"role":"user","content":"hello world"}}
+{"type":"assistant","uuid":"a-1","sessionId":"sess-1","timestamp":"2026-07-28T10:00:01.000Z","cwd":"C:/Users/test/prompt/react-prompt-editor","message":{"role":"assistant","content":[{"type":"text","text":"hi there"}]}}

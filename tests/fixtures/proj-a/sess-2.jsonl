@@ -1,0 +1,2 @@
+{"type":"user","uuid":"u-2","sessionId":"sess-2","timestamp":"2026-07-27T10:00:00.000Z","cwd":"C:/Users/test/prompt/boss-prompts-manager","message":{"role":"user","content":"how do I reset the database"}}
+{"type":"assistant","uuid":"a-2","sessionId":"sess-2","timestamp":"2026-07-27T10:00:05.000Z","cwd":"C:/Users/test/prompt/boss-prompts-manager","message":{"role":"assistant","content":[{"type":"text","text":"use DROP DATABASE"}]}}

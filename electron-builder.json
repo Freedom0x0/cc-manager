@@ -1,0 +1,7 @@
+{
+  "appId": "com.ccsessionmanager.app",
+  "productName": "cc-session-manager",
+  "directories": { "output": "release" },
+  "files": ["dist/**/*", "dist-electron/**/*", "package.json"],
+  "win": { "target": "nsis" }
+}
