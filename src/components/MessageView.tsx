@@ -1,13 +1,21 @@
 import React, { useEffect, useRef } from 'react';
-import { Button, Empty, Tag } from 'antd';
-import { PlayCircleOutlined, UserOutlined, RobotOutlined } from '@ant-design/icons';
-import type { MessageRow } from '../types';
+import { Button, Empty } from 'antd';
+import {
+  PlayCircleOutlined,
+  UserOutlined,
+  RobotOutlined,
+  ToolOutlined,
+  FileSearchOutlined,
+  BulbOutlined,
+  QuestionCircleOutlined,
+} from '@ant-design/icons';
+import type { MessageRow, ContentBlock } from '../types';
 
 interface Props {
   messages: MessageRow[];
   onResume: () => void;
   showResume: boolean;
-  highlightedMessageId?: string | null; // when set, scroll to this message
+  highlightedMessageId?: string | null;
 }
 
 export const MessageView: React.FC<Props> = ({
@@ -21,7 +29,6 @@ export const MessageView: React.FC<Props> = ({
 
   useEffect(() => {
     if (!highlightedMessageId) return;
-    // Find the message element by data-uuid and scroll into view
     const el = containerRef.current?.querySelector<HTMLDivElement>(
       `[data-uuid="${CSS.escape(highlightedMessageId)}"]`
     );
@@ -64,7 +71,7 @@ export const MessageView: React.FC<Props> = ({
                 {m.role === 'user' ? '你' : 'Claude'} · {new Date(m.createdAt).toLocaleString()}
               </span>
             </div>
-            <div style={{ whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.6 }}>{m.content}</div>
+            {renderMessageBody(m)}
           </div>
         );
       })}
@@ -82,3 +89,167 @@ export const MessageView: React.FC<Props> = ({
     </div>
   );
 };
+
+function renderMessageBody(m: MessageRow): React.ReactNode {
+  // 没 blocks → 走老路径:直接渲染 content(空 content 渲染占位)
+  if (!m.blocks || m.blocks.length === 0) {
+    return (
+      <div style={{ whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.6 }}>
+        {m.content || <EmptyContentPlaceholder />}
+      </div>
+    );
+  }
+  return (
+    <div>
+      {m.blocks.map((b, i) => (
+        <BlockRenderer key={i} block={b} />
+      ))}
+    </div>
+  );
+}
+
+function BlockRenderer({ block }: { block: ContentBlock }): React.ReactNode {
+  switch (block.type) {
+    case 'text': {
+      if (!block.text) return <EmptyContentPlaceholder />;
+      return (
+        <div style={{ whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.6, marginBottom: 6 }}>
+          {block.text}
+        </div>
+      );
+    }
+    case 'tool_use':
+      return (
+        <div
+          style={{
+            fontSize: 12,
+            color: '#6b7280',
+            background: '#eef2ff',
+            border: '1px solid #c7d2fe',
+            borderRadius: 4,
+            padding: '4px 8px',
+            marginBottom: 6,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          <ToolOutlined />
+          <span>
+            🔧 调用工具:<b>{block.name}</b>
+            {summarizeInput(block.input) ? ` (${summarizeInput(block.input)})` : ''}
+          </span>
+        </div>
+      );
+    case 'tool_result':
+      return (
+        <div
+          style={{
+            fontSize: 12,
+            color: block.isError ? '#b91c1c' : '#4b5563',
+            background: block.isError ? '#fef2f2' : '#f9fafb',
+            border: '1px solid #e5e7eb',
+            borderRadius: 4,
+            padding: '4px 8px',
+            marginBottom: 6,
+            display: 'inline-flex',
+            alignItems: 'flex-start',
+            gap: 6,
+            maxWidth: '100%',
+            wordBreak: 'break-all',
+          }}
+        >
+          <FileSearchOutlined />
+          <span>
+            📋 工具结果:{truncate(stringifyResult(block.content), 200)}
+          </span>
+        </div>
+      );
+    case 'thinking':
+      return (
+        <details
+          style={{
+            fontSize: 12,
+            color: '#6b7280',
+            background: '#fafafa',
+            border: '1px dashed #d1d5db',
+            borderRadius: 4,
+            padding: '4px 8px',
+            marginBottom: 6,
+          }}
+        >
+          <summary style={{ cursor: 'pointer' }}>
+            <BulbOutlined style={{ marginRight: 4 }} />
+            💭 思考过程
+          </summary>
+          <div style={{ whiteSpace: 'pre-wrap', marginTop: 4 }}>{block.thinking}</div>
+        </details>
+      );
+    case 'unknown':
+    default:
+      return (
+        <div
+          style={{
+            fontSize: 12,
+            color: '#9ca3af',
+            fontStyle: 'italic',
+            marginBottom: 6,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+          }}
+        >
+          <QuestionCircleOutlined />
+          (无法解析的内容块)
+        </div>
+      );
+  }
+}
+
+function EmptyContentPlaceholder(): React.ReactNode {
+  return (
+    <span
+      style={{
+        fontSize: 12,
+        color: '#9ca3af',
+        fontStyle: 'italic',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 4,
+      }}
+    >
+      <QuestionCircleOutlined />
+      (空内容,可能为纯工具调用或思考块)
+    </span>
+  );
+}
+
+function summarizeInput(input: unknown): string {
+  if (!input || typeof input !== 'object') return '';
+  const obj = input as Record<string, unknown>;
+  const keys = Object.keys(obj);
+  if (keys.length === 0) return '';
+  // 取前 2 个字段,值截断 30 字符
+  return keys
+    .slice(0, 2)
+    .map((k) => {
+      const v = obj[k];
+      const s = typeof v === 'string' ? v : JSON.stringify(v);
+      return `${k}=${truncate(s, 30)}`;
+    })
+    .join(', ');
+}
+
+function stringifyResult(c: unknown): string {
+  if (typeof c === 'string') return c;
+  try {
+    return JSON.stringify(c);
+  } catch {
+    return String(c);
+  }
+}
+
+function truncate(s: string, n: number): string {
+  if (s.length <= n) return s;
+  return s.slice(0, n) + '…';
+}

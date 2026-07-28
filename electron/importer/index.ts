@@ -25,7 +25,7 @@ export function importFile(db: DB, filePath: string): ImportStats {
     'INSERT INTO sessions (session_id, project_id, title, cwd, started_at, last_message_at, message_count, source_file) VALUES (?, ?, ?, ?, ?, ?, 0, ?)'
   );
   const insertMessage = db.prepare(
-    'INSERT OR IGNORE INTO messages (uuid, session_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)'
+    'INSERT OR IGNORE INTO messages (uuid, session_id, role, content, content_blocks, created_at) VALUES (?, ?, ?, ?, ?, ?)'
   );
   const updateSession = db.prepare(
     'UPDATE sessions SET last_message_at = MAX(last_message_at, ?), message_count = message_count + 1 WHERE session_id = ?'
@@ -59,7 +59,15 @@ export function importFile(db: DB, filePath: string): ImportStats {
         );
         sessionsAdded++;
       }
-      const result = insertMessage.run(msg.uuid, msg.sessionId, msg.role, msg.content, msg.createdAtMs);
+      const blocksJson = msg.blocks.length > 0 ? JSON.stringify(msg.blocks) : null;
+      const result = insertMessage.run(
+        msg.uuid,
+        msg.sessionId,
+        msg.role,
+        msg.content,
+        blocksJson,
+        msg.createdAtMs
+      );
       if (result.changes > 0) {
         updateSession.run(msg.createdAtMs, msg.sessionId);
         messagesAdded++;
@@ -93,7 +101,7 @@ export function importProjectFolder(db: DB, folder: ProjectFolder): ImportStats 
     "UPDATE sessions SET source_file = ? WHERE session_id = ? AND (source_file IS NULL OR source_file = '')"
   );
   const insertMessage = db.prepare(
-    'INSERT OR IGNORE INTO messages (uuid, session_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)'
+    'INSERT OR IGNORE INTO messages (uuid, session_id, role, content, content_blocks, created_at) VALUES (?, ?, ?, ?, ?, ?)'
   );
   const updateSession = db.prepare(
     'UPDATE sessions SET last_message_at = MAX(last_message_at, ?), message_count = message_count + 1 WHERE session_id = ?'
@@ -135,7 +143,15 @@ export function importProjectFolder(db: DB, folder: ProjectFolder): ImportStats 
           updateSessionCwd.run(msg.projectPath, msg.sessionId);
           updateSessionSource.run(file, msg.sessionId);
         }
-        const result = insertMessage.run(msg.uuid, msg.sessionId, msg.role, msg.content, msg.createdAtMs);
+        const blocksJson = msg.blocks.length > 0 ? JSON.stringify(msg.blocks) : null;
+        const result = insertMessage.run(
+          msg.uuid,
+          msg.sessionId,
+          msg.role,
+          msg.content,
+          blocksJson,
+          msg.createdAtMs
+        );
         if (result.changes > 0) {
           updateSession.run(msg.createdAtMs, msg.sessionId);
           messagesAdded++;

@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS messages (
   session_id TEXT NOT NULL,
   role TEXT NOT NULL,
   content TEXT NOT NULL,
+  content_blocks TEXT,
   created_at INTEGER NOT NULL
 );
 
@@ -96,6 +97,11 @@ export function initDB(dbPath: string): DB {
   // Migration: add cwd to projects for v4 (real display name = basename(cwd))
   if (!projCols.some((c) => c.name === 'cwd')) {
     db.exec("ALTER TABLE projects ADD COLUMN cwd TEXT");
+  }
+  // Migration: add content_blocks to messages for v4 (preserve tool_use / tool_result / thinking)
+  const msgCols = db.prepare("PRAGMA table_info(messages)").all() as { name: string }[];
+  if (!msgCols.some((c) => c.name === 'content_blocks')) {
+    db.exec("ALTER TABLE messages ADD COLUMN content_blocks TEXT");
   }
   return db;
 }

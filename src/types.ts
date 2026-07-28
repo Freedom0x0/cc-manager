@@ -1,3 +1,10 @@
+export type ContentBlock =
+  | { type: 'text'; text: string }
+  | { type: 'tool_use'; name: string; input: unknown }
+  | { type: 'tool_result'; content: unknown; isError?: boolean }
+  | { type: 'thinking'; thinking: string }
+  | { type: 'unknown'; raw: unknown };
+
 export interface ProjectTreeNode {
   id: number;
   name: string;
@@ -32,6 +39,7 @@ export interface MessageRow {
   sessionId: string;
   role: 'user' | 'assistant';
   content: string;
+  blocks: ContentBlock[];
   createdAt: number;
 }
 

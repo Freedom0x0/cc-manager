@@ -51,6 +51,7 @@ export function search(
       sessionId: r.sessionId,
       role: r.role,
       content: r.content,
+      blocks: [], // 搜索结果不需要 blocks(前端只显示 snippet)
       createdAt: r.createdAt,
     } as MessageRow,
     snippet: r.snippet,
