@@ -17,7 +17,7 @@
     "dev": "concurrently -k -n vite,electron -c blue,green \"vite\" \"npm run dev:electron\"",
     "dev:electron": "wait-on tcp:5173 && tsc -p tsconfig.electron.json && cross-env NODE_ENV=development electron .",
     "build": "tsc -p tsconfig.electron.json && vite build",
-    "test": "cross-env ELECTRON_RUN_AS_NODE=1 electron --import tsx --test tests/db.test.ts tests/parser.test.ts tests/importer.test.ts tests/projects-repo.test.ts tests/sessions-repo.test.ts tests/search.test.ts tests/tree.test.ts tests/resumer.test.ts tests/template.test.ts",
+    "test": "cross-env ELECTRON_RUN_AS_NODE=1 electron --import tsx --test tests/db.test.ts tests/parser.test.ts tests/importer.test.ts tests/projects-repo.test.ts tests/sessions-repo.test.ts tests/search.test.ts tests/tree.test.ts tests/resumer.test.ts tests/template.test.ts tests/watcher.test.ts",
     "typecheck": "tsc -p tsconfig.electron.json --noEmit && tsc --noEmit",
     "package": "npm run build && electron-builder",
     "package:portable": "npm run build && electron-builder --win portable"
@@ -40,6 +40,7 @@
   "dependencies": {
     "antd": "^6.5.2",
     "better-sqlite3": "^11.10.0",
+    "chokidar": "^5.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   }
