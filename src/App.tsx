@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { ConfigProvider, App as AntApp, Empty, Layout, Tabs } from 'antd';
+import { ConfigProvider, App as AntApp, Layout, Tabs } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { GlobalSearchBar } from './components/GlobalSearchBar';
 import { ProjectSelector } from './components/ProjectSelector';
 import { WatcherStatusIndicator } from './components/WatcherStatusIndicator';
+import { ComingSoon } from './components/ComingSoon';
 import { SessionsPane } from './modules/sessions/SessionsModule';
 
 const { Header, Sider, Content } = Layout;
@@ -44,11 +45,17 @@ export default function AppRoot() {
   );
 }
 
-const ComingSoon: React.FC<{ label: string }> = ({ label }) => (
-  <div style={{ padding: 40, height: '100%' }}>
-    <Empty description={`${label} — 波 1+ 启用`} />
-  </div>
-);
+const TAB_WAVES: Record<TabKey, number> = {
+  sessions: 0,
+  mcp: 1,
+  skills: 1,
+  commands: 1,
+  'sub-agents': 2,
+  hooks: 2,
+  plugins: 2,
+  profiles: 3,
+  usage: 3,
+};
 
 function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('sessions');
@@ -85,7 +92,7 @@ function App() {
           />
         </Sider>
         <Content style={{ background: '#fff', overflow: 'auto' }}>
-          {activeTab === 'sessions' ? <SessionsPane /> : <ComingSoon label={TAB_LABELS[activeTab]} />}
+          {activeTab === 'sessions' ? <SessionsPane /> : <ComingSoon label={TAB_LABELS[activeTab]} wave={TAB_WAVES[activeTab]} />}
         </Content>
       </Layout>
     </Layout>
