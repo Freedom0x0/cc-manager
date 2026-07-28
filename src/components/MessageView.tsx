@@ -1,7 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import { Button, Empty } from 'antd';
+import { Empty } from 'antd';
 import {
-  PlayCircleOutlined,
   UserOutlined,
   RobotOutlined,
   ToolOutlined,
@@ -13,17 +12,10 @@ import type { MessageRow, ContentBlock } from '../types';
 
 interface Props {
   messages: MessageRow[];
-  onResume: () => void;
-  showResume: boolean;
   highlightedMessageId?: string | null;
 }
 
-export const MessageView: React.FC<Props> = ({
-  messages,
-  onResume,
-  showResume,
-  highlightedMessageId,
-}) => {
+export const MessageView: React.FC<Props> = ({ messages, highlightedMessageId }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const highlightedRef = useRef<HTMLDivElement | null>(null);
 
@@ -75,17 +67,6 @@ export const MessageView: React.FC<Props> = ({
           </div>
         );
       })}
-      {showResume && (
-        <Button
-          type="primary"
-          size="large"
-          icon={<PlayCircleOutlined />}
-          onClick={onResume}
-          style={{ marginTop: 16 }}
-        >
-          继续会话
-        </Button>
-      )}
     </div>
   );
 };

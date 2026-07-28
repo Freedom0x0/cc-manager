@@ -2,7 +2,7 @@
 // In Electron, window.api is set by electron/preload.ts at runtime.
 // Type is the union of both; both implementations match this contract.
 
-import type { ProjectRow, SessionRow, MessageRow, SearchHit, ProjectTreeNode } from './types';
+import type { ProjectRow, SessionRow, MessageRow, SearchHit, ProjectTreeNode, ResumeCommand } from './types';
 
 export type Api = {
   listProjects(): Promise<ProjectRow[]>;
@@ -19,7 +19,7 @@ export type Api = {
   softDeleteSession(sessionId: string): Promise<void>;
   restoreSession(sessionId: string): Promise<void>;
   permanentDeleteSession(sessionId: string): Promise<void>;
-  resumeSession(sessionId: string): Promise<number>;
+  resumeSession(sessionId: string): Promise<ResumeCommand | null>;
 };
 
 declare global {

@@ -9,7 +9,7 @@ import * as sessionsRepo from './repo/sessions';
 import * as messagesRepo from './repo/messages';
 import * as searchRepo from './repo/search';
 import * as treeRepo from './repo/tree';
-import { resumeSession } from './resumer';
+import { buildResumeCommand } from './resumer';
 
 let db: DB;
 
@@ -116,14 +116,12 @@ app.whenReady().then(() => {
   );
   ipcMain.handle('resume_session', (_e, sessionId: string) => {
     const session = sessionsRepo.get(db, sessionId);
-    if (!session) return 0;
-    const cwd = path.dirname(session.sourceFile);
-    try {
-      return resumeSession(sessionId, cwd);
-    } catch (e) {
-      console.error('Resume error', e);
-      return 0;
-    }
+    if (!session) return null;
+    // v4:返回 { command, cwd } 字符串,前端在卡片里展示可复制
+    // cwd 取 sessions.cwd(导入时从 message.cwd 拿到的真实路径),
+    // 兜底到 session.sourceFile 的父目录(folder 路径)
+    const cwd = session.cwd || path.dirname(session.sourceFile);
+    return buildResumeCommand(sessionId, cwd);
   });
 
   createWindow();

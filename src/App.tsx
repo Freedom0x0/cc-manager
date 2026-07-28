@@ -1,14 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { ConfigProvider, App as AntApp, Empty, Tag, Card } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { api } from './api';
-import type { ProjectTreeNode, SessionRow, MessageRow, SearchHit } from './types';
+import type { ProjectTreeNode, SessionRow, MessageRow, SearchHit, ResumeCommand } from './types';
 import { SearchBar } from './components/SearchBar';
 import { ProjectTree } from './components/ProjectTree';
 import { SessionList } from './components/SessionList';
 import { MessageView } from './components/MessageView';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { RecycleBinView } from './components/RecycleBinView';
+import { ResumeCommandCard } from './components/ResumeCommandCard';
 import { useSearch, type TimeRange } from './hooks/useSearch';
 
 export default function AppRoot() {
@@ -36,6 +37,27 @@ function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [confirmSoft, setConfirmSoft] = useState<string | null>(null);
   const [confirmPermanent, setConfirmPermanent] = useState<SessionRow | null>(null);
+  const [resumeCommand, setResumeCommand] = useState<ResumeCommand | null>(null);
+
+  const fetchResumeCommand = useCallback(async (sessionId: string) => {
+    setResumeCommand(null);
+    try {
+      const cmd = await api.resumeSession(sessionId);
+      setResumeCommand(cmd);
+    } catch (e) {
+      console.error('Failed to fetch resume command', e);
+      setResumeCommand(null);
+    }
+  }, []);
+
+  // 切到不同 session 时清空命令
+  useEffect(() => {
+    if (selectedSessionId) {
+      fetchResumeCommand(selectedSessionId);
+    } else {
+      setResumeCommand(null);
+    }
+  }, [selectedSessionId, fetchResumeCommand]);
 
   const { hits, searched } = useSearch(query, projectFilter, timeRange);
 
@@ -126,19 +148,17 @@ function App() {
                 onSelect={(id) => { setSelectedSessionId(id); setHighlightedMessageId(null); }}
                 onSoftDelete={setConfirmSoft}
               />
-              <MessageView
-                messages={messages}
-                showResume={!!selectedSessionId}
-                highlightedMessageId={highlightedMessageId}
-                onResume={async () => {
-                  if (!selectedSessionId) return;
-                  try {
-                    await api.resumeSession(selectedSessionId);
-                  } catch (e) {
-                    console.error('Resume failed', e);
-                  }
-                }}
-              />
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <ResumeCommandCard
+                  sessionId={selectedSessionId}
+                  resumeCommand={resumeCommand}
+                  onFetch={fetchResumeCommand}
+                />
+                <MessageView
+                  messages={messages}
+                  highlightedMessageId={highlightedMessageId}
+                />
+              </div>
             </>
           )}
         </div>

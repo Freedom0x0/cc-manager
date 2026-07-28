@@ -42,7 +42,8 @@ if (typeof window !== 'undefined' && !window.api) {
       deleted.add(id);
       return ok(undefined);
     },
-    resumeSession: () => ok(0),
+    resumeSession: (sessionId) =>
+      ok({ command: `claude --resume ${sessionId}`, cwd: 'C:/Users/15532/Desktop' }),
   };
   console.log('[mock] window.api stub installed (browser dev mode)');
 }

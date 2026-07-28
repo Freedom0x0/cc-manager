@@ -50,3 +50,8 @@ export interface SearchHit {
   projectName: string;
   projectId: number;
 }
+
+export interface ResumeCommand {
+  command: string;
+  cwd?: string;
+}

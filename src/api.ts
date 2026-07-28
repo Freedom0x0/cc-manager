@@ -1,4 +1,4 @@
-import type { ProjectRow, ProjectTreeNode, SessionRow, MessageRow, SearchHit } from './types';
+import type { ProjectRow, ProjectTreeNode, SessionRow, MessageRow, SearchHit, ResumeCommand } from './types';
 
 export const api = {
   listProjects: (): Promise<ProjectRow[]> => window.api.listProjects(),
@@ -17,5 +17,6 @@ export const api = {
   restoreSession: (sessionId: string): Promise<void> => window.api.restoreSession(sessionId),
   permanentDeleteSession: (sessionId: string): Promise<void> =>
     window.api.permanentDeleteSession(sessionId),
-  resumeSession: (sessionId: string): Promise<number> => window.api.resumeSession(sessionId),
+  resumeSession: (sessionId: string): Promise<ResumeCommand | null> =>
+    window.api.resumeSession(sessionId),
 };
