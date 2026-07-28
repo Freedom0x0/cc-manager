@@ -68,6 +68,16 @@ CREATE TRIGGER IF NOT EXISTS messages_au AFTER UPDATE ON messages BEGIN
   INSERT INTO messages_fts(messages_fts, rowid, content) VALUES('delete', old.id, old.content);
   INSERT INTO messages_fts(rowid, content) VALUES (new.id, new.content);
 END;
+
+-- v5 wave-0: watcher 单值 KV 表,记录 chokidar 监听状态/最后事件/最后错误。
+-- 列收敛到 3 列(KV 模型):key 唯一 / value 存 JSON 或纯文本 / updated_at 时间戳。
+-- 故意偏离 RD §4 模板的 5 列(id+key UNIQUE 冗余、last_event 与 value 概念重叠):违反 Simplicity First。
+-- watcher-state.ts 4 函数(getState/setStatus/recordEvent/recordError)共享这一个 KV 表,不同 key 隔离。
+CREATE TABLE IF NOT EXISTS watcher_state (
+  key TEXT PRIMARY KEY,
+  value TEXT,
+  updated_at INTEGER NOT NULL
+);
 `;
 
 export function initDB(dbPath: string): DB {
