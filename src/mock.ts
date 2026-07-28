@@ -83,7 +83,7 @@ if (typeof window !== 'undefined' && !window.api) {
     },
     resumeSession: (sessionId) =>
       ok({ command: `claude --resume ${sessionId}`, cwd: 'C:/Users/15532/Desktop' }),
-    // v5 wave-1 MCP 模块 — 5 mock(浏览器 dev 用,内存 fixture)
+    // v5 wave-1 MCP 模块 — 6 mock(浏览器 dev 用,内存 fixture)
     mcpList: () => ok(testMcpServers),
     mcpGet: (name) => ok(testMcpServers.find((s) => s.name === name) ?? null),
     mcpCreate: (input) => {
@@ -98,6 +98,11 @@ if (typeof window !== 'undefined' && !window.api) {
     mcpDelete: (name) => {
       const idx = testMcpServers.findIndex((s) => s.name === name);
       if (idx >= 0) testMcpServers.splice(idx, 1);
+      return ok(undefined);
+    },
+    mcpToggleEnabled: (name, enabled) => {
+      const idx = testMcpServers.findIndex((s) => s.name === name);
+      if (idx >= 0) testMcpServers[idx] = { ...testMcpServers[idx], enabled };
       return ok(undefined);
     },
   };

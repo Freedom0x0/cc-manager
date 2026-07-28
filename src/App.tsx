@@ -6,6 +6,7 @@ import { ProjectSelector } from './components/ProjectSelector';
 import { WatcherStatusIndicator } from './components/WatcherStatusIndicator';
 import { ComingSoon } from './components/ComingSoon';
 import { SessionsPane } from './modules/sessions/SessionsModule';
+import { McpManager } from './modules/mcp/McpManager';
 
 const { Header, Sider, Content } = Layout;
 
@@ -92,7 +93,13 @@ function App() {
           />
         </Sider>
         <Content style={{ background: '#fff', overflow: 'auto' }}>
-          {activeTab === 'sessions' ? <SessionsPane /> : <ComingSoon label={TAB_LABELS[activeTab]} wave={TAB_WAVES[activeTab]} />}
+          {activeTab === 'sessions' ? (
+            <SessionsPane />
+          ) : activeTab === 'mcp' ? (
+            <McpManager />
+          ) : (
+            <ComingSoon label={TAB_LABELS[activeTab]} wave={TAB_WAVES[activeTab]} />
+          )}
         </Content>
       </Layout>
     </Layout>

@@ -150,13 +150,17 @@ app.whenReady().then(() => {
     return buildResumeCommand(sessionId, cwd);
   });
 
-  // v5 wave-1 MCP 模块 — 5 IPC channel。create/update/delete 改 ~/.claude.json
-  // (原子写);list/get 注入 enabled 状态(从 mcp_server_state KV 表读)。
+  // v5 wave-1 MCP 模块 — 6 IPC channel。create/update/delete 改 ~/.claude.json
+  // (原子写);list/get 注入 enabled 状态(从 mcp_server_state KV 表读);
+  // toggle_enabled 写 KV 表(不污染原文件 — D6 决策)。
   ipcMain.handle('mcp_list', () => mcpRepo.listMcpServers(db));
   ipcMain.handle('mcp_get', (_e, name: string) => mcpRepo.getMcpServer(db, name));
   ipcMain.handle('mcp_create', (_e, input) => mcpRepo.createMcpServer(input));
   ipcMain.handle('mcp_update', (_e, name: string, patch) => mcpRepo.updateMcpServer(name, patch));
   ipcMain.handle('mcp_delete', (_e, name: string) => mcpRepo.deleteMcpServer(name));
+  ipcMain.handle('mcp_toggle_enabled', (_e, name: string, enabled: boolean) => {
+    mcpRepo.setEnabled(db, name, enabled);
+  });
 
   createWindow();
 });
