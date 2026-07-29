@@ -82,6 +82,13 @@ interface PluginUpdatePatch {
   dependencies?: string[];
   entry?: string;
 }
+interface ProfileCreateInput {
+  name: string;
+  description: string;
+}
+interface ProfileUpdatePatch {
+  description?: string;
+}
 
 contextBridge.exposeInMainWorld('api', {
   listProjects: () => ipcRenderer.invoke('list_projects'),
@@ -155,4 +162,13 @@ contextBridge.exposeInMainWorld('api', {
   pluginDelete: (name: string) => ipcRenderer.invoke('plugin_delete', name),
   pluginToggleEnabled: (name: string, enabled: boolean) =>
     ipcRenderer.invoke('plugin_toggle_enabled', name, enabled),
+  // v5 wave-3 Profiles 模块 — 6 IPC invoke
+  profileList: () => ipcRenderer.invoke('profile_list'),
+  profileGet: (name: string) => ipcRenderer.invoke('profile_get', name),
+  profileCapture: (name: string, description: string) =>
+    ipcRenderer.invoke('profile_capture', name, description),
+  profileApply: (name: string) => ipcRenderer.invoke('profile_apply', name),
+  profileDelete: (name: string) => ipcRenderer.invoke('profile_delete', name),
+  profileUpdate: (name: string, patch: ProfileUpdatePatch) =>
+    ipcRenderer.invoke('profile_update', name, patch),
 });

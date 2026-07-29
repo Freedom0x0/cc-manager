@@ -16,6 +16,7 @@ import * as commandsRepo from './repo/commands';
 import * as subAgentsRepo from './repo/sub-agents';
 import * as hooksRepo from './repo/hooks';
 import * as pluginsRepo from './repo/plugins';
+import * as profilesRepo from './repo/profiles';
 import { buildResumeCommand } from './resumer';
 import { startWatcher } from './watcher';
 
@@ -246,6 +247,25 @@ app.whenReady().then(() => {
   ipcMain.handle('plugin_toggle_enabled', (_e, name: string, enabled: boolean) => {
     pluginsRepo.setEnabled(db, name, enabled);
   });
+
+  // v5 wave-3 Profiles 模块 — 6 IPC channel。profile 数据存
+  // ~/.claude/profiles.json(单文件 JSON,原子写)。profile_apply 是核心
+  // 事务化操作:备份当前 KV 表所有 enabled 状态 → 写 profile.config.enabled*
+  // → 验证 → 失败回滚(任务硬规则)。profile_capture 实时从 mcp_server_state
+  // KV 表读 6 个 enabled* 命名空间(mcp: / skill: / cmd: / agent: / hook: /
+  // plugin:)生成 config 快照(不缓存,每次 capture 重新读 KV)。
+  ipcMain.handle('profile_list', () => profilesRepo.listProfiles());
+  ipcMain.handle('profile_get', (_e, name: string) => profilesRepo.getProfile(name));
+  ipcMain.handle('profile_capture', (_e, name: string, description: string) =>
+    profilesRepo.createProfile(db, { name, description })
+  );
+  ipcMain.handle('profile_apply', (_e, name: string) =>
+    profilesRepo.applyProfile(db, name)
+  );
+  ipcMain.handle('profile_delete', (_e, name: string) => profilesRepo.deleteProfile(name));
+  ipcMain.handle('profile_update', (_e, name: string, patch) =>
+    profilesRepo.updateProfile(name, patch)
+  );
 
   createWindow();
 });

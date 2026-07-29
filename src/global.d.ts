@@ -29,6 +29,9 @@ import type {
   Plugin,
   PluginCreateInput,
   PluginUpdatePatch,
+  Profile,
+  ProfileCreateInput,
+  ProfileUpdatePatch,
 } from './types';
 
 export type Api = {
@@ -92,6 +95,13 @@ export type Api = {
   pluginUpdate(name: string, patch: PluginUpdatePatch): Promise<void>;
   pluginDelete(name: string): Promise<void>;
   pluginToggleEnabled(name: string, enabled: boolean): Promise<void>;
+  // v5 wave-3 Profiles 模块 — 6 IPC channel
+  profileList(): Promise<Profile[]>;
+  profileGet(name: string): Promise<Profile | null>;
+  profileCapture(name: string, description: string): Promise<void>;
+  profileApply(name: string): Promise<{ ok: true; appliedAt: number }>;
+  profileDelete(name: string): Promise<void>;
+  profileUpdate(name: string, patch: ProfileUpdatePatch): Promise<void>;
 };
 
 declare global {

@@ -3,7 +3,7 @@
 // and take screenshots. The real Electron IPC is unaffected.
 
 import { testProjects, testSessions, testMessages, testSearchHits, testProjectTree } from './mock-data';
-import type { McpServer, Skill, Command, SubAgent, Hook, Plugin } from './types';
+import type { McpServer, Skill, Command, SubAgent, Hook, Plugin, Profile } from './types';
 
 // v5 wave-1 MCP 模块 fixture。浏览器 dev 模式(纯 vite serve)用,
 const testMcpServers: McpServer[] = [
@@ -133,6 +133,40 @@ const testHooks: Hook[] = [
     command: 'echo "on stop"',
     enabled: false,
     scope: 'global',
+  },
+];
+
+// v5 wave-3 Profiles 模块 fixture。浏览器 dev 模式(纯 vite serve)用,
+// 数据来源是 ~/.claude/profiles.json 单文件 JSON。Profile.config 是整个
+// ~/.claude 状态的快照 — 6 个 enabled* 命名空间的合并视图。
+const testProfiles: Profile[] = [
+  {
+    name: 'default',
+    description: 'Default workspace — everything enabled',
+    config: {
+      enabledServers: ['filesystem'],
+      enabledSkills: ['commit-helper'],
+      enabledCommands: ['review'],
+      enabledAgents: ['explore'],
+      enabledHooks: ['PreToolUse-0'],
+      enabledPlugins: ['gh'],
+    },
+    createdAt: '2026-07-29T00:00:00.000Z',
+    updatedAt: '2026-07-29T00:00:00.000Z',
+  },
+  {
+    name: 'minimal',
+    description: 'Minimal workspace — only essential tools',
+    config: {
+      enabledServers: [],
+      enabledSkills: ['commit-helper'],
+      enabledCommands: [],
+      enabledAgents: ['explore'],
+      enabledHooks: [],
+      enabledPlugins: [],
+    },
+    createdAt: '2026-07-29T00:00:00.000Z',
+    updatedAt: '2026-07-29T00:00:00.000Z',
   },
 ];
 
@@ -352,6 +386,61 @@ if (typeof window !== 'undefined' && !window.api) {
     pluginToggleEnabled: (name, enabled) => {
       const idx = testPlugins.findIndex((p) => p.name === name);
       if (idx >= 0) testPlugins[idx] = { ...testPlugins[idx], enabled };
+      return ok(undefined);
+    },
+    // v5 wave-3 Profiles 模块 — 6 mock(浏览器 dev 用,内存 fixture)
+    profileList: () => ok(testProfiles),
+    profileGet: (name) => ok(testProfiles.find((p) => p.name === name) ?? null),
+    profileCapture: (name, description) => {
+      // 实时 capture(从各 enabled fixture 数组生成)
+      const config = {
+        enabledServers: testMcpServers.filter((s) => s.enabled).map((s) => s.name),
+        enabledSkills: testSkills.filter((s) => s.enabled).map((s) => s.name),
+        enabledCommands: testCommands.filter((c) => c.enabled).map((c) => c.name),
+        enabledAgents: testSubAgents.filter((a) => a.enabled).map((a) => a.name),
+        enabledHooks: testHooks.filter((h) => h.enabled).map((h) => h.id),
+        enabledPlugins: testPlugins.filter((p) => p.enabled).map((p) => p.name),
+      };
+      const now = new Date().toISOString();
+      const idx = testProfiles.findIndex((p) => p.name === name);
+      if (idx >= 0) {
+        testProfiles[idx] = {
+          ...testProfiles[idx],
+          description,
+          config,
+          updatedAt: now,
+        };
+      } else {
+        testProfiles.push({ name, description, config, createdAt: now, updatedAt: now });
+      }
+      return ok(undefined);
+    },
+    profileApply: (name) => {
+      const profile = testProfiles.find((p) => p.name === name);
+      if (!profile) throw new Error(`Profile "${name}" not found`);
+      // 应用到 fixture
+      for (const s of testMcpServers) s.enabled = profile.config.enabledServers.includes(s.name);
+      for (const s of testSkills) s.enabled = profile.config.enabledSkills.includes(s.name);
+      for (const c of testCommands) c.enabled = profile.config.enabledCommands.includes(c.name);
+      for (const a of testSubAgents) a.enabled = profile.config.enabledAgents.includes(a.name);
+      for (const h of testHooks) h.enabled = profile.config.enabledHooks.includes(h.id);
+      for (const p of testPlugins) p.enabled = profile.config.enabledPlugins.includes(p.name);
+      return ok({ ok: true as const, appliedAt: Date.now() });
+    },
+    profileDelete: (name) => {
+      const idx = testProfiles.findIndex((p) => p.name === name);
+      if (idx >= 0) testProfiles.splice(idx, 1);
+      return ok(undefined);
+    },
+    profileUpdate: (name, patch) => {
+      const idx = testProfiles.findIndex((p) => p.name === name);
+      if (idx >= 0) {
+        testProfiles[idx] = {
+          ...testProfiles[idx],
+          ...patch,
+          updatedAt: new Date().toISOString(),
+        };
+      }
       return ok(undefined);
     },
   };

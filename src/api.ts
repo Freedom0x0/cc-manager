@@ -25,6 +25,9 @@ import type {
   Plugin,
   PluginCreateInput,
   PluginUpdatePatch,
+  Profile,
+  ProfileCreateInput,
+  ProfileUpdatePatch,
 } from './types';
 
 export const api = {
@@ -105,4 +108,14 @@ export const api = {
   pluginDelete: (name: string): Promise<void> => window.api.pluginDelete(name),
   pluginToggleEnabled: (name: string, enabled: boolean): Promise<void> =>
     window.api.pluginToggleEnabled(name, enabled),
+  // v5 wave-3 Profiles module — 6 IPC wrappers
+  profileList: (): Promise<Profile[]> => window.api.profileList(),
+  profileGet: (name: string): Promise<Profile | null> => window.api.profileGet(name),
+  profileCapture: (name: string, description: string): Promise<void> =>
+    window.api.profileCapture(name, description),
+  profileApply: (name: string): Promise<{ ok: true; appliedAt: number }> =>
+    window.api.profileApply(name),
+  profileDelete: (name: string): Promise<void> => window.api.profileDelete(name),
+  profileUpdate: (name: string, patch: ProfileUpdatePatch): Promise<void> =>
+    window.api.profileUpdate(name, patch),
 };
