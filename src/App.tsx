@@ -1,16 +1,47 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { ConfigProvider, App as AntApp, Empty, Tag, Card } from 'antd';
+import React, { useState } from 'react';
+import { ConfigProvider, App as AntApp, Layout, Tabs } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
-import { api } from './api';
-import type { ProjectTreeNode, SessionRow, MessageRow, SearchHit, ResumeCommand } from './types';
-import { SearchBar } from './components/SearchBar';
-import { ProjectTree } from './components/ProjectTree';
-import { SessionList } from './components/SessionList';
-import { MessageView } from './components/MessageView';
-import { ConfirmDialog } from './components/ConfirmDialog';
-import { RecycleBinView } from './components/RecycleBinView';
-import { ResumeCommandCard } from './components/ResumeCommandCard';
-import { useSearch, type TimeRange } from './hooks/useSearch';
+import { GlobalSearchBar } from './components/GlobalSearchBar';
+import { ProjectSelector } from './components/ProjectSelector';
+import { WatcherStatusIndicator } from './components/WatcherStatusIndicator';
+import { ComingSoon } from './components/ComingSoon';
+import { SessionsPane } from './modules/sessions/SessionsModule';
+import { McpManager } from './modules/mcp/McpManager';
+import { SkillsManager } from './modules/skills/SkillsManager';
+import { CommandsManager } from './modules/commands/CommandsManager';
+import { SubAgentsManager } from './modules/sub_agents/SubAgentsManager';
+import { HooksManager } from './modules/hooks/HooksManager';
+import { PluginsManager } from './modules/plugins/PluginsManager';
+import { ProfileManager } from './modules/profiles/ProfileManager';
+import { AnalyticsModule } from './modules/analytics/AnalyticsModule';
+
+const { Header, Sider, Content } = Layout;
+
+const TAB_KEYS = [
+  'sessions',
+  'mcp',
+  'skills',
+  'commands',
+  'sub-agents',
+  'hooks',
+  'plugins',
+  'profiles',
+  'usage',
+] as const;
+
+type TabKey = (typeof TAB_KEYS)[number];
+
+const TAB_LABELS: Record<TabKey, string> = {
+  sessions: '会话',
+  mcp: 'MCP',
+  skills: 'Skills',
+  commands: 'Commands',
+  'sub-agents': 'Sub-Agents',
+  hooks: 'Hooks',
+  plugins: '插件',
+  profiles: 'Profiles',
+  usage: '用量分析',
+};
 
 export default function AppRoot() {
   return (
@@ -22,232 +53,76 @@ export default function AppRoot() {
   );
 }
 
+const TAB_WAVES: Record<TabKey, number> = {
+  sessions: 0,
+  mcp: 1,
+  skills: 1,
+  commands: 1,
+  'sub-agents': 2,
+  hooks: 2,
+  plugins: 2,
+  profiles: 3,
+  usage: 3,
+};
+
 function App() {
-  const [tree, setTree] = useState<ProjectTreeNode[]>([]);
-  const [flatProjects, setFlatProjects] = useState<{ id: number; name: string }[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
-  const [sessions, setSessions] = useState<SessionRow[]>([]);
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<MessageRow[]>([]);
-  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
-  const [query, setQuery] = useState('');
-  const [projectFilter, setProjectFilter] = useState<number[] | null>(null);
-  const [timeRange, setTimeRange] = useState<TimeRange>('all');
-  const [showRecycleBin, setShowRecycleBin] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [confirmSoft, setConfirmSoft] = useState<string | null>(null);
-  const [confirmPermanent, setConfirmPermanent] = useState<SessionRow | null>(null);
-  const [resumeCommand, setResumeCommand] = useState<ResumeCommand | null>(null);
-
-  const fetchResumeCommand = useCallback(async (sessionId: string) => {
-    setResumeCommand(null);
-    try {
-      const cmd = await api.resumeSession(sessionId);
-      setResumeCommand(cmd);
-    } catch (e) {
-      console.error('Failed to fetch resume command', e);
-      setResumeCommand(null);
-    }
-  }, []);
-
-  // 切到不同 session 时清空命令
-  useEffect(() => {
-    if (selectedSessionId) {
-      fetchResumeCommand(selectedSessionId);
-    } else {
-      setResumeCommand(null);
-    }
-  }, [selectedSessionId, fetchResumeCommand]);
-
-  const { hits, searched } = useSearch(query, projectFilter, timeRange);
-
-  useEffect(() => {
-    (async () => {
-      const t = await api.listProjectTree();
-      setTree(t);
-      // Flat list — every project is a peer; no children to walk.
-      setFlatProjects(t.map((n) => ({ id: n.id, name: n.name })));
-    })();
-  }, [refreshKey]);
-
-  // 首次导入完成后主进程推送 import_done，触发刷新（只在 Electron 中有效）
-  useEffect(() => {
-    window.api.onImportDone(() => setRefreshKey((k) => k + 1));
-  }, []);
-
-  useEffect(() => {
-    if (selectedProjectId === null) {
-      setSessions([]);
-      return;
-    }
-    api.listSessions(selectedProjectId, false).then(setSessions);
-  }, [selectedProjectId, refreshKey]);
-
-  useEffect(() => {
-    if (!selectedSessionId) {
-      setMessages([]);
-      return;
-    }
-    api.listMessages(selectedSessionId).then(setMessages);
-  }, [selectedSessionId]);
-
-  const refresh = () => setRefreshKey((k) => k + 1);
+  const [activeTab, setActiveTab] = useState<TabKey>('sessions');
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100vh',
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      }}
-    >
-      <SearchBar
-        query={query}
-        onQueryChange={setQuery}
-        onShowRecycleBin={() => setShowRecycleBin((v) => !v)}
-        showingRecycleBin={showRecycleBin}
-        projectIds={projectFilter}
-        onProjectIdsChange={setProjectFilter}
-        timeRange={timeRange}
-        onTimeRangeChange={setTimeRange}
-        availableProjects={flatProjects}
-      />
-      {showRecycleBin ? (
-        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-          <RecycleBinView
-            refreshKey={refreshKey}
-            onRestore={async (id) => { await api.restoreSession(id); refresh(); }}
-            onPermanentDelete={(id) => {
-              const target = sessions.find((s) => s.sessionId === id) || ({ sessionId: id, title: id } as SessionRow);
-              setConfirmPermanent(target);
-            }}
-          />
-          <div style={{ flex: 1, padding: 40, color: '#6b7280', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            回收站 — 选择左侧会话进行恢复或永久删除
-          </div>
+    <Layout style={{ height: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+      <Header
+        style={{
+          height: 64,
+          background: '#fff',
+          borderBottom: '1px solid #e5e7eb',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
+          padding: '0 24px',
+        }}
+      >
+        <div style={{ fontWeight: 700, fontSize: 16, marginRight: 8 }}>cc-session-manager</div>
+        <GlobalSearchBar />
+        <ProjectSelector />
+        <div style={{ marginLeft: 'auto' }}>
+          <WatcherStatusIndicator />
         </div>
-      ) : (
-        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-          <ProjectTree
-            projects={tree}
-            selectedProjectId={selectedProjectId}
-            onSelect={setSelectedProjectId}
+      </Header>
+      <Layout>
+        <Sider width={200} style={{ background: '#fafafa', borderRight: '1px solid #e5e7eb' }}>
+          <Tabs
+            tabPosition="left"
+            activeKey={activeTab}
+            onChange={(k) => setActiveTab(k as TabKey)}
+            style={{ height: '100%' }}
+            tabBarStyle={{ width: '100%' }}
+            items={TAB_KEYS.map((k) => ({ key: k, label: TAB_LABELS[k] }))}
           />
-          {query.trim() ? (
-            <SearchResultsPane
-              hits={hits}
-              searched={searched}
-              onPick={(hit) => {
-                setSelectedProjectId(hit.projectId);
-                setSelectedSessionId(hit.message.sessionId);
-                setHighlightedMessageId(hit.message.uuid);
-                setQuery('');
-              }}
-            />
+        </Sider>
+        <Content style={{ background: '#fff', overflow: 'auto' }}>
+          {activeTab === 'sessions' ? (
+            <SessionsPane />
+          ) : activeTab === 'mcp' ? (
+            <McpManager />
+          ) : activeTab === 'skills' ? (
+            <SkillsManager />
+          ) : activeTab === 'commands' ? (
+            <CommandsManager />
+          ) : activeTab === 'sub-agents' ? (
+            <SubAgentsManager />
+          ) : activeTab === 'hooks' ? (
+            <HooksManager />
+          ) : activeTab === 'plugins' ? (
+            <PluginsManager />
+          ) : activeTab === 'profiles' ? (
+            <ProfileManager />
+          ) : activeTab === 'usage' ? (
+            <AnalyticsModule />
           ) : (
-            <>
-              <SessionList
-                sessions={sessions}
-                selectedSessionId={selectedSessionId}
-                onSelect={(id) => { setSelectedSessionId(id); setHighlightedMessageId(null); }}
-                onSoftDelete={setConfirmSoft}
-              />
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                <ResumeCommandCard
-                  sessionId={selectedSessionId}
-                  resumeCommand={resumeCommand}
-                  onFetch={fetchResumeCommand}
-                />
-                <MessageView
-                  messages={messages}
-                  highlightedMessageId={highlightedMessageId}
-                />
-              </div>
-            </>
+            <ComingSoon label={TAB_LABELS[activeTab]} wave={TAB_WAVES[activeTab]} />
           )}
-        </div>
-      )}
-      <ConfirmDialog
-        open={!!confirmSoft}
-        title="移到回收站"
-        message="此会话将进入回收站，可随时恢复。"
-        confirmText="移到回收站"
-        onCancel={() => setConfirmSoft(null)}
-        onConfirm={async () => {
-          if (confirmSoft) await api.softDeleteSession(confirmSoft);
-          setConfirmSoft(null);
-          refresh();
-        }}
-      />
-      <ConfirmDialog
-        open={!!confirmPermanent}
-        title="永久删除"
-        message={`此操作不可恢复！请输入会话标题以确认：${
-          confirmPermanent?.title || confirmPermanent?.sessionId
-        }`}
-        confirmText="永久删除"
-        requireInput={confirmPermanent?.title || ''}
-        onCancel={() => setConfirmPermanent(null)}
-        onConfirm={async () => {
-          if (confirmPermanent) await api.permanentDeleteSession(confirmPermanent.sessionId);
-          setConfirmPermanent(null);
-          refresh();
-        }}
-      />
-    </div>
+        </Content>
+      </Layout>
+    </Layout>
   );
 }
-
-const SearchResultsPane: React.FC<{
-  hits: SearchHit[];
-  searched: boolean;
-  onPick: (hit: SearchHit) => void;
-}> = ({ hits, searched, onPick }) => {
-  if (searched && hits.length === 0) {
-    return (
-      <div style={{ width: 400, borderRight: '1px solid #e5e7eb', padding: 16, background: '#fff' }}>
-        <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description={
-            <div>
-              <div style={{ marginBottom: 8 }}>未找到匹配会话</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', lineHeight: 1.6 }}>
-                建议：<br />
-                · 检查关键词拼写<br />
-                · 时间范围改成"全部"<br />
-                · 回收站里的内容默认不搜
-              </div>
-            </div>
-          }
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ width: 400, borderRight: '1px solid #e5e7eb', overflowY: 'auto' }}>
-      <div style={{ padding: '12px 16px', fontSize: 12, color: '#6b7280', fontWeight: 600, background: '#fafafa', borderBottom: '1px solid #e5e7eb' }}>
-        搜索结果 ({hits.length})
-      </div>
-      {hits.map((h) => (
-        <Card
-          key={h.message.uuid}
-          size="small"
-          hoverable
-          onClick={() => onPick(h)}
-          style={{ margin: 8, cursor: 'pointer' }}
-        >
-          <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>
-            <Tag color="blue">{h.projectName}</Tag>
-            <span style={{ marginLeft: 4 }}>{h.sessionTitle || '(无标题)'}</span>
-          </div>
-          <div
-            style={{ fontSize: 13, lineHeight: 1.6, color: '#1f2937' }}
-            dangerouslySetInnerHTML={{ __html: h.snippet }}
-          />
-        </Card>
-      ))}
-    </div>
-  );
-};

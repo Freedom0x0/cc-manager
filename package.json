@@ -1,6 +1,6 @@
 {
   "name": "cc-manager",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "本地管理 Claude Code 会话历史:查看、搜索、继续会话",
   "author": "Freedom0x0",
   "license": "MIT",
@@ -17,7 +17,7 @@
     "dev": "concurrently -k -n vite,electron -c blue,green \"vite\" \"npm run dev:electron\"",
     "dev:electron": "wait-on tcp:5173 && tsc -p tsconfig.electron.json && cross-env NODE_ENV=development electron .",
     "build": "tsc -p tsconfig.electron.json && vite build",
-    "test": "cross-env ELECTRON_RUN_AS_NODE=1 electron --import tsx --test tests/db.test.ts tests/parser.test.ts tests/importer.test.ts tests/projects-repo.test.ts tests/sessions-repo.test.ts tests/search.test.ts tests/tree.test.ts tests/resumer.test.ts",
+    "test": "cross-env ELECTRON_RUN_AS_NODE=1 electron --import tsx --test tests/db.test.ts tests/parser.test.ts tests/importer.test.ts tests/projects-repo.test.ts tests/sessions-repo.test.ts tests/search.test.ts tests/tree.test.ts tests/resumer.test.ts tests/template.test.ts tests/watcher.test.ts tests/global-search.test.ts tests/mcp.test.ts tests/mcp-ui-smoke.test.ts tests/skills.test.ts tests/skills-ui-smoke.test.ts tests/commands.test.ts tests/commands-ui-smoke.test.ts tests/sub-agents.test.ts tests/sub-agents-ui-smoke.test.ts tests/hooks.test.ts tests/hooks-ui-smoke.test.ts tests/plugins.test.ts tests/plugins-ui-smoke.test.ts tests/profiles.test.ts tests/profiles-ui-smoke.test.ts tests/usage.test.ts tests/usage-ui-smoke.test.ts",
     "typecheck": "tsc -p tsconfig.electron.json --noEmit && tsc --noEmit",
     "rebuild:sqlite": "electron-rebuild -f -w better-sqlite3",
     "package": "npm run build && electron-builder",
@@ -43,6 +43,7 @@
   "dependencies": {
     "antd": "^6.5.2",
     "better-sqlite3": "^11.10.0",
+    "chokidar": "^5.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   }

@@ -68,6 +68,28 @@ CREATE TRIGGER IF NOT EXISTS messages_au AFTER UPDATE ON messages BEGIN
   INSERT INTO messages_fts(messages_fts, rowid, content) VALUES('delete', old.id, old.content);
   INSERT INTO messages_fts(rowid, content) VALUES (new.id, new.content);
 END;
+
+-- v5 wave-0: watcher 单值 KV 表,记录 chokidar 监听状态/最后事件/最后错误。
+-- 列收敛到 3 列(KV 模型):key 唯一 / value 存 JSON 或纯文本 / updated_at 时间戳。
+-- 故意偏离 RD §4 模板的 5 列(id+key UNIQUE 冗余、last_event 与 value 概念重叠):违反 Simplicity First。
+-- watcher-state.ts 4 函数(getState/setStatus/recordEvent/recordError)共享这一个 KV 表,不同 key 隔离。
+CREATE TABLE IF NOT EXISTS watcher_state (
+  key TEXT PRIMARY KEY,
+  value TEXT,
+  updated_at INTEGER NOT NULL
+);
+
+-- v5 wave-1 MCP 模块:enabled 状态 + last_modified 时间戳的 KV 表。
+-- 与 watcher_state 共用 3 列 KV 模型(key PRIMARY KEY / value / updated_at)— Simplicity First。
+-- key 约定:
+--   'enabled:<server-name>'        → 'true' / 'false'(用户 toggle 的启用状态,独立于原文件 ~/.claude.json)
+--   'last_modified:<server-name>'  → ISO timestamp(原文件 mcpServers[name] 的 mtime 字符串)
+-- 本表故意**不**存真实 mcpServers 配置:那是 scanner 读 ~/.claude.json 的事(D6 决策)。
+CREATE TABLE IF NOT EXISTS mcp_server_state (
+  key TEXT PRIMARY KEY,
+  value TEXT,
+  updated_at INTEGER NOT NULL
+);
 `;
 
 export function initDB(dbPath: string): DB {

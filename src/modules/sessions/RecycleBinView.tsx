@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Empty } from 'antd';
-import { api } from '../api';
-import type { SessionRow } from '../types';
+import { api } from '../../api';
+import type { SessionRow } from '../../types';
 import { SessionList } from './SessionList';
 
 interface Props {
