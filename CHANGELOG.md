@@ -37,3 +37,16 @@
 - McpManager / SkillsManager / CommandsManager 三个 UI 完整实装(各 ~150-330 行),antd List + Switch + Modal + Form
 - 测试 44 → 69(基线 30 + 14 wave-0 + 5 + 3 + 5 + 3 + 5 + 3 = 69)
 - npm test: 69 passed / 0 failed
+
+## v2.1 — wave-2 业务模块上线 (2026-07-29)
+
+- Sub-Agents 模块:扫描 `~/.claude/agents/<name>.md`,看 / 改 / 删 / 启停 6 个 IPC(`subagent_list` / `subagent_get` / `subagent_create` / `subagent_update` / `subagent_delete` + `subagent_toggle_enabled`)
+- Hooks 模块:扫描 `~/.claude/settings.json` 的 `hooks` 字段(pre/post tool 触发),看 / 改 / 删 / 启停 6 个 IPC(`hook_*` + `hook_toggle_enabled`)
+- 插件模块:扫描 `~/.claude/plugins/<name>/plugin.json`,看 / 改 / 删 / 启停 6 个 IPC(`plugin_*` + `plugin_toggle_enabled`)
+- 18 个新 IPC channel,每个模块 6 个(共 18 覆盖 3 模块)
+- 累计 IPC channel:34 → 52
+- enabled 状态走 KV 表(D6 决策延伸,不污染原文件)
+- settings.json / plugin.json 原子写(D7 决策,失败不破坏原文件)
+- SubAgentsManager / HooksManager / PluginsManager 三个 UI 完整实装
+- 测试 69 → 93(基线 30 + 14 wave-0 + 5+3+5+3+5+3 wave-1 + 5+3+5+3+5+3 wave-2 = 93)
+- npm test: 93 passed / 0 failed
