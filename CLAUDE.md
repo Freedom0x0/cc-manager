@@ -180,6 +180,7 @@ cc-session-manager/
 - **2026-07-28 v5 D6**：enabled 状态走 KV 表（`mcp_server_state.enabled:<name>` 或 `skill:` / `cmd:` 前缀），不复用原文件（避免污染 `~/.claude.json` / SKILL.md / commands/*.md 的语义）。这是 wave-1 v2.0 的核心约束 — 用户 toggle 不破坏原文件结构
 - **2026-07-29 v5 D7**：`~/.claude/settings.json` 和 `~/.claude/plugins/<name>/plugin.json` 等 JSON 配置走原子写（tmp + rename），失败 catch unlink tmp 残留 + 保留原文件。Hook / 插件模块的 create/update/delete 都走此模式，不破坏原文件其他字段
 - **2026-07-29 v5 D9**：所有 6 个业务模块（MCP / Skills / Commands / Sub-Agents / Hooks / 插件）的 enabled 状态都走 `mcp_server_state` KV 表，不复用各自原文件。key 前缀区分（`mcp:` / `skill:` / `cmd:` / `agent:` / `hook:` / `plugin:`）。D6 决策延伸，统一走一张表简化
+- **2026-07-29 macOS 适配**：`getDataDir()` 已做跨平台：Windows 用 `%APPDATA%`，macOS 用 `~/Library/Application Support`，Linux 用 `$XDG_CONFIG_HOME` 或 `~/.config`。`logFile()` 复用同一函数，不再有独立 fallback 路径。chokidar 需单独 `npm install`（package.json `dependencies` 已有，但 mac 首次 `npm install --ignore-scripts` 后需验证）
 
 ## 14. 用户语言
 
