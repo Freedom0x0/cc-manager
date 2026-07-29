@@ -1,55 +1,153 @@
 # CC Manager
 
-> 本地管理 Claude Code 会话历史:查看、搜索、继续会话
+> **Claude Code 一站式配置中心** — 管理 MCP / Skills / Commands / Sub-Agents / Hooks / 插件 / Profiles / 用量分析,本地 Windows 桌面工具
 
-一款 Windows 桌面工具,自动接管 `~/.claude/projects/` 下所有会话,提供比 `cc_switch` 更强的搜索和分类能力,无需登录云端。
+一款 Windows 桌面工具,把 Claude Code 的 `~/.claude/` 散落配置(MCP server、Skills、Commands、Sub-Agents、Hooks、插件)集中管理 + Profiles 切换 + 用量分析仪表盘。无需登录云端,数据全本地 `better-sqlite3` 存储。
 
 ## ✨ 特性
 
-- 📁 **自动扫描**:`~/.claude/projects/` 下所有 folder,每个 folder 视为一个项目
-- 🔍 **毫秒级全文搜索** — 基于 SQLite FTS5(unicode61 中文友好)
+### 核心
+- 📁 **自动扫描** `~/.claude/projects/` 下所有 folder,每个 folder 视为一个项目(基线 v1-v4 沿用)
+- 🔍 **毫秒级全文搜索** — SQLite FTS5(unicode61 中文友好)
 - 🗑️ **软删除 + 回收站** — 误删可恢复
-- 📋 **继续会话一键复制** — 不在 Electron 里 spawn 子进程(那玩意儿不可控),改返回 `claude --resume <id>` 命令字符串,你粘贴到终端执行
-- 🎨 **Ant Design UI** — 现代化交互,主题蓝色 `#2563eb`
-- 💾 **本地存储** — 所有数据存 `better-sqlite3` 库,无云端依赖
+- 📋 **继续会话一键复制** — 返回 `claude --resume <id>` 命令字符串,你粘贴到终端执行
+
+### v2.0+ 业务模块
+- 🧩 **6 业务模块 UI**(看 / 改 / 删 / 启停)
+  - **MCP** — 扫 `~/.claude.json` 的 `mcpServers`
+  - **Skills** — 扫 `~/.claude/skills/<name>/SKILL.md`
+  - **Commands** — 扫 `~/.claude/commands/<name>.md`
+  - **Sub-Agents** — 扫 `~/.claude/agents/<name>.md`
+  - **Hooks** — 改 `~/.claude/settings.json` 的 `hooks` 字段(原子写)
+  - **插件** — 扫 `~/.claude/plugins/<name>/plugin.json`(严格 schema)
+- 🔌 **chokidar 5 事件驱动 watcher** — 文件变化自动刷新 UI,无 polling
+- 🎛️ **Profiles 切换**(v3.0) — 命名快照 + 一键恢复整个 enabled 状态
+- 📊 **用量分析仪表盘**(v3.0) — 按日 / 按项目 / 按工具的 token / 消息 / 时长聚合 SQL
+
+### 工程
+- 🏗️ **模块化目录** — `electron/repo/<module>/` + `src/modules/<module>/`(D3 决策)
+- 🔒 **原子写** — JSON 配置 tmp + rename,失败 catch 还原(D7 决策)
+- 🧪 **109 测试 case / 0 typecheck 错误**
+- 💾 **enabled 状态走 KV 表** — 不污染原文件,统一 6 业务模块共用一张表(D6/D9 决策)
 
 ## 📥 下载
 
-前往 [Releases 页面](https://github.com/Freedom0x0/cc-manager/releases)下载最新版本:
+前往 [Releases 页面](https://github.com/Freedom0x0/cc-manager/releases)下载最新 portable:
 
-| 文件 | 大小 | 说明 |
-|---|---|---|
-| `CC Manager-0.1.0-x64.exe` | ~90 MB | NSIS 安装器(传统 Next 安装流程) |
-| `CC Manager-0.1.0-portable.exe` | ~90 MB | 免安装绿色版,双击即用 |
+| 版本 | 文件 | 大小 | 包含 |
+|---|---|---|---|
+| v0.3.0 | `CC Manager-0.3.0-portable.exe` | ~80 MB | 完整版(8 业务模块 + Profiles + 用量分析 + 3 IPC + watch) |
+| v0.2.0 | `CC Manager-0.2.0-portable.exe` | ~80 MB | MCP / Skills / Commands 3 模块 |
+| v0.1.0 | `CC Manager-0.1.0-portable.exe` | ~80 MB | 骨架(8 占位模块) |
 
-> Windows 10/11 64-bit,首次启动会自动扫描 `C:\Users\<你>\.claude\projects\` 并入库。
+> Windows 10/11 64-bit,免安装,双击即用。首次启动自动扫描 `C:\Users\<你>\.claude\projects\` 并入库。
 
 ## 🚀 快速开始
 
-### 安装版
-
-1. 下载 `CC Manager-0.1.0-x64.exe`
-2. 双击安装 → 选目录 → 完成
-3. 桌面双击 "CC Manager" 图标启动
-
-### 免安装版
-
-1. 下载 `CC Manager-0.1.0-portable.exe`
+1. 下载 `CC Manager-0.3.0-portable.exe`
 2. 放到任意目录(比如 `D:\Tools\`)
 3. 双击运行
 
-首次启动会自动:
+首次启动自动:
 - 创建 `%APPDATA%\cc-session-manager\app.db` 数据文件
 - 扫描 `~/.claude/projects/` 把所有 session 入库
-- 显示项目栏(左)、会话列表(中)、消息视图(右)
+- 顶部 3 组件:全局搜索 / 项目选择 / Watcher 状态
+- 左侧 9 Tab:会话 / MCP / Skills / Commands / Sub-Agents / Hooks / 插件 / Profiles / 用量分析
+
+## 🧩 9 Tab 业务模块
+
+| Tab | 状态 | 读取 | 编辑 |
+|---|---|---|---|
+| **会话**(Sessions) | ✅ 真实 | `~/.claude/projects/<folder>/*.jsonl` | 看消息 / 搜 / 删 / 恢复 / 复制 resume 命令 |
+| **MCP** | ✅ 真实 | `~/.claude.json` mcpServers | 看 / 改 / 删 / 启停 |
+| **Skills** | ✅ 真实 | `~/.claude/skills/<name>/SKILL.md` | 看 / 改 / 删 / 启停 |
+| **Commands** | ✅ 真实 | `~/.claude/commands/<name>.md` | 看 / 改 / 删 / 启停 |
+| **Sub-Agents** | ✅ 真实 | `~/.claude/agents/<name>.md` | 看 / 改 / 删 / 启停 |
+| **Hooks** | ✅ 真实 | `~/.claude/settings.json` hooks 字段 | 看 / 改 / 删 / 启停(原子写) |
+| **插件** | ✅ 真实 | `~/.claude/plugins/<name>/plugin.json` | 看 / 改 / 删 / 启停(严格 schema 校验) |
+| **Profiles** | ✅ 真实 | `~/.claude/profiles.json` | 命名快照 + 一键 apply + 启用事务化(失败回滚) |
+| **用量分析** | ✅ 真实 | sessions / messages 聚合 | 按日 / 按项目 / 按工具的 token + 消息数 + 时长 |
+
+## 🏗️ 架构
+
+### 三层链路(基线 v1+ 沿用)
+```
+[React 组件] → [src/api.ts] → [window.api] → [preload.ts]
+                                           ↓
+                                    [IPC channel]
+                                           ↓
+[main.ts handler] → [repo 函数] → [better-sqlite3 + FTS5]
+```
+
+### 模块化目录(v2+ 沿用)
+```
+cc-manager/
+├── electron/
+│   ├── main.ts                     # initDB → startWatcher → IPC 注册
+│   ├── watcher.ts                  # chokidar 5 事件驱动 + dynamic import
+│   ├── db/connection.ts            # schema + 兼容 ALTER
+│   ├── repo/
+│   │   ├── _template/              # 4 文件 + README(波 1+ 业务模块 cp -r)
+│   │   ├── mcp/                    # v2.0
+│   │   ├── skills/                 # v2.0
+│   │   ├── commands/               # v2.0
+│   │   ├── sub-agents/             # v2.1
+│   │   ├── hooks/                  # v2.1(原子写 settings.json)
+│   │   ├── plugins/                # v2.1(严格 schema 校验)
+│   │   ├── profiles/               # v3.0(命名快照 + 事务化 apply)
+│   │   ├── usage/                  # v3.0(只读聚合 SQL)
+│   │   ├── watcher-state.ts        # 4 prepared statement(D1 决策 3 列 KV)
+│   │   └── projects/sessions/messages/search/tree.ts
+│   └── resumer.ts                  # 生成 claude --resume 命令
+├── src/
+│   ├── App.tsx (99 行)             # 9 Tab 导航壳子(D4 决策)
+│   ├── components/                 # 3 Header 占位 + ComingSoon
+│   ├── modules/
+│   │   ├── sessions/               # 9 components + SessionsModule 入口
+│   │   ├── mcp/McpManager.tsx      # v2.0 实装
+│   │   ├── skills/SkillsManager.tsx
+│   │   ├── commands/CommandsManager.tsx
+│   │   ├── sub_agents/SubAgentsManager.tsx # v2.1
+│   │   ├── hooks/HooksManager.tsx
+│   │   ├── plugins/PluginsManager.tsx
+│   │   ├── profiles/ProfileManager.tsx   # v3.0
+│   │   └── analytics/AnalyticsModule.tsx # v3.0
+│   └── api.ts / types.ts / mock.ts / global.d.ts
+├── tests/                          # 109 case / 13 文件
+├── docs/superpowers/specs/         # 设计 spec
+└── electron-builder.json           # NSIS + Portable 配置
+```
+
+### IPC 累计 61 个
+
+| 来源 | 数量 | 备注 |
+|---|---|---|
+| 基线 (v1+) | 13 | list/list_project_tree/list_sessions 等 |
+| watcher (v5) | 3 | global_search + watcher_rescan_all + watcher_get_status |
+| wave-1 业务模块 | 18 | MCP / Skills / Commands 各 6 |
+| wave-2 业务模块 | 18 | Sub-Agents / Hooks / 插件 各 6 |
+| wave-3 业务模块 | 12 | Profiles / 用量分析 各 6 |
+
+### 关键决策(CLAUDE.md §13)
+
+- **D1**:watcher_state 3 列 KV 模型(Simplicity First)
+- **D2**:chokidar 5.0.0 ABI 兼容 Electron 32 + Node 22,`usePolling: false` 显式声明
+- **D3**:模块化目录 = `src/modules/` + `electron/repo/<module>/`
+- **D4**:App.tsx 改导航壳子,业务下放 modules/(248 → 99 行)
+- **D5**:`ProjectList.tsx` 删(全代码库 0 引用,违反"不留死代码")
+- **D6**:enabled 状态走 KV 表(不复用原文件,避免污染)
+- **D7**:settings.json / plugin.json 原子写(tmp + rename)
+- **D8**:跨平台代码用 `process.platform` + `os.homedir()`(OS 中性)
+- **D9**:6 模块 enabled 状态统一走 `mcp_server_state` 表(D6 延伸)
 
 ## 🛠️ 开发者
 
 ### 环境要求
 
-- Node.js 22+ (用 `ELECTRON_RUN_AS_NODE` 跑测试,避免 better-sqlite3 ABI 不匹配)
+- **Node.js 22+**(用 `ELECTRON_RUN_AS_NODE=1 electron` 跑测试,避免 better-sqlite3 ABI 不匹配)
 - npm 9+
 - Windows 10/11 64-bit(开发平台)
+- TypeScript 5+ / Electron 32 / better-sqlite3 11 / chokidar 5 / antd 6
 
 ### 开发模式
 
@@ -63,70 +161,45 @@ npm run dev      # 同时启 Vite(5173) + Electron
 ### 跑测试
 
 ```bash
-npm test         # 30 个 case,必须用 ELECTRON_RUN_AS_NODE
+npm test         # 109 个 case
+                 # 必须用 ELECTRON_RUN_AS_NODE(已配在 scripts.test)
 ```
 
 ### 类型检查
 
 ```bash
-npm run typecheck   # electron + renderer 都检查
+npm run typecheck   # electron + renderer 都检查,要求 0 errors
 ```
 
 ### 打包
 
 ```bash
 npm run package              # 出 NSIS + Portable 双产物(到 release/)
-npm run package:portable     # 只出 Portable
+npm run package:portable     # 只出 Portable(80 MB 左右)
 ```
 
-> **首次打包**需要在 Windows 开启"开发人员模式",否则 7z 解压 darwin symlink 会失败。
+### 推送(SSH 协议)
 
-## 🏗️ 架构
+> 本机 443 端口被 ISP 挡,推 GitHub 用 SSH 22 端口。
 
-```
-[React 组件] → [src/api.ts 包装] → [window.api] → [preload.ts]
-                                              ↓
-                                       [IPC channel]
-                                              ↓
-[main.ts handler] → [repo 函数] → [better-sqlite3 + FTS5]
-```
-
-每加一个功能,**7 个文件都改**(`types.ts` / `global.d.ts` / `mock.ts` / `main.ts` / `preload.ts` / `api.ts` / 组件)。漏一个 = 编译错或运行时崩。
-
-### 项目结构
-
-```
-cc-manager/
-├── electron/                       # Node 后端
-│   ├── main.ts                     # Electron 主进程 + IPC 注册
-│   ├── preload.ts                  # contextBridge 暴露 window.api
-│   ├── db/connection.ts            # schema + 兼容 ALTER
-│   ├── importer/{scanner,parser,index,migrate}.ts
-│   ├── repo/{projects,sessions,messages,search,tree,types}.ts
-│   └── resumer.ts                  # 生成 claude --resume 命令
-├── src/                            # React 渲染进程
-│   ├── main.tsx / App.tsx
-│   ├── components/                 # 7 个 antd 组件
-│   ├── hooks/useSearch.ts
-│   ├── api.ts / types.ts / mock.ts / mock-data.ts
-│   └── global.d.ts                 # window.api 类型
-├── tests/                          # 30 个 node --test case
-├── docs/superpowers/specs/         # 设计 spec
-├── build/                          # electron-builder 资源(icon, LICENSE)
-├── electron-builder.json           # NSIS + Portable 配置
-└── package.json
+```bash
+git remote set-url origin git@github.com:Freedom0x0/cc-manager.git
+git push origin main --tags
 ```
 
 ## 🔧 已知限制
 
-- ⚠️ **目前只支持 Windows** — electron-builder config 没配 macOS / Linux 产物
-- ⚠️ **数据迁移**:v1 → v4 升级时老库 cwd-style 假 project 会自动归档(`is_archived=1`),不显示
-- ⚠️ **继续会话**:返回命令字符串让用户复制到终端执行,**不**在应用里直接 spawn(避免 Windows 进程生命周期问题)
+- ⚠️ **目前只支持 Windows** — electron-builder 没配 macOS / Linux(macOS 适配 v4.0 范围)
+- ⚠️ **chokidar 5 pure ESM** — Electron 主进程 CJS 需 `await import('chokidar')` + tsconfig `module: NodeNext`
+- ⚠️ **enabled KV 表名 `mcp_server_state`** — 表名 6 模块复用,key 前缀区分(`mcp:` / `skill:` / `cmd:` / `agent:` / `hook:` / `plugin:`)
+- ⚠️ **frontmatter 解析简化** — Skills / Commands / Sub-Agents 用正则手 parse,只支持 `key: value` 单行(YAML 复杂特性不支持)
+- ⚠️ **continue session** — 返回命令字符串让用户复制到终端执行,**不**在应用里直接 spawn
 
 ## 🐛 反馈
 
 - [GitHub Issues](https://github.com/Freedom0x0/cc-manager/issues) — 报 bug / 提需求
-- 已知问题 + 解决方案:见 `CLAUDE.md`(项目根目录)
+- 项目宪法:见 `CLAUDE.md`(根目录)
+- 决策记录:见 `CLAUDE.md` §13
 
 ## 📜 许可证
 
@@ -134,14 +207,14 @@ cc-manager/
 
 ## 🙏 致谢
 
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) — Anthropic 的 CLI 工具,本项目读取它的 session 存储
-- [cc_switch](https://github.com/) — 灵感来源(本项目解决它的搜索弱问题)
-- [Ant Design](https://ant.design/) — UI 组件库
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) — Anthropic 的 CLI 工具
+- [antd](https://ant.design/) — UI 组件库
 - [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) — 同步 SQLite 绑定
+- [chokidar](https://github.com/paulmillr/chokidar) — 文件监听
 - [electron-builder](https://www.electron.build/) — 打包工具
 
 ---
 
 <p align="center">
-  Made with ❤️ for Claude Code users
+  Made with ❤️ for Claude Code users · v0.3.0 / 2026-07-29
 </p>
