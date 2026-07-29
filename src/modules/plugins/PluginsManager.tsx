@@ -168,7 +168,7 @@ export const PluginsManager: React.FC = () => {
         <div>
           <h2 style={{ margin: 0 }}>插件</h2>
           <div style={{ color: '#6b7280', fontSize: 12, marginTop: 4 }}>
-            读取 ~/.claude/plugins/<name>/plugin.json · 严格 schema 校验
+            读取 ~/.claude/plugins/{`<name>`}/plugin.json · 严格 schema 校验
             (name/version/description 必填)· 启用状态独立存于 mcp_server_state KV 表
           </div>
         </div>
