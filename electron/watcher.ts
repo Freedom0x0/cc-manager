@@ -14,7 +14,10 @@
  * main.ts 集成是 Task 9 范围(本 task 不动 main.ts)。
  */
 
-import chokidar, { type FSWatcher } from 'chokidar';
+// chokidar@5+ 是 pure ESM (type=module),Electron 主进程是 CJS,不能用 require()
+// 修法 (main reducer, 2026-07-29):dynamic import
+// 详情见 dispatch 报告 + peaks-code RD §5 evidence
+import type { FSWatcher } from 'chokidar';
 import type { DB } from './db/connection';
 import { setStatus, recordEvent, recordError } from './repo/watcher-state';
 
@@ -27,6 +30,8 @@ import { setStatus, recordEvent, recordError } from './repo/watcher-state';
  */
 export async function startWatcher(db: DB, targetDir: string): Promise<FSWatcher> {
   setStatus(db, 'starting');
+  // dynamic import: chokidar 5.0.0 是 pure ESM,Electron CJS 必须 await import()
+  const chokidar = (await import('chokidar')).default;
 
   const watcher = chokidar.watch(targetDir, {
     ignoreInitial: true,
