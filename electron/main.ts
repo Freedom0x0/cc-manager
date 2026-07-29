@@ -17,6 +17,7 @@ import * as subAgentsRepo from './repo/sub-agents';
 import * as hooksRepo from './repo/hooks';
 import * as pluginsRepo from './repo/plugins';
 import * as profilesRepo from './repo/profiles';
+import * as usageRepo from './repo/usage';
 import { buildResumeCommand } from './resumer';
 import { startWatcher } from './watcher';
 
@@ -265,6 +266,29 @@ app.whenReady().then(() => {
   ipcMain.handle('profile_delete', (_e, name: string) => profilesRepo.deleteProfile(name));
   ipcMain.handle('profile_update', (_e, name: string, patch) =>
     profilesRepo.updateProfile(name, patch)
+  );
+
+  // v5 wave-3 用量分析 模块 — 6 IPC channel。全只读聚合,无 create / update /
+  // delete / toggle。基于 sessions / messages 表做 COUNT / SUM / GROUP BY +
+  // json_extract(content_blocks, '$.name') 提 tool_use.name。token 数走
+  // JS 端估算(text / thinking length + tool_use.input JSON length,均 /4)。
+  ipcMain.handle('usage_summary', (_e, rangeDays: number = 30) =>
+    usageRepo.usageSummary(db, rangeDays)
+  );
+  ipcMain.handle('usage_get_session_cost', (_e, sessionId: string) =>
+    usageRepo.getSessionCost(db, sessionId)
+  );
+  ipcMain.handle('usage_get_session_timeline', (_e, sessionId: string) =>
+    usageRepo.getSessionTimeline(db, sessionId)
+  );
+  ipcMain.handle('usage_get_project_breakdown', (_e, projectId: number) =>
+    usageRepo.getProjectBreakdown(db, projectId)
+  );
+  ipcMain.handle('usage_get_daily_breakdown', (_e, rangeDays: number = 30) =>
+    usageRepo.getDailyBreakdown(db, rangeDays)
+  );
+  ipcMain.handle('usage_get_top_tools', (_e, limit: number = 10) =>
+    usageRepo.getTopTools(db, limit)
   );
 
   createWindow();

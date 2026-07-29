@@ -28,6 +28,12 @@ import type {
   Profile,
   ProfileCreateInput,
   ProfileUpdatePatch,
+  UsageSummary,
+  SessionCost,
+  SessionTimeline,
+  UsageByProjectRow,
+  UsageByDayRow,
+  UsageByToolRow,
 } from './types';
 
 export const api = {
@@ -118,4 +124,17 @@ export const api = {
   profileDelete: (name: string): Promise<void> => window.api.profileDelete(name),
   profileUpdate: (name: string, patch: ProfileUpdatePatch): Promise<void> =>
     window.api.profileUpdate(name, patch),
+  // v5 wave-3 用量分析 module — 6 IPC wrappers(全只读聚合)
+  usageSummary: (rangeDays: number): Promise<UsageSummary> =>
+    window.api.usageSummary(rangeDays),
+  usageGetSessionCost: (sessionId: string): Promise<SessionCost | null> =>
+    window.api.usageGetSessionCost(sessionId),
+  usageGetSessionTimeline: (sessionId: string): Promise<SessionTimeline | null> =>
+    window.api.usageGetSessionTimeline(sessionId),
+  usageGetProjectBreakdown: (projectId: number): Promise<UsageByProjectRow | null> =>
+    window.api.usageGetProjectBreakdown(projectId),
+  usageGetDailyBreakdown: (rangeDays: number): Promise<UsageByDayRow[]> =>
+    window.api.usageGetDailyBreakdown(rangeDays),
+  usageGetTopTools: (limit: number): Promise<UsageByToolRow[]> =>
+    window.api.usageGetTopTools(limit),
 };

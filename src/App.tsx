@@ -13,6 +13,7 @@ import { SubAgentsManager } from './modules/sub_agents/SubAgentsManager';
 import { HooksManager } from './modules/hooks/HooksManager';
 import { PluginsManager } from './modules/plugins/PluginsManager';
 import { ProfileManager } from './modules/profiles/ProfileManager';
+import { AnalyticsModule } from './modules/analytics/AnalyticsModule';
 
 const { Header, Sider, Content } = Layout;
 
@@ -115,6 +116,8 @@ function App() {
             <PluginsManager />
           ) : activeTab === 'profiles' ? (
             <ProfileManager />
+          ) : activeTab === 'usage' ? (
+            <AnalyticsModule />
           ) : (
             <ComingSoon label={TAB_LABELS[activeTab]} wave={TAB_WAVES[activeTab]} />
           )}

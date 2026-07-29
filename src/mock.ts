@@ -3,7 +3,21 @@
 // and take screenshots. The real Electron IPC is unaffected.
 
 import { testProjects, testSessions, testMessages, testSearchHits, testProjectTree } from './mock-data';
-import type { McpServer, Skill, Command, SubAgent, Hook, Plugin, Profile } from './types';
+import type {
+  McpServer,
+  Skill,
+  Command,
+  SubAgent,
+  Hook,
+  Plugin,
+  Profile,
+  UsageSummary,
+  SessionCost,
+  SessionTimeline,
+  UsageByProjectRow,
+  UsageByDayRow,
+  UsageByToolRow,
+} from './types';
 
 // v5 wave-1 MCP 模块 fixture。浏览器 dev 模式(纯 vite serve)用,
 const testMcpServers: McpServer[] = [
@@ -442,6 +456,187 @@ if (typeof window !== 'undefined' && !window.api) {
         };
       }
       return ok(undefined);
+    },
+    // v5 wave-3 用量分析 模块 — 6 mock。从 testSessions + testMessages 聚合,
+    // 行为与 electron/repo/usage/scanner.ts 同形(只读、rangeDays 过滤 byDay、
+    // totalSessions / totalMessages 全量计)。
+    usageSummary: (rangeDays: number) => {
+      const cutoff = Date.now() - rangeDays * 24 * 3600 * 1000;
+      const sessions = testSessions.filter((s) => !s.isDeleted);
+      const messages = testMessages;
+      const totalSessions = sessions.length;
+      const totalMessages = messages.length;
+      const totalDurationMs = sessions.reduce(
+        (acc, s) => acc + (s.lastMessageAt - s.startedAt),
+        0
+      );
+      // token 粗估:content 字符 / 4
+      const totalTokens = messages.reduce(
+        (acc, m) => acc + Math.floor(m.content.length / 4),
+        0
+      );
+
+      // byProject:从 sessions 聚合
+      const projectNameById = new Map(testProjects.map((p) => [p.id, p.name]));
+      const byProjectMap = new Map<number, UsageByProjectRow>();
+      for (const s of sessions) {
+        const cur =
+          byProjectMap.get(s.projectId) ??
+          {
+            projectId: s.projectId,
+            projectName: projectNameById.get(s.projectId) ?? '?',
+            sessions: 0,
+            messages: 0,
+            tokens: 0,
+          };
+        cur.sessions += 1;
+        byProjectMap.set(s.projectId, cur);
+      }
+      for (const m of messages) {
+        const s = sessions.find((x) => x.sessionId === m.sessionId);
+        if (!s) continue;
+        const cur = byProjectMap.get(s.projectId);
+        if (cur) {
+          cur.messages += 1;
+          cur.tokens += Math.floor(m.content.length / 4);
+        }
+      }
+      const byProject: UsageByProjectRow[] = Array.from(byProjectMap.values()).sort(
+        (a, b) => b.messages - a.messages
+      );
+
+      // byDay:rangeDays 窗口
+      const dayMap = new Map<string, { messages: number; tokens: number }>();
+      for (const m of messages) {
+        if (m.createdAt < cutoff) continue;
+        const day = new Date(m.createdAt).toISOString().slice(0, 10);
+        const cur = dayMap.get(day) ?? { messages: 0, tokens: 0 };
+        cur.messages += 1;
+        cur.tokens += Math.floor(m.content.length / 4);
+        dayMap.set(day, cur);
+      }
+      const byDay: UsageByDayRow[] = Array.from(dayMap.entries())
+        .map(([date, v]) => ({ date, messages: v.messages, tokens: v.tokens }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      // byTool:从 message.blocks 抽 tool_use.name
+      const toolMap = new Map<string, number>();
+      for (const m of messages) {
+        for (const b of m.blocks as Array<{ type: string; name?: string }>) {
+          if (b.type === 'tool_use' && typeof b.name === 'string') {
+            toolMap.set(b.name, (toolMap.get(b.name) ?? 0) + 1);
+          }
+        }
+      }
+      const byTool: UsageByToolRow[] = Array.from(toolMap.entries())
+        .map(([tool, count]) => ({ tool, count }))
+        .sort((a, b) => b.count - a.count);
+
+      return ok<UsageSummary>({
+        totalSessions,
+        totalMessages,
+        totalTokens,
+        totalDurationMs,
+        byProject,
+        byDay,
+        byTool,
+        generatedAt: new Date().toISOString(),
+      });
+    },
+    usageGetSessionCost: (sessionId) => {
+      const s = testSessions.find((x) => x.sessionId === sessionId);
+      if (!s) return ok(null);
+      const msgs = testMessages.filter((m) => m.sessionId === sessionId);
+      const tokens = msgs.reduce((acc, m) => acc + Math.floor(m.content.length / 4), 0);
+      const toolMap = new Map<string, number>();
+      for (const m of msgs) {
+        for (const b of m.blocks as Array<{ type: string; name?: string }>) {
+          if (b.type === 'tool_use' && typeof b.name === 'string') {
+            toolMap.set(b.name, (toolMap.get(b.name) ?? 0) + 1);
+          }
+        }
+      }
+      const tools: UsageByToolRow[] = Array.from(toolMap.entries())
+        .map(([tool, count]) => ({ tool, count }))
+        .sort((a, b) => b.count - a.count);
+      const projectName =
+        testProjects.find((p) => p.id === s.projectId)?.name ?? '(deleted)';
+      return ok<SessionCost>({
+        sessionId,
+        projectId: s.projectId,
+        projectName,
+        startedAt: s.startedAt,
+        lastMessageAt: s.lastMessageAt,
+        durationMs: s.lastMessageAt - s.startedAt,
+        messageCount: s.messageCount,
+        tokens,
+        tools,
+      });
+    },
+    usageGetSessionTimeline: (sessionId) => {
+      const s = testSessions.find((x) => x.sessionId === sessionId);
+      if (!s) return ok(null);
+      const msgs = testMessages.filter((m) => m.sessionId === sessionId);
+      const projectName =
+        testProjects.find((p) => p.id === s.projectId)?.name ?? '(deleted)';
+      return ok<SessionTimeline>({
+        sessionId,
+        projectName,
+        title: s.title,
+        entries: msgs.map((m) => ({
+          uuid: m.uuid,
+          role: m.role,
+          content: m.content,
+          createdAt: m.createdAt,
+        })),
+      });
+    },
+    usageGetProjectBreakdown: (projectId) => {
+      const p = testProjects.find((x) => x.id === projectId);
+      if (!p) return ok(null);
+      const sessions = testSessions.filter((s) => s.projectId === projectId && !s.isDeleted);
+      const messages = testMessages.filter((m) =>
+        sessions.some((s) => s.sessionId === m.sessionId)
+      );
+      const tokens = messages.reduce((acc, m) => acc + Math.floor(m.content.length / 4), 0);
+      return ok<UsageByProjectRow>({
+        projectId,
+        projectName: p.name,
+        sessions: sessions.length,
+        messages: messages.length,
+        tokens,
+      });
+    },
+    usageGetDailyBreakdown: (rangeDays) => {
+      const cutoff = Date.now() - rangeDays * 24 * 3600 * 1000;
+      const dayMap = new Map<string, { messages: number; tokens: number }>();
+      for (const m of testMessages) {
+        if (m.createdAt < cutoff) continue;
+        const day = new Date(m.createdAt).toISOString().slice(0, 10);
+        const cur = dayMap.get(day) ?? { messages: 0, tokens: 0 };
+        cur.messages += 1;
+        cur.tokens += Math.floor(m.content.length / 4);
+        dayMap.set(day, cur);
+      }
+      const out: UsageByDayRow[] = Array.from(dayMap.entries())
+        .map(([date, v]) => ({ date, messages: v.messages, tokens: v.tokens }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+      return ok(out);
+    },
+    usageGetTopTools: (limit) => {
+      const toolMap = new Map<string, number>();
+      for (const m of testMessages) {
+        for (const b of m.blocks as Array<{ type: string; name?: string }>) {
+          if (b.type === 'tool_use' && typeof b.name === 'string') {
+            toolMap.set(b.name, (toolMap.get(b.name) ?? 0) + 1);
+          }
+        }
+      }
+      const out: UsageByToolRow[] = Array.from(toolMap.entries())
+        .map(([tool, count]) => ({ tool, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, limit);
+      return ok(out);
     },
   };
   console.log('[mock] window.api stub installed (browser dev mode)');

@@ -329,3 +329,80 @@ export interface ProfileCreateInput {
 export interface ProfileUpdatePatch {
   description?: string;
 }
+
+/**
+ * UsageSummary — 跨层共享类型(CLAUDE.md §5)
+ *
+ * 与 electron/repo/usage/types.ts 中的 UsageSummary **同形**(字段名 +
+ * 类型一致)。双修:任何字段重命名都要同步改 electron 侧。
+ *
+ * v5 wave-3 用量分析 模块:UsageSummary 是 sessions / messages 表的只读
+ * 聚合结果。1 IPC 返 1 个对象,无 schema、无 state、无 writer。token 数
+ * 走 JS 端估算(粗估,精度不追求——用量分析意图是趋势 / 占比展示)。
+ *
+ * 6 个 IPC channel 都基于此结构或其子结构:
+ *   - usage_summary → 整个 UsageSummary
+ *   - usage_get_session_cost → SessionCost
+ *   - usage_get_session_timeline → SessionTimeline
+ *   - usage_get_project_breakdown → UsageByProjectRow
+ *   - usage_get_daily_breakdown → UsageByDayRow[]
+ *   - usage_get_top_tools → UsageByToolRow[]
+ */
+export interface UsageByProjectRow {
+  projectId: number;
+  projectName: string;
+  sessions: number;
+  messages: number;
+  tokens: number;
+}
+
+export interface UsageByDayRow {
+  /** YYYY-MM-DD (UTC date) */
+  date: string;
+  messages: number;
+  tokens: number;
+}
+
+export interface UsageByToolRow {
+  tool: string;
+  count: number;
+}
+
+export interface UsageSummary {
+  totalSessions: number;
+  totalMessages: number;
+  /** 估算 token 数 */
+  totalTokens: number;
+  /** 所有 sessions 总时长(毫秒) */
+  totalDurationMs: number;
+  byProject: UsageByProjectRow[];
+  byDay: UsageByDayRow[];
+  byTool: UsageByToolRow[];
+  generatedAt: string;
+}
+
+export interface SessionCost {
+  sessionId: string;
+  projectId: number;
+  projectName: string;
+  startedAt: number;
+  lastMessageAt: number;
+  durationMs: number;
+  messageCount: number;
+  tokens: number;
+  tools: UsageByToolRow[];
+}
+
+export interface SessionTimelineEntry {
+  uuid: string;
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt: number;
+}
+
+export interface SessionTimeline {
+  sessionId: string;
+  projectName: string;
+  title: string | null;
+  entries: SessionTimelineEntry[];
+}

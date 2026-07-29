@@ -32,6 +32,12 @@ import type {
   Profile,
   ProfileCreateInput,
   ProfileUpdatePatch,
+  UsageSummary,
+  SessionCost,
+  SessionTimeline,
+  UsageByProjectRow,
+  UsageByDayRow,
+  UsageByToolRow,
 } from './types';
 
 export type Api = {
@@ -102,6 +108,13 @@ export type Api = {
   profileApply(name: string): Promise<{ ok: true; appliedAt: number }>;
   profileDelete(name: string): Promise<void>;
   profileUpdate(name: string, patch: ProfileUpdatePatch): Promise<void>;
+  // v5 wave-3 用量分析 模块 — 6 IPC channel(全只读聚合)
+  usageSummary(rangeDays: number): Promise<UsageSummary>;
+  usageGetSessionCost(sessionId: string): Promise<SessionCost | null>;
+  usageGetSessionTimeline(sessionId: string): Promise<SessionTimeline | null>;
+  usageGetProjectBreakdown(projectId: number): Promise<UsageByProjectRow | null>;
+  usageGetDailyBreakdown(rangeDays: number): Promise<UsageByDayRow[]>;
+  usageGetTopTools(limit: number): Promise<UsageByToolRow[]>;
 };
 
 declare global {

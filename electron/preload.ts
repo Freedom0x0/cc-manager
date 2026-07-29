@@ -171,4 +171,16 @@ contextBridge.exposeInMainWorld('api', {
   profileDelete: (name: string) => ipcRenderer.invoke('profile_delete', name),
   profileUpdate: (name: string, patch: ProfileUpdatePatch) =>
     ipcRenderer.invoke('profile_update', name, patch),
+  // v5 wave-3 用量分析 模块 — 6 IPC invoke。全只读聚合
+  usageSummary: (rangeDays: number) => ipcRenderer.invoke('usage_summary', rangeDays),
+  usageGetSessionCost: (sessionId: string) =>
+    ipcRenderer.invoke('usage_get_session_cost', sessionId),
+  usageGetSessionTimeline: (sessionId: string) =>
+    ipcRenderer.invoke('usage_get_session_timeline', sessionId),
+  usageGetProjectBreakdown: (projectId: number) =>
+    ipcRenderer.invoke('usage_get_project_breakdown', projectId),
+  usageGetDailyBreakdown: (rangeDays: number) =>
+    ipcRenderer.invoke('usage_get_daily_breakdown', rangeDays),
+  usageGetTopTools: (limit: number) =>
+    ipcRenderer.invoke('usage_get_top_tools', limit),
 });
