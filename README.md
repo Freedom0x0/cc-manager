@@ -1,8 +1,10 @@
 # CC Manager
 
-> **Claude Code 一站式配置中心** — 管理 MCP / Skills / Commands / Sub-Agents / Hooks / 插件 / Profiles / 用量分析,本地 Windows 桌面工具
+> **Claude Code 一站式配置中心** — 管理 MCP / Skills / Commands / Sub-Agents / Hooks / 插件 / Profiles / 用量分析,本地桌面工具(Windows installer / macOS 开发模式)
 
-一款 Windows 桌面工具,把 Claude Code 的 `~/.claude/` 散落配置(MCP server、Skills、Commands、Sub-Agents、Hooks、插件)集中管理 + Profiles 切换 + 用量分析仪表盘。无需登录云端,数据全本地 `better-sqlite3` 存储。
+一款本地桌面工具,把 Claude Code 的 `~/.claude/` 散落配置(MCP server、Skills、Commands、Sub-Agents、Hooks、插件)集中管理 + Profiles 切换 + 用量分析仪表盘。无需登录云端,数据全本地 `better-sqlite3` 存储。
+
+> **平台说明**:Windows 提供打包好的 `.exe` 直接下载；macOS 目前支持**开发模式**(`npm run dev`),打包版(`.dmg`)在 v4.0 规划中。
 
 ## ✨ 特性
 
@@ -32,6 +34,8 @@
 
 ## 📥 下载
 
+### Windows
+
 前往 [Releases 页面](https://github.com/Freedom0x0/cc-manager/releases)下载最新 portable:
 
 | 版本 | 文件 | 大小 | 包含 |
@@ -42,6 +46,22 @@
 
 > Windows 10/11 64-bit,免安装,双击即用。首次启动自动扫描 `C:\Users\<你>\.claude\projects\` 并入库。
 
+### macOS
+
+macOS 打包版(.dmg)在 v4.0 规划中,**目前请用开发模式**运行:
+
+```bash
+git clone https://github.com/Freedom0x0/cc-manager.git
+cd cc-manager
+# macOS 首次需要用 Electron headers 编译 better-sqlite3(见下方"macOS 开发指南")
+npm install --ignore-scripts
+node node_modules/electron/install.js
+npm run rebuild:sqlite     # 若不兼容见下方手动步骤
+npm run dev
+```
+
+> 数据文件路径:`~/Library/Application Support/cc-session-manager/app.db`
+
 ## 🚀 快速开始
 
 1. 下载 `CC Manager-0.3.0-portable.exe`
@@ -49,7 +69,8 @@
 3. 双击运行
 
 首次启动自动:
-- 创建 `%APPDATA%\cc-session-manager\app.db` 数据文件
+- Windows 创建 `%APPDATA%\cc-session-manager\app.db`
+- macOS 创建 `~/Library/Application Support/cc-session-manager/app.db`
 - 扫描 `~/.claude/projects/` 把所有 session 入库
 - 顶部 3 组件:全局搜索 / 项目选择 / Watcher 状态
 - 左侧 9 Tab:会话 / MCP / Skills / Commands / Sub-Agents / Hooks / 插件 / Profiles / 用量分析
@@ -146,10 +167,10 @@ cc-manager/
 
 - **Node.js 22+**(用 `ELECTRON_RUN_AS_NODE=1 electron` 跑测试,避免 better-sqlite3 ABI 不匹配)
 - npm 9+
-- Windows 10/11 64-bit(开发平台)
+- **Windows 10/11 64-bit**(打包产物目标平台) 或 **macOS 12+**(开发模式可用)
 - TypeScript 5+ / Electron 32 / better-sqlite3 11 / chokidar 5 / antd 6
 
-### 开发模式
+### Windows 开发模式
 
 ```bash
 git clone https://github.com/Freedom0x0/cc-manager.git
@@ -157,6 +178,42 @@ cd cc-manager
 npm install
 npm run dev      # 同时启 Vite(5173) + Electron
 ```
+
+### macOS 开发指南
+
+macOS 系统 Node.js 版本与 Electron 内置 Node ABI 不同,`npm install` 时 `better-sqlite3` 的 node-gyp 编译会失败。正确流程:
+
+```bash
+git clone https://github.com/Freedom0x0/cc-manager.git
+cd cc-manager
+
+# 1. 跳过 native 编译,只装 JS 包
+npm install --ignore-scripts
+
+# 2. 下载 Electron 二进制
+node node_modules/electron/install.js
+
+# 3a. 用封装脚本重编 better-sqlite3(优先)
+npm run rebuild:sqlite
+
+# 3b. 若 3a 不兼容(Node v26+ 下 electron-rebuild 可能失败),手动重编:
+cd node_modules/better-sqlite3
+HOME=~/.electron-gyp node_modules/.bin/node-gyp rebuild \
+  --target=$(cat ../../node_modules/electron/dist/version) \
+  --arch=arm64 \          # Intel Mac 改为 x64
+  --dist-url=https://electronjs.org/headers \
+  --module-name=better_sqlite3 \
+  --module-path=build/Release
+cd ../..
+
+# 4. 启动
+npm run dev
+```
+
+**数据文件路径**(macOS): `~/Library/Application Support/cc-session-manager/app.db`  
+**日志路径**(macOS): `~/Library/Application Support/cc-session-manager/app.log`
+
+> **注意**:`npm run package` / `npm run package:mac` 在 v4.0 前不在维护范围(Apple 签名 / notarization 留到 v4.0 处理)。开发模式(`npm run dev`)完全可用。
 
 ### 跑测试
 
@@ -189,7 +246,8 @@ git push origin main --tags
 
 ## 🔧 已知限制
 
-- ⚠️ **目前只支持 Windows** — electron-builder 没配 macOS / Linux(macOS 适配 v4.0 范围)
+- ⚠️ **macOS 无打包版** — `.dmg` 在 v4.0 规划中(Apple 签名 / notarization);开发模式(`npm run dev`)完全可用
+- ⚠️ **macOS 首次安装需手动重编 better-sqlite3** — 见上方"macOS 开发指南"
 - ⚠️ **chokidar 5 pure ESM** — Electron 主进程 CJS 需 `await import('chokidar')` + tsconfig `module: NodeNext`
 - ⚠️ **enabled KV 表名 `mcp_server_state`** — 表名 6 模块复用,key 前缀区分(`mcp:` / `skill:` / `cmd:` / `agent:` / `hook:` / `plugin:`)
 - ⚠️ **frontmatter 解析简化** — Skills / Commands / Sub-Agents 用正则手 parse,只支持 `key: value` 单行(YAML 复杂特性不支持)
