@@ -67,6 +67,21 @@ interface HookUpdatePatch {
   matcher?: string;
   command?: string;
 }
+interface PluginCreateInput {
+  name: string;
+  version: string;
+  description: string;
+  author?: string;
+  dependencies?: string[];
+  entry?: string;
+}
+interface PluginUpdatePatch {
+  version?: string;
+  description?: string;
+  author?: string;
+  dependencies?: string[];
+  entry?: string;
+}
 
 contextBridge.exposeInMainWorld('api', {
   listProjects: () => ipcRenderer.invoke('list_projects'),
@@ -131,4 +146,13 @@ contextBridge.exposeInMainWorld('api', {
   hookDelete: (id: string) => ipcRenderer.invoke('hook_delete', id),
   hookToggleEnabled: (id: string, enabled: boolean) =>
     ipcRenderer.invoke('hook_toggle_enabled', id, enabled),
+  // v5 wave-2 Plugins 模块 — 6 IPC invoke
+  pluginList: () => ipcRenderer.invoke('plugin_list'),
+  pluginGet: (name: string) => ipcRenderer.invoke('plugin_get', name),
+  pluginCreate: (input: PluginCreateInput) => ipcRenderer.invoke('plugin_create', input),
+  pluginUpdate: (name: string, patch: PluginUpdatePatch) =>
+    ipcRenderer.invoke('plugin_update', name, patch),
+  pluginDelete: (name: string) => ipcRenderer.invoke('plugin_delete', name),
+  pluginToggleEnabled: (name: string, enabled: boolean) =>
+    ipcRenderer.invoke('plugin_toggle_enabled', name, enabled),
 });

@@ -244,3 +244,48 @@ export interface HookUpdatePatch {
   matcher?: string;
   command?: string;
 }
+
+/**
+ * Plugin — 跨层共享类型(CLAUDE.md §5)
+ *
+ * 与 electron/repo/plugins/types.ts 中的 Plugin **同形**(字段名 + 类型一致)。
+ * 双修:任何字段重命名都要同步改 electron 侧。
+ *
+ * v5 wave-2 Plugins 模块:从 ~/.claude/plugins/<name>/plugin.json 读 JSON
+ * → 注入 enabled(KV 表 key 前缀 'plugin:enabled:<name>')→ UI 渲染。
+ * createPlugin 接收 PluginCreateInput;updatePlugin 接收 PluginUpdatePatch。
+ *
+ * 严格 schema 校验:必填 name/version/description,缺则 throw —
+ * wave-2-spec §2.3。
+ *
+ * 与 Skill 类似(都是子目录),但用 JSON plugin.json 而非 frontmatter .md;
+ * 与 Command / SubAgent 不同(Command/SubAgent 是单文件 .md,Plugin 是目录 +
+ * JSON 文件)。
+ */
+export interface Plugin {
+  name: string;
+  path: string;
+  version: string;
+  description: string;
+  author?: string;
+  dependencies?: string[];
+  entry?: string;
+  enabled: boolean;
+}
+
+export interface PluginCreateInput {
+  name: string;
+  version: string;
+  description: string;
+  author?: string;
+  dependencies?: string[];
+  entry?: string;
+}
+
+export interface PluginUpdatePatch {
+  version?: string;
+  description?: string;
+  author?: string;
+  dependencies?: string[];
+  entry?: string;
+}

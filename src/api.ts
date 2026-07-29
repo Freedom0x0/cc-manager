@@ -22,6 +22,9 @@ import type {
   Hook,
   HookCreateInput,
   HookUpdatePatch,
+  Plugin,
+  PluginCreateInput,
+  PluginUpdatePatch,
 } from './types';
 
 export const api = {
@@ -93,4 +96,13 @@ export const api = {
   hookDelete: (id: string): Promise<void> => window.api.hookDelete(id),
   hookToggleEnabled: (id: string, enabled: boolean): Promise<void> =>
     window.api.hookToggleEnabled(id, enabled),
+  // v5 wave-2 Plugins module — 6 IPC wrappers
+  pluginList: (): Promise<Plugin[]> => window.api.pluginList(),
+  pluginGet: (name: string): Promise<Plugin | null> => window.api.pluginGet(name),
+  pluginCreate: (input: PluginCreateInput): Promise<void> => window.api.pluginCreate(input),
+  pluginUpdate: (name: string, patch: PluginUpdatePatch): Promise<void> =>
+    window.api.pluginUpdate(name, patch),
+  pluginDelete: (name: string): Promise<void> => window.api.pluginDelete(name),
+  pluginToggleEnabled: (name: string, enabled: boolean): Promise<void> =>
+    window.api.pluginToggleEnabled(name, enabled),
 };

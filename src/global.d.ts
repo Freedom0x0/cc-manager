@@ -26,6 +26,9 @@ import type {
   Hook,
   HookCreateInput,
   HookUpdatePatch,
+  Plugin,
+  PluginCreateInput,
+  PluginUpdatePatch,
 } from './types';
 
 export type Api = {
@@ -82,6 +85,13 @@ export type Api = {
   hookUpdate(id: string, patch: HookUpdatePatch): Promise<void>;
   hookDelete(id: string): Promise<void>;
   hookToggleEnabled(id: string, enabled: boolean): Promise<void>;
+  // v5 wave-2 Plugins 模块 — 6 IPC channel
+  pluginList(): Promise<Plugin[]>;
+  pluginGet(name: string): Promise<Plugin | null>;
+  pluginCreate(input: PluginCreateInput): Promise<void>;
+  pluginUpdate(name: string, patch: PluginUpdatePatch): Promise<void>;
+  pluginDelete(name: string): Promise<void>;
+  pluginToggleEnabled(name: string, enabled: boolean): Promise<void>;
 };
 
 declare global {

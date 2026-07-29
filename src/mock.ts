@@ -3,7 +3,7 @@
 // and take screenshots. The real Electron IPC is unaffected.
 
 import { testProjects, testSessions, testMessages, testSearchHits, testProjectTree } from './mock-data';
-import type { McpServer, Skill, Command, SubAgent, Hook } from './types';
+import type { McpServer, Skill, Command, SubAgent, Hook, Plugin } from './types';
 
 // v5 wave-1 MCP 模块 fixture。浏览器 dev 模式(纯 vite serve)用,
 const testMcpServers: McpServer[] = [
@@ -83,6 +83,28 @@ const testSubAgents: SubAgent[] = [
     description: 'Plan a multi-step implementation',
     enabled: false,
     body: 'Analyze requirements and propose a phased plan before code changes.',
+  },
+];
+
+// v5 wave-2 Plugins 模块 fixture。浏览器 dev 模式(纯 vite serve)用,
+// 数据来源是 ~/.claude/plugins/<name>/plugin.json JSON,严格 schema 校验。
+const testPlugins: Plugin[] = [
+  {
+    name: 'gh',
+    path: 'C:/Users/15532/.claude/plugins/gh',
+    version: '1.2.0',
+    description: 'GitHub CLI helpers',
+    author: 'octocat',
+    dependencies: ['git', 'gh-cli'],
+    entry: 'index.js',
+    enabled: true,
+  },
+  {
+    name: 'docker-tools',
+    path: 'C:/Users/15532/.claude/plugins/docker-tools',
+    version: '0.1.0',
+    description: 'Docker workflow shortcuts',
+    enabled: false,
   },
 ];
 
@@ -304,6 +326,32 @@ if (typeof window !== 'undefined' && !window.api) {
     hookToggleEnabled: (id, enabled) => {
       const idx = testHooks.findIndex((h) => h.id === id);
       if (idx >= 0) testHooks[idx] = { ...testHooks[idx], enabled };
+      return ok(undefined);
+    },
+    // v5 wave-2 Plugins 模块 — 6 mock(浏览器 dev 用,内存 fixture)
+    pluginList: () => ok(testPlugins),
+    pluginGet: (name) => ok(testPlugins.find((p) => p.name === name) ?? null),
+    pluginCreate: (input) => {
+      testPlugins.push({
+        ...input,
+        path: `C:/Users/15532/.claude/plugins/${input.name}`,
+        enabled: true,
+      });
+      return ok(undefined);
+    },
+    pluginUpdate: (name, patch) => {
+      const idx = testPlugins.findIndex((p) => p.name === name);
+      if (idx >= 0) testPlugins[idx] = { ...testPlugins[idx], ...patch };
+      return ok(undefined);
+    },
+    pluginDelete: (name) => {
+      const idx = testPlugins.findIndex((p) => p.name === name);
+      if (idx >= 0) testPlugins.splice(idx, 1);
+      return ok(undefined);
+    },
+    pluginToggleEnabled: (name, enabled) => {
+      const idx = testPlugins.findIndex((p) => p.name === name);
+      if (idx >= 0) testPlugins[idx] = { ...testPlugins[idx], enabled };
       return ok(undefined);
     },
   };

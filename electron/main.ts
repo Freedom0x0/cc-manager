@@ -15,6 +15,7 @@ import * as skillsRepo from './repo/skills';
 import * as commandsRepo from './repo/commands';
 import * as subAgentsRepo from './repo/sub-agents';
 import * as hooksRepo from './repo/hooks';
+import * as pluginsRepo from './repo/plugins';
 import { buildResumeCommand } from './resumer';
 import { startWatcher } from './watcher';
 
@@ -228,6 +229,22 @@ app.whenReady().then(() => {
   );
   ipcMain.handle('hook_toggle_enabled', (_e, id: string, enabled: boolean) => {
     hooksRepo.setEnabled(db, id, enabled);
+  });
+
+  // v5 wave-2 Plugins 模块 — 6 IPC channel。create/update/delete 改
+  // ~/.claude/plugins/<name>/plugin.json(原子写)或 rm -rf 整个子目录。
+  // 严格 schema 校验:缺必填字段(name/version/description)throw,wave-2-spec §2.3。
+  // list/get 注入 enabled 状态(从 mcp_server_state KV 表读,key 前缀
+  // 'plugin:enabled:<name>');toggle_enabled 写 KV 表(不污染原文件 — D6 决策延伸)。
+  ipcMain.handle('plugin_list', () => pluginsRepo.listPlugins(db));
+  ipcMain.handle('plugin_get', (_e, name: string) => pluginsRepo.getPlugin(db, name));
+  ipcMain.handle('plugin_create', (_e, input) => pluginsRepo.createPlugin(input));
+  ipcMain.handle('plugin_update', (_e, name: string, patch) =>
+    pluginsRepo.updatePlugin(name, patch)
+  );
+  ipcMain.handle('plugin_delete', (_e, name: string) => pluginsRepo.deletePlugin(name));
+  ipcMain.handle('plugin_toggle_enabled', (_e, name: string, enabled: boolean) => {
+    pluginsRepo.setEnabled(db, name, enabled);
   });
 
   createWindow();
