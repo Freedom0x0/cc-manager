@@ -290,6 +290,8 @@ if (typeof window !== 'undefined' && !window.api) {
       if (idx >= 0) testSkills[idx] = { ...testSkills[idx], enabled };
       return ok(undefined);
     },
+    // 浏览器 dev 模式无 dialog，直接返回 null（UI 收到 null 时不预填表单）
+    skillImportFile: () => ok(null),
     // v5 wave-1 Commands 模块 — 6 mock(浏览器 dev 用,内存 fixture)
     commandList: () => ok(testCommands),
     commandGet: (name) => ok(testCommands.find((c) => c.name === name) ?? null),

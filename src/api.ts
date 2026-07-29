@@ -77,6 +77,7 @@ export const api = {
   skillDelete: (name: string): Promise<void> => window.api.skillDelete(name),
   skillToggleEnabled: (name: string, enabled: boolean): Promise<void> =>
     window.api.skillToggleEnabled(name, enabled),
+  skillImportFile: (): Promise<SkillCreateInput | null> => window.api.skillImportFile(),
   // v5 wave-1 Commands module — 6 IPC wrappers
   commandList: (): Promise<Command[]> => window.api.commandList(),
   commandGet: (name: string): Promise<Command | null> => window.api.commandGet(name),

@@ -6,6 +6,8 @@
  * Case 3: createSkill() 写 SKILL.md
  * Case 4: updateSkill() 改 description
  * Case 5: deleteSkill() 删目录
+ * Case 6: readSkillFromFile() 读 fixture .md 文件 → 返 SkillCreateInput(含 name 推断)
+ * Case 7: readSkillFromFile() 读标准 SKILL.md → 用父目录名推断 name
  *
  * Fixture 设计(CLAUDE.md §13 D10):
  * - DB 用 initDB(':memory:') — 内存 DB,沙箱干净
@@ -26,6 +28,7 @@ import {
   updateSkill,
   deleteSkill,
   setEnabled,
+  readSkillFromFile,
 } from '../electron/repo/skills';
 
 // 模块级 fixture 路径 — 所有 case 共享一个 tmp 目录
@@ -125,4 +128,58 @@ test('deleteSkill removes the skill directory', async () => {
   assert.ok(got2, 'getSkill 应能找到 commit');
   assert.strictEqual(got2?.name, 'commit');
   closeDB(db);
+});
+
+// Case 6: readSkillFromFile() 读 fixture .md 文件 → 返 SkillCreateInput(含 name 推断)
+test('readSkillFromFile parses frontmatter and infers name from filename', async () => {
+  // 写 fixture .md 文件到 os.tmpdir()（非 SKILL.md，用文件名推断）
+  const fixturePath = path.join(os.tmpdir(), 'commit-helper.md');
+  fs.writeFileSync(
+    fixturePath,
+    [
+      '---',
+      'description: Generate commit message',
+      'allowed-tools: Read, Bash',
+      'version: 1.2.0',
+      '---',
+      'Write a conventional commit message based on the diff.',
+    ].join('\n'),
+    'utf8'
+  );
+
+  const result = await readSkillFromFile(fixturePath);
+
+  assert.strictEqual(result.name, 'commit-helper', 'name 应从文件名推断');
+  assert.strictEqual(result.description, 'Generate commit message', 'description 应从 frontmatter 读取');
+  assert.deepStrictEqual(result.allowedTools, ['Read', 'Bash'], 'allowedTools 应正确解析');
+  assert.strictEqual(result.version, '1.2.0', 'version 应从 frontmatter 读取');
+  assert.ok(result.body?.includes('conventional commit'), 'body 应包含正文内容');
+
+  fs.unlinkSync(fixturePath); // 清理 fixture
+});
+
+// Case 7: readSkillFromFile() 读标准 ~/.claude/skills/<name>/SKILL.md 格式 → 用父目录名作为 name
+test('readSkillFromFile uses parent directory name when file is SKILL.md', async () => {
+  // 模拟标准目录结构：<tmpdir>/my-skill/SKILL.md
+  const skillDir = path.join(os.tmpdir(), 'ccsm-skill-import-test-my-skill');
+  fs.mkdirSync(skillDir, { recursive: true });
+  const fixturePath = path.join(skillDir, 'SKILL.md');
+  fs.writeFileSync(
+    fixturePath,
+    [
+      '---',
+      'description: My imported skill',
+      '---',
+      'Do something useful.',
+    ].join('\n'),
+    'utf8'
+  );
+
+  const result = await readSkillFromFile(fixturePath);
+
+  assert.strictEqual(result.name, 'ccsm-skill-import-test-my-skill', 'SKILL.md 应用父目录名推断 name');
+  assert.strictEqual(result.description, 'My imported skill');
+  assert.ok(result.body?.includes('Do something useful'));
+
+  fs.rmSync(skillDir, { recursive: true, force: true }); // 清理 fixture
 });

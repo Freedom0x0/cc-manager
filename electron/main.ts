@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
@@ -190,6 +190,17 @@ app.whenReady().then(() => {
   ipcMain.handle('skill_delete', (_e, name: string) => skillsRepo.deleteSkill(name));
   ipcMain.handle('skill_toggle_enabled', (_e, name: string, enabled: boolean) => {
     skillsRepo.setEnabled(db, name, enabled);
+  });
+  // skill_import_file：打开文件选择对话框 → 读取 .md 文件 → 解析 frontmatter → 返回 SkillCreateInput
+  // 用户取消对话框时返回 null（前端不做任何操作）
+  ipcMain.handle('skill_import_file', async () => {
+    const result = await dialog.showOpenDialog({
+      title: '选择 SKILL.md 文件',
+      filters: [{ name: 'Markdown', extensions: ['md'] }],
+      properties: ['openFile'],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return skillsRepo.readSkillFromFile(result.filePaths[0]);
   });
 
   // v5 wave-1 Commands 模块 — 6 IPC channel。create/update/delete 改

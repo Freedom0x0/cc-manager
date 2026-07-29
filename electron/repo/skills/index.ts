@@ -15,6 +15,6 @@ export {
   defaultSkillsDir,
   parseFrontmatter,
 } from './scanner';
-export { createSkill, updateSkill, deleteSkill } from './writer';
+export { createSkill, updateSkill, deleteSkill, readSkillFromFile } from './writer';
 export { getEnabled, setEnabled } from './state';
 export type { Skill, SkillCreateInput, SkillUpdatePatch } from './types';

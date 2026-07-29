@@ -16,6 +16,7 @@ import {
   EditOutlined,
   DeleteOutlined,
   ReloadOutlined,
+  ImportOutlined,
 } from '@ant-design/icons';
 import { api } from '../../api';
 import type { Skill, SkillCreateInput } from '../../types';
@@ -122,6 +123,24 @@ export const SkillsManager: React.FC = () => {
     } catch (e) {
       if (e instanceof Error) console.error('skillUpdate failed', e);
       message.error('更新失败');
+    }
+  };
+
+  const handleImport = async () => {
+    try {
+      const imported = await api.skillImportFile();
+      if (!imported) return; // 用户取消对话框
+      createForm.setFieldsValue({
+        name: imported.name,
+        description: imported.description,
+        allowedTools: imported.allowedTools ? imported.allowedTools.join(', ') : '',
+        version: imported.version ?? '',
+        body: imported.body ?? '',
+      });
+      message.success(`已从文件导入: ${imported.name}`);
+    } catch (e) {
+      console.error('skillImportFile failed', e);
+      message.error('导入失败');
     }
   };
 
@@ -284,6 +303,11 @@ export const SkillsManager: React.FC = () => {
         destroyOnClose
       >
         <Form form={createForm} layout="vertical" preserve={false}>
+          <div style={{ marginBottom: 16, textAlign: 'right' }}>
+            <Button icon={<ImportOutlined />} onClick={handleImport} size="small">
+              从文件导入
+            </Button>
+          </div>
           <Form.Item
             label="名称(目录名)"
             name="name"

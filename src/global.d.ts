@@ -73,6 +73,7 @@ export type Api = {
   skillUpdate(name: string, patch: SkillUpdatePatch): Promise<void>;
   skillDelete(name: string): Promise<void>;
   skillToggleEnabled(name: string, enabled: boolean): Promise<void>;
+  skillImportFile(): Promise<SkillCreateInput | null>;
   // v5 wave-1 Commands 模块 — 6 IPC channel
   commandList(): Promise<Command[]>;
   commandGet(name: string): Promise<Command | null>;

@@ -12,9 +12,9 @@
  * - updateSkill / deleteSkill name 不存在 → 抛错
  */
 
-import { mkdir, writeFile, rename, unlink, rm } from 'fs/promises';
+import { mkdir, writeFile, rename, unlink, rm, readFile } from 'fs/promises';
 import { existsSync } from 'fs';
-import { join } from 'path';
+import { join, basename } from 'path';
 import { defaultSkillsDir, parseFrontmatter, readSkillFile } from './scanner';
 import type { SkillCreateInput, SkillUpdatePatch } from './types';
 
@@ -121,6 +121,41 @@ export async function deleteSkill(name: string, skillsDir?: string): Promise<voi
     throw new Error(`Skill "${name}" not found`);
   }
   await rm(skillDir, { recursive: true, force: true });
+}
+
+/**
+ * 读取本地 .md 文件，解析 frontmatter，返回可直接传入 createSkill 的 SkillCreateInput。
+ *
+ * name 推断规则（与 ~/.claude/skills/<name>/SKILL.md 的目录结构对齐）：
+ * - 文件名是 SKILL.md（大小写不敏感）→ 用**父目录名**推断 name（标准格式）
+ * - 其他 .md 文件 → 用文件名（去 .md 后缀）推断 name（兼容散装文件）
+ * 推断后 slug 化：转小写，非 [a-z0-9_-] 替换为 -，去首尾 -。
+ *
+ * description 若 frontmatter 无，取正文首行（与 scanner 逻辑一致）。
+ *
+ * 用途：UI "从文件导入" → dialog 选文件路径 → 调本函数 → 预填新建表单。
+ */
+export async function readSkillFromFile(filePath: string): Promise<SkillCreateInput> {
+  const raw = await readFile(filePath, 'utf8');
+  const { meta, body } = parseFrontmatter(raw);
+  // 文件名是 SKILL.md → 用父目录名作为 skill name；否则用文件名
+  const fileName = basename(filePath);
+  const rawName = /^skill\.md$/i.test(fileName)
+    ? basename(join(filePath, '..'))          // 父目录名
+    : fileName.replace(/\.md$/i, '');         // 文件名去后缀
+  const name = rawName.toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'imported-skill';
+  const description = meta.description ?? body.split('\n').find((l) => l.trim()) ?? '';
+  const allowedToolsRaw = meta['allowed-tools'];
+  const allowedTools = allowedToolsRaw
+    ? allowedToolsRaw.split(',').map((s) => s.trim()).filter(Boolean)
+    : undefined;
+  return {
+    name,
+    description,
+    body,
+    allowedTools,
+    version: meta.version,
+  };
 }
 
 // re-export 让外部统一从 writer.ts 拿解析函数 — 避免散落
