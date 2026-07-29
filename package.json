@@ -1,6 +1,6 @@
 {
   "name": "cc-manager",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "本地管理 Claude Code 会话历史:查看、搜索、继续会话",
   "author": "Freedom0x0",
   "license": "MIT",
