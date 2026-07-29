@@ -44,7 +44,8 @@ export function defaultCommandsDir(): string {
 export function parseFrontmatter(
   content: string
 ): { meta: Record<string, string>; body: string } {
-  const match = content.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+  // CRLF + LF 双支持:Windows .md 是 \r\n,Linux/macOS 是 \n
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
   if (!match) return { meta: {}, body: content };
   const meta: Record<string, string> = {};
   for (const line of match[1].split('\n')) {
