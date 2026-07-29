@@ -24,9 +24,7 @@ import { startWatcher } from './watcher';
 let db: DB;
 
 function logFile(): string {
-  const dataDir = process.env.APPDATA
-    ? path.join(process.env.APPDATA, 'cc-session-manager')
-    : path.join(os.homedir(), '.cc-session-manager');
+  const dataDir = getDataDir();
   fs.mkdirSync(dataDir, { recursive: true });
   return path.join(dataDir, 'app.log');
 }
@@ -40,8 +38,18 @@ process.on('uncaughtException', (e) => log('UNCAUGHT', e?.stack || String(e)));
 process.on('unhandledRejection', (e) => log('UNHANDLED', e instanceof Error ? e.stack : String(e)));
 
 function getDataDir(): string {
-  const appData = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
-  return path.join(appData, 'cc-session-manager');
+  // Windows: %APPDATA%\cc-session-manager
+  // macOS:   ~/Library/Application Support/cc-session-manager
+  // Linux:   ~/.config/cc-session-manager  (XDG_CONFIG_HOME fallback)
+  if (process.env.APPDATA) {
+    return path.join(process.env.APPDATA, 'cc-session-manager');
+  }
+  if (process.platform === 'darwin') {
+    return path.join(os.homedir(), 'Library', 'Application Support', 'cc-session-manager');
+  }
+  // Linux/others: respect XDG_CONFIG_HOME
+  const xdgConfig = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config');
+  return path.join(xdgConfig, 'cc-session-manager');
 }
 
 function createWindow() {

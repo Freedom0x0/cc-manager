@@ -23,7 +23,7 @@ cc-session-manager/
 │   ├── db/connection.ts            # schema + 兼容 ALTER
 │   ├── importer/{parser,scanner,cluster,index}.ts
 │   ├── repo/{projects,sessions,messages,search,tree,types}.ts
-│   └── resumer.ts                  # spawn claude.cmd --resume
+│   └── resumer.ts                  # 生成 claude --resume 命令字符串（返回给前端复制）
 ├── src/                            # React 渲染进程
 │   ├── main.tsx / App.tsx
 │   ├── global.d.ts                 # window.api 类型
@@ -112,6 +112,20 @@ cc-session-manager/
 ## 10. 已知陷阱
 
 - **better-sqlite3 ABI**：用 Node 22 跑测试会报 `NODE_MODULE_VERSION` 错。**必须**用 `ELECTRON_RUN_AS_NODE=1 electron` 跑测试，package.json 已配。
+- **Mac 首次安装（或切换平台后）**：系统 Node.js 版本与 Electron 内置 Node ABI 不同，`npm install` 会因 node-gyp 编译 better-sqlite3 失败而退出。正确流程：
+  ```bash
+  npm install --ignore-scripts            # 跳过 native 编译
+  node node_modules/electron/install.js   # 下载 Electron 二进制
+  # 然后用 Electron 的 headers 编译 better-sqlite3：
+  HOME=~/.electron-gyp node_modules/.bin/node-gyp rebuild \
+    --target=$(cat node_modules/electron/dist/version) \
+    --arch=arm64 \  # x64 机器改为 x64
+    --dist-url=https://electronjs.org/headers \
+    --module-name=better_sqlite3 \
+    --module-path=build/Release \
+    2>&1  # 在 node_modules/better-sqlite3/ 目录内执行
+  ```
+  或者直接用封装好的脚本：`npm run rebuild:sqlite`（内部调 electron-rebuild，Node v26 下可能不兼容，见上）。
 - **`rootDir: "electron"`** 才能输出 `dist-electron/main.js`（不是 `dist-electron/electron/main.js`）
 - **FTS5 中文分词**：`unicode61 remove_diacritics 2` 是当前方案，按词切分；够用就别动
 - **soft delete + FTS**：FTS5 触发器自动同步 `INSERT/DELETE/UPDATE messages`，所以 `is_deleted=1` 的会话消息**不删**，搜索自动不返回
@@ -166,6 +180,7 @@ cc-session-manager/
 - **2026-07-28 v5 D6**：enabled 状态走 KV 表（`mcp_server_state.enabled:<name>` 或 `skill:` / `cmd:` 前缀），不复用原文件（避免污染 `~/.claude.json` / SKILL.md / commands/*.md 的语义）。这是 wave-1 v2.0 的核心约束 — 用户 toggle 不破坏原文件结构
 - **2026-07-29 v5 D7**：`~/.claude/settings.json` 和 `~/.claude/plugins/<name>/plugin.json` 等 JSON 配置走原子写（tmp + rename），失败 catch unlink tmp 残留 + 保留原文件。Hook / 插件模块的 create/update/delete 都走此模式，不破坏原文件其他字段
 - **2026-07-29 v5 D9**：所有 6 个业务模块（MCP / Skills / Commands / Sub-Agents / Hooks / 插件）的 enabled 状态都走 `mcp_server_state` KV 表，不复用各自原文件。key 前缀区分（`mcp:` / `skill:` / `cmd:` / `agent:` / `hook:` / `plugin:`）。D6 决策延伸，统一走一张表简化
+- **2026-07-29 macOS 适配**：`getDataDir()` 已做跨平台：Windows 用 `%APPDATA%`，macOS 用 `~/Library/Application Support`，Linux 用 `$XDG_CONFIG_HOME` 或 `~/.config`。`logFile()` 复用同一函数，不再有独立 fallback 路径。chokidar 需单独 `npm install`（package.json `dependencies` 已有，但 mac 首次 `npm install --ignore-scripts` 后需验证）
 
 ## 14. 用户语言
 
