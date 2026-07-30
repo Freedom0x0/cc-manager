@@ -306,9 +306,9 @@ app.whenReady().then(async () => {
   ipcMain.handle('profile_capture', (_e, name: string, description: string) =>
     profilesRepo.createProfile(db, { name, description })
   );
-  ipcMain.handle('profile_apply', (_e, name: string) =>
-    profilesRepo.applyProfile(db, name)
-  );
+  ipcMain.handle('profile_apply', async (_e, name: string) => {
+    return profilesRepo.applyProfile(db, name, undefined, settingsPath);
+  });
   ipcMain.handle('profile_delete', (_e, name: string) => profilesRepo.deleteProfile(name));
   ipcMain.handle('profile_update', (_e, name: string, patch) =>
     profilesRepo.updateProfile(name, patch)

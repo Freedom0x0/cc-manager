@@ -46,20 +46,25 @@ beforeEach(() => {
   fs.rmSync(profilesPath, { force: true });
 });
 
-/** 直接写 KV 表的辅助函数(不走各模块 setEnabled)— Case 3/4 用 */
+/** 直接写 KV 表的辅助函数(不走各模块 setEnabled)— Case 3/4 用
+ * v5 wave-3 修正(2026-07-30):MCP 实际 writer 用 'enabled:'(无 mcp:
+ * 前缀),所以这里 mcp 用裸 prefix。其余 5 prefix 不变。
+ */
 function setKvEnabled(db: DB, prefix: 'mcp' | 'skill' | 'cmd' | 'agent' | 'hook' | 'plugin', name: string, enabled: boolean): void {
   const v = enabled ? 'true' : 'false';
+  const key = prefix === 'mcp' ? `enabled:${name}` : `${prefix}:enabled:${name}`;
   db.prepare(
     "INSERT INTO mcp_server_state (key, value, updated_at) VALUES (?, ?, ?) " +
       "ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at"
-  ).run(`${prefix}:enabled:${name}`, v, Date.now());
+  ).run(key, v, Date.now());
 }
 
 /** 直接读 KV 表的辅助函数 */
 function getKvEnabled(db: DB, prefix: string, name: string): string | null {
+  const key = prefix === 'mcp' ? `enabled:${name}` : `${prefix}:enabled:${name}`;
   const row = db.prepare(
     "SELECT value FROM mcp_server_state WHERE key = ?"
-  ).get(`${prefix}:enabled:${name}`) as { value: string } | undefined;
+  ).get(key) as { value: string } | undefined;
   return row?.value ?? null;
 }
 
@@ -154,8 +159,18 @@ test('captureProfile reads KV table and generates ProfileConfig', async () => {
   closeDB(db);
 });
 
-// Case 4: applyProfile 写 KV 表 + 验证事务
-test('applyProfile writes enabled=true to KV table and verifies', () => {
+// Case 4: applyProfile 写 KV 表 + 验证事务(async — v5 wave-3 real-disable)
+test('applyProfile writes enabled=true to KV table and verifies', async () => {
+  // v5 wave-3:real 文件也参与 apply。先建真实文件(因为 setDisabledSuffix
+  // 需要 source/.disabled 存在)
+  const claudeDir = path.join(tmpRoot, '.claude');
+  fs.mkdirSync(path.join(claudeDir, 'skills', 'commit-helper'), { recursive: true });
+  fs.writeFileSync(
+    path.join(claudeDir, 'skills', 'commit-helper', 'SKILL.md'),
+    '# commit'
+  );
+  // 真实 skill 已存在(enabled=true 实际状态)
+
   // 先在 KV 表写一些 enabled=false 的项(模拟当前 disabled 状态)
   setKvEnabled(db, 'mcp', 'filesystem', false);
   setKvEnabled(db, 'skill', 'commit-helper', false);
@@ -183,18 +198,25 @@ test('applyProfile writes enabled=true to KV table and verifies', () => {
     })
   );
 
-  const result = applyProfile(db, 'enable-fs', profilesPath);
+  const result = await applyProfile(db, 'enable-fs', profilesPath, undefined, claudeDir);
   assert.strictEqual(result.ok, true);
   assert.ok(typeof result.appliedAt === 'number');
+  assert.deepStrictEqual(result.realFileErrors, [], '真实文件无错误');
 
   // 验证 KV 表 — 应 enabled=true
   assert.strictEqual(getKvEnabled(db, 'mcp', 'filesystem'), 'true', 'filesystem 应启用');
   assert.strictEqual(getKvEnabled(db, 'skill', 'commit-helper'), 'true', 'commit-helper 应启用');
+
+  // 真实文件验证:commit-helper/.disabled 不应存在
+  assert.ok(
+    !fs.existsSync(path.join(claudeDir, 'skills', 'commit-helper.disabled')),
+    'applyProfile 后 commit-helper.disabled/ 不应存在'
+  );
   closeDB(db);
 });
 
-// Case 5: applyProfile 失败回滚(故意构造坏 profile 触发 throw,验证 KV 表恢复)
-test('applyProfile rolls back KV state on failure', () => {
+// Case 5: applyProfile 失败回滚(async — 故意构造坏 profile 触发 throw,验证 KV 表恢复)
+test('applyProfile rolls back KV state on failure', async () => {
   // 1. 设置初始 KV 状态(已 enabled 的若干项)
   setKvEnabled(db, 'mcp', 'filesystem', true);
   setKvEnabled(db, 'mcp', 'github', true);
@@ -218,7 +240,7 @@ test('applyProfile rolls back KV state on failure', () => {
   );
 
   // 3. applyProfile 应该 throw
-  assert.throws(
+  await assert.rejects(
     () => applyProfile(db, 'broken', profilesPath),
     /is not iterable|Cannot read|undefined/,
     'broken profile 应抛 TypeError(访问 undefined.enabledServers)'
@@ -228,5 +250,52 @@ test('applyProfile rolls back KV state on failure', () => {
   assert.strictEqual(getKvEnabled(db, 'mcp', 'filesystem'), 'true', 'filesystem 应保持 enabled');
   assert.strictEqual(getKvEnabled(db, 'mcp', 'github'), 'true', 'github 应保持 enabled');
   assert.strictEqual(getKvEnabled(db, 'skill', 'commit-helper'), 'true', 'commit-helper 应保持 enabled');
+  closeDB(db);
+});
+
+// Case 6 (新增): applyProfile 写真实文件 — settings.json.disabledMcpjsonServers 真删除
+test('applyProfile writes real settings.json (MCP enabled list removes from black list)', async () => {
+  // 预置:settings.json 已有 filesystem 在黑名单
+  const settingsPath = path.join(tmpRoot, 'settings.json');
+  fs.writeFileSync(
+    settingsPath,
+    JSON.stringify({ disabledMcpjsonServers: ['filesystem'] })
+  );
+  // KV 写 enabled=false(模拟当前 disabled)
+  setKvEnabled(db, 'mcp', 'filesystem', false);
+  // profile 配 enabledServers: ['filesystem']
+  fs.writeFileSync(
+    profilesPath,
+    JSON.stringify({
+      profiles: [
+        {
+          name: 'enable-fs',
+          description: 'enable filesystem',
+          config: {
+            enabledServers: ['filesystem'],
+            enabledSkills: [],
+            enabledCommands: [],
+            enabledAgents: [],
+            enabledHooks: [],
+            enabledPlugins: [],
+          },
+          createdAt: '2026-07-29T00:00:00.000Z',
+          updatedAt: '2026-07-29T00:00:00.000Z',
+        },
+      ],
+    })
+  );
+
+  const result = await applyProfile(db, 'enable-fs', profilesPath, settingsPath);
+  assert.strictEqual(result.ok, true);
+  assert.deepStrictEqual(result.realFileErrors, []);
+
+  // 真实文件验证:disabledMcpjsonServers 应不含 filesystem
+  const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  assert.deepStrictEqual(
+    settings.disabledMcpjsonServers,
+    [],
+    'applyProfile 写真实文件:filesystem 应从黑名单移除'
+  );
   closeDB(db);
 });
