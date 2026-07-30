@@ -101,23 +101,30 @@ const testSubAgents: SubAgent[] = [
 ];
 
 // v5 wave-2 Plugins 模块 fixture。浏览器 dev 模式(纯 vite serve)用,
-// 数据来源是 ~/.claude/plugins/<name>/plugin.json JSON,严格 schema 校验。
+// 数据来源是 ~/.claude/plugins/installed_plugins.json 单文件(2026-07-30 改)。
 const testPlugins: Plugin[] = [
   {
+    fullName: 'gh@claude-plugins-official',
     name: 'gh',
-    path: 'C:/Users/15532/.claude/plugins/gh',
+    marketplace: 'claude-plugins-official',
+    installPath: 'C:/Users/15532/.claude/plugins/cache/claude-plugins-official/gh/1.0.0',
     version: '1.2.0',
-    description: 'GitHub CLI helpers',
-    author: 'octocat',
-    dependencies: ['git', 'gh-cli'],
-    entry: 'index.js',
+    scope: 'user',
+    installedAt: '2026-07-01T06:16:31.254Z',
+    lastUpdated: '2026-07-01T06:16:31.254Z',
+    gitCommitSha: 'abc123',
     enabled: true,
   },
   {
+    fullName: 'docker-tools@local',
     name: 'docker-tools',
-    path: 'C:/Users/15532/.claude/plugins/docker-tools',
+    marketplace: 'local',
+    installPath: 'C:/Users/15532/.claude/plugins/cache/local/docker-tools/0.1.0',
     version: '0.1.0',
-    description: 'Docker workflow shortcuts',
+    scope: 'user',
+    installedAt: '2026-07-02T10:00:00.000Z',
+    lastUpdated: '2026-07-02T10:00:00.000Z',
+    gitCommitSha: 'def456',
     enabled: false,
   },
 ];
@@ -377,28 +384,43 @@ if (typeof window !== 'undefined' && !window.api) {
       return ok(undefined);
     },
     // v5 wave-2 Plugins 模块 — 6 mock(浏览器 dev 用,内存 fixture)
+    // 2026-07-30 改:用 fullName(name@marketplace) 作主键
     pluginList: () => ok(testPlugins),
-    pluginGet: (name) => ok(testPlugins.find((p) => p.name === name) ?? null),
+    pluginGet: (fullName) => ok(testPlugins.find((p) => p.fullName === fullName) ?? null),
     pluginCreate: (input) => {
+      const now = new Date().toISOString();
       testPlugins.push({
-        ...input,
-        path: `C:/Users/15532/.claude/plugins/${input.name}`,
+        fullName: input.fullName,
+        name: input.fullName.split('@')[0] ?? input.fullName,
+        marketplace: input.fullName.split('@')[1] ?? '',
+        installPath: input.installPath,
+        version: input.version,
+        scope: input.scope,
+        installedAt: now,
+        lastUpdated: now,
+        gitCommitSha: '',
         enabled: true,
       });
       return ok(undefined);
     },
-    pluginUpdate: (name, patch) => {
-      const idx = testPlugins.findIndex((p) => p.name === name);
-      if (idx >= 0) testPlugins[idx] = { ...testPlugins[idx], ...patch };
+    pluginUpdate: (fullName, patch) => {
+      const idx = testPlugins.findIndex((p) => p.fullName === fullName);
+      if (idx >= 0) {
+        testPlugins[idx] = {
+          ...testPlugins[idx],
+          ...patch,
+          lastUpdated: new Date().toISOString(),
+        };
+      }
       return ok(undefined);
     },
-    pluginDelete: (name) => {
-      const idx = testPlugins.findIndex((p) => p.name === name);
+    pluginDelete: (fullName) => {
+      const idx = testPlugins.findIndex((p) => p.fullName === fullName);
       if (idx >= 0) testPlugins.splice(idx, 1);
       return ok(undefined);
     },
-    pluginToggleEnabled: (name, enabled) => {
-      const idx = testPlugins.findIndex((p) => p.name === name);
+    pluginToggleEnabled: (fullName, enabled) => {
+      const idx = testPlugins.findIndex((p) => p.fullName === fullName);
       if (idx >= 0) testPlugins[idx] = { ...testPlugins[idx], enabled };
       return ok(undefined);
     },

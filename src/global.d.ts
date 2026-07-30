@@ -96,11 +96,11 @@ export type Api = {
   hookToggleEnabled(id: string, enabled: boolean): Promise<void>;
   // v5 wave-2 Plugins 模块 — 6 IPC channel
   pluginList(): Promise<Plugin[]>;
-  pluginGet(name: string): Promise<Plugin | null>;
+  pluginGet(fullName: string): Promise<Plugin | null>;
   pluginCreate(input: PluginCreateInput): Promise<void>;
-  pluginUpdate(name: string, patch: PluginUpdatePatch): Promise<void>;
-  pluginDelete(name: string): Promise<void>;
-  pluginToggleEnabled(name: string, enabled: boolean): Promise<void>;
+  pluginUpdate(fullName: string, patch: PluginUpdatePatch): Promise<void>;
+  pluginDelete(fullName: string): Promise<void>;
+  pluginToggleEnabled(fullName: string, enabled: boolean): Promise<void>;
   // v5 wave-3 Profiles 模块 — 6 IPC channel
   profileList(): Promise<Profile[]>;
   profileGet(name: string): Promise<Profile | null>;

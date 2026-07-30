@@ -1,57 +1,79 @@
 /**
  * electron/repo/plugins/types.ts — v5 wave-2 Plugins 模块跨层共享类型
  *
- * 跨层复用约定(CLAUDE.md §5):electron 主进程不 import src/types.ts(主进程
- * 不能跑浏览器模块),所以 Plugin 实体类型在本文件定义,再由 src/types.ts
- * 同样形状地再声明一次。两边必须保持字段一致。
+ * 数据源(2026-07-30 修):
+ * Claude Code 实际 schema 是 ~/.claude/plugins/installed_plugins.json 单文件:
+ *   {
+ *     "version": 2,
+ *     "plugins": {
+ *       "code-review@claude-plugins-official": [
+ *         { "scope": "user", "installPath": "...", "version": "...",
+ *           "installedAt": "...", "lastUpdated": "...", "gitCommitSha": "..." }
+ *       ],
+ *       ...
+ *     }
+ *   }
  *
- * Plugin 是**对外契约**:scanner 读 ~/.claude/plugins/<name>/plugin.json
- * 单文件 → 注入 enabled 状态(从 mcp_server_state KV 表读,key 前缀
- * 'plugin:enabled:<name>')后返回。
+ * key 格式: `<shortName>@<marketplace>`(如 code-review@claude-plugins-official)
+ * value: array of installed versions(同 plugin 可装多个 version,目前通常 1 个)
  *
- * 与 Skill 类似(都存子目录),但用 JSON 而非 frontmatter,且 schema 严格
- * 校验(name / version / description 必填)— wave-2-spec §2.3。
- *
- * pluginsDir 参数是模块级 fixture 注入点(CLAUDE.md §13 D10)。
+ * 跨层复用约定(CLAUDE.md §5):electron 主进程不 import src/types.ts,所以
+ * Plugin 实体类型在本文件定义,再由 src/types.ts 同样形状地再声明一次。
  */
 
 export interface Plugin {
-  /** 子目录名,主键 */
+  /** 完整 name@marketplace,主键 */
+  fullName: string;
+  /** 解析后的 shortName,如 'code-review' */
   name: string;
-  /** 完整路径:~/.claude/plugins/<name>/ */
-  path: string;
-  /** plugin.json.version — semver 字符串(必填,非空) */
+  /** 解析后的 marketplace,如 'claude-plugins-official' */
+  marketplace: string;
+  /** 实际安装路径 */
+  installPath: string;
+  /** version 字符串(可能是 git commit sha 或 semver) */
   version: string;
-  /** plugin.json.description(必填,非空) */
-  description: string;
-  /** plugin.json.author(可选) */
-  author?: string;
-  /** plugin.json.dependencies(可选,字符串数组) */
-  dependencies?: string[];
-  /** plugin.json.entry(可选,主入口文件) */
-  entry?: string;
+  /** 安装 scope:user(全局)或 project(项目级)— 本 task 只支持 user */
+  scope: 'user' | 'project';
+  /** 安装时间 ISO */
+  installedAt: string;
+  /** 最后更新时间 ISO */
+  lastUpdated: string;
+  /** git commit sha */
+  gitCommitSha: string;
   /** 用户 toggle 的启用状态,从 mcp_server_state KV 表读(默认 true) */
   enabled: boolean;
 }
 
 /**
- * createPlugin 接收的输入:必填 name/version/description 严格校验
- * (writer.ts 用 validatePluginInput 抛错,不是 silent return null)
+ * installed_plugins.json 顶层结构(只读 type)
  */
-export interface PluginCreateInput {
-  name: string;
-  version: string;
-  description: string;
-  author?: string;
-  dependencies?: string[];
-  entry?: string;
+export interface InstalledPluginsFile {
+  version: number;
+  plugins: Record<string, InstalledPluginVersion[]>;
 }
 
-/** updatePlugin 接收的 patch:除 name/path/enabled 外都可改 */
+export interface InstalledPluginVersion {
+  scope: 'user' | 'project';
+  installPath: string;
+  version: string;
+  installedAt: string;
+  lastUpdated: string;
+  gitCommitSha: string;
+}
+
+/**
+ * createPlugin 接收的输入(在主进程严格校验)。
+ * 注意:Claude Code plugins 是从 marketplace 装,本应用**不实际**安装新 plugin
+ * (那需要 marketplace API + git clone)。createPlugin 仅作 UI 占位。
+ */
+export interface PluginCreateInput {
+  fullName: string;       // 含 @marketplace
+  installPath: string;
+  version: string;
+  scope: 'user' | 'project';
+}
+
 export interface PluginUpdatePatch {
+  scope?: 'user' | 'project';
   version?: string;
-  description?: string;
-  author?: string;
-  dependencies?: string[];
-  entry?: string;
 }

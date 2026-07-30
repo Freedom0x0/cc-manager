@@ -1,119 +1,130 @@
 /**
  * electron/repo/plugins/scanner.ts — v5 wave-2 Plugins 配置扫描器
  *
- * 读 ~/.claude/plugins/<name>/plugin.json → 注入 enabled(KV 表)→ 返 Plugin[]。
- * 存的是**目录**(同 Skill 模式,但 Skill 用 .md frontmatter,Plugin 用 JSON)。
+ * 读 ~/.claude/plugins/installed_plugins.json 单文件 → 解析
+ * `plugins: Record<fullName, InstalledPluginVersion[]>` → 注入 enabled(KV 表)
+ * → 返 Plugin[]。
  *
- * JSON 解析:依赖 plugin.json schema 严格校验(必填 name/version/description)。
- * schema 校验在 writer.ts 的 validatePluginInput,scanner 只容忍"非破坏性
- * 解析失败"(JSON 损坏 / 缺必填字段 → 跳过该目录,不抛错)— 读路径宽容、
- * 写路径严格(防止 create 脏数据进入)。
+ * 2026-07-30 重写:原 scanner 假设 `<name>/plugin.json` 目录结构,实际 Claude Code
+ * 用 installed_plugins.json 单文件。详见 wave-3 收尾时核对。
  *
  * 容错:
- * - pluginsDir 不存在 → 返 [](prd §1 边界 case)
- * - 子目录内无 plugin.json → 跳过该目录(不报错)
- * - 单 plugin.json read 失败 / JSON 损坏 → 跳过(stray 文件不污染列表)
- * - plugin.json 缺必填字段 → 跳过(读路径宽容,抛错发生在 create/update)
+ * - installed_plugins.json 不存在 → 返 []
+ * - 顶层 JSON 损坏 / 缺 plugins 字段 → 返 []
+ * - 单 plugin 缺必填字段 → 跳过(读路径宽容)
  *
- * 路径注入:pluginsDir 参数允许测试注入 fixture 路径(避免碰真实
- * ~/.claude/plugins);生产调用方传 defaultPluginsDir() —
+ * 路径注入:filePath 参数允许测试注入 fixture 路径(避免碰真实
+ * ~/.claude/plugins);生产调用方传 defaultInstalledPluginsPath() —
  * CLAUDE.md §13 D8 + D10。
  */
 
-import { readdir, readFile } from 'fs/promises';
+import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 import type { DB } from '../../db/connection';
 import { getEnabled } from './state';
-import type { Plugin } from './types';
+import type {
+  Plugin,
+  InstalledPluginsFile,
+  InstalledPluginVersion,
+} from './types';
 
-/** 默认生产路径 ~/.claude/plugins。测试通过 pluginsDir 参数覆盖。 */
-export function defaultPluginsDir(): string {
-  return join(homedir(), '.claude', 'plugins');
+/** 默认生产路径 ~/.claude/plugins/installed_plugins.json。 */
+export function defaultInstalledPluginsPath(): string {
+  return join(homedir(), '.claude', 'plugins', 'installed_plugins.json');
+}
+
+/** 解析 fullName(name@marketplace)→ {name, marketplace},无 @ 视为 name 全 */
+function parseFullName(fullName: string): { name: string; marketplace: string } {
+  const at = fullName.lastIndexOf('@');
+  if (at < 0) return { name: fullName, marketplace: '' };
+  return {
+    name: fullName.slice(0, at),
+    marketplace: fullName.slice(at + 1),
+  };
 }
 
 /**
- * 读 ~/.claude/plugins/<name>/plugin.json → 注入 enabled → 返 Plugin[]。
- * pluginsDir 不存在或空目录返 []。
+ * 校验单条 InstalledPluginVersion 必填字段,缺则返 null。
+ */
+function validateVersion(v: unknown): InstalledPluginVersion | null {
+  if (!v || typeof v !== 'object') return null;
+  const o = v as Record<string, unknown>;
+  if (typeof o.scope !== 'string') return null;
+  if (typeof o.installPath !== 'string') return null;
+  if (typeof o.version !== 'string') return null;
+  if (typeof o.installedAt !== 'string') return null;
+  if (typeof o.lastUpdated !== 'string') return null;
+  if (typeof o.gitCommitSha !== 'string') return null;
+  return {
+    scope: o.scope as 'user' | 'project',
+    installPath: o.installPath,
+    version: o.version,
+    installedAt: o.installedAt,
+    lastUpdated: o.lastUpdated,
+    gitCommitSha: o.gitCommitSha,
+  };
+}
+
+/**
+ * 读 installed_plugins.json → 解析 → 注入 enabled → 返 Plugin[]。
+ * 文件不存在或 JSON 损坏返 []。同 plugin 多个 version 返**最新**(lastUpdated 倒序)
  *
  * @param db 已 initDB 的 SQLite handle(读 enabled KV)
- * @param pluginsDir 可选:注入 fixture 路径(测试用);默认走 ~/.claude/plugins
+ * @param filePath 可选:注入 fixture 路径(测试用);默认走 ~/.claude/plugins/installed_plugins.json
  */
-export async function listPlugins(db: DB, pluginsDir?: string): Promise<Plugin[]> {
-  const dir = pluginsDir ?? defaultPluginsDir();
-  if (!existsSync(dir)) return [];
-  let entries: string[];
+export async function listPlugins(db: DB, filePath?: string): Promise<Plugin[]> {
+  const path = filePath ?? defaultInstalledPluginsPath();
+  if (!existsSync(path)) return [];
+  let data: InstalledPluginsFile;
   try {
-    entries = await readdir(dir, { withFileTypes: true })
-      .then((d) => d.filter((e) => e.isDirectory()).map((e) => e.name))
-      .catch(() => []);
+    const raw = await readFile(path, 'utf8');
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (typeof parsed.plugins !== 'object' || parsed.plugins === null) return [];
+    data = {
+      version: typeof parsed.version === 'number' ? parsed.version : 2,
+      plugins: parsed.plugins as Record<string, InstalledPluginVersion[]>,
+    };
   } catch {
     return [];
   }
+
   const out: Plugin[] = [];
-  for (const name of entries) {
-    const pluginDir = join(dir, name);
-    const pluginFile = join(pluginDir, 'plugin.json');
-    if (!existsSync(pluginFile)) continue;
-    let data: Record<string, unknown>;
-    try {
-      const raw = await readFile(pluginFile, 'utf8');
-      data = JSON.parse(raw) as Record<string, unknown>;
-    } catch {
-      // 单文件读/解析失败 → 跳过(stray 文件不污染列表)
-      continue;
-    }
-    // 缺必填字段 → 跳过(读路径宽容,不抛)
-    const version = data.version;
-    const description = data.description;
-    if (typeof version !== 'string' || version.length === 0) continue;
-    if (typeof description !== 'string' || description.length === 0) continue;
-
-    const author = typeof data.author === 'string' ? data.author : undefined;
-    const entry = typeof data.entry === 'string' ? data.entry : undefined;
-    const dependencies = Array.isArray(data.dependencies)
-      ? (data.dependencies as unknown[]).filter((d): d is string => typeof d === 'string')
-      : undefined;
-
+  for (const [fullName, versions] of Object.entries(data.plugins)) {
+    if (!Array.isArray(versions) || versions.length === 0) continue;
+    // 多版本取 lastUpdated 最新
+    const validVersions = versions
+      .map(validateVersion)
+      .filter((v): v is InstalledPluginVersion => v !== null);
+    if (validVersions.length === 0) continue;
+    validVersions.sort((a, b) => b.lastUpdated.localeCompare(a.lastUpdated));
+    const v = validVersions[0];
+    const { name, marketplace } = parseFullName(fullName);
     out.push({
+      fullName,
       name,
-      path: pluginDir,
-      version,
-      description,
-      author,
-      entry,
-      dependencies,
-      enabled: getEnabled(db, name),
+      marketplace,
+      installPath: v.installPath,
+      version: v.version,
+      scope: v.scope,
+      installedAt: v.installedAt,
+      lastUpdated: v.lastUpdated,
+      gitCommitSha: v.gitCommitSha,
+      enabled: getEnabled(db, fullName),
     });
   }
   return out;
 }
 
 /**
- * 单 plugin 查询。name 不存在返 null。
+ * 单 plugin 查询。fullName 不存在返 null。
  */
 export async function getPlugin(
   db: DB,
-  name: string,
-  pluginsDir?: string
+  fullName: string,
+  filePath?: string
 ): Promise<Plugin | null> {
-  const list = await listPlugins(db, pluginsDir);
-  return list.find((p) => p.name === name) ?? null;
-}
-
-/**
- * 取 plugin.json 原始内容(供 writer 读改写用)+ 目录路径。
- * name 不存在返 null。
- */
-export async function readPluginFile(
-  name: string,
-  pluginsDir?: string
-): Promise<{ dir: string; content: Record<string, unknown> } | null> {
-  const dir = pluginsDir ?? defaultPluginsDir();
-  const pluginDir = join(dir, name);
-  const pluginFile = join(pluginDir, 'plugin.json');
-  if (!existsSync(pluginFile)) return null;
-  const raw = await readFile(pluginFile, 'utf8');
-  return { dir: pluginDir, content: JSON.parse(raw) as Record<string, unknown> };
+  const list = await listPlugins(db, filePath);
+  return list.find((p) => p.fullName === fullName) ?? null;
 }

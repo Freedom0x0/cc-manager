@@ -245,16 +245,17 @@ app.whenReady().then(() => {
   // ~/.claude/plugins/<name>/plugin.json(原子写)或 rm -rf 整个子目录。
   // 严格 schema 校验:缺必填字段(name/version/description)throw,wave-2-spec §2.3。
   // list/get 注入 enabled 状态(从 mcp_server_state KV 表读,key 前缀
-  // 'plugin:enabled:<name>');toggle_enabled 写 KV 表(不污染原文件 — D6 决策延伸)。
+  // 'plugin:enabled:<fullName>');toggle_enabled 写 KV 表(不污染原文件 — D6 决策延伸)。
+  // 2026-07-30 改:主键是 fullName(name@marketplace),不是 name
   ipcMain.handle('plugin_list', () => pluginsRepo.listPlugins(db));
-  ipcMain.handle('plugin_get', (_e, name: string) => pluginsRepo.getPlugin(db, name));
+  ipcMain.handle('plugin_get', (_e, fullName: string) => pluginsRepo.getPlugin(db, fullName));
   ipcMain.handle('plugin_create', (_e, input) => pluginsRepo.createPlugin(input));
-  ipcMain.handle('plugin_update', (_e, name: string, patch) =>
-    pluginsRepo.updatePlugin(name, patch)
+  ipcMain.handle('plugin_update', (_e, fullName: string, patch) =>
+    pluginsRepo.updatePlugin(fullName, patch)
   );
-  ipcMain.handle('plugin_delete', (_e, name: string) => pluginsRepo.deletePlugin(name));
-  ipcMain.handle('plugin_toggle_enabled', (_e, name: string, enabled: boolean) => {
-    pluginsRepo.setEnabled(db, name, enabled);
+  ipcMain.handle('plugin_delete', (_e, fullName: string) => pluginsRepo.deletePlugin(fullName));
+  ipcMain.handle('plugin_toggle_enabled', (_e, fullName: string, enabled: boolean) => {
+    pluginsRepo.setEnabled(db, fullName, enabled);
   });
 
   // v5 wave-3 Profiles 模块 — 6 IPC channel。profile 数据存
