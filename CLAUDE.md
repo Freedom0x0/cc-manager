@@ -179,7 +179,16 @@ cc-session-manager/
 - **2026-07-28 v5 D5**：`ProjectList.tsx` 全代码库 0 引用孤儿组件，`git rm` 删（不留死代码）
 - **2026-07-28 v5 D6**：enabled 状态走 KV 表（`mcp_server_state.enabled:<name>` 或 `skill:` / `cmd:` 前缀），不复用原文件（避免污染 `~/.claude.json` / SKILL.md / commands/*.md 的语义）。这是 wave-1 v2.0 的核心约束 — 用户 toggle 不破坏原文件结构
 - **2026-07-29 v5 D7**：`~/.claude/settings.json` 和 `~/.claude/plugins/<name>/plugin.json` 等 JSON 配置走原子写（tmp + rename），失败 catch unlink tmp 残留 + 保留原文件。Hook / 插件模块的 create/update/delete 都走此模式，不破坏原文件其他字段
-- **2026-07-29 v5 D9**：所有 6 个业务模块（MCP / Skills / Commands / Sub-Agents / Hooks / 插件）的 enabled 状态都走 `mcp_server_state` KV 表，不复用各自原文件。key 前缀区分（`mcp:` / `skill:` / `cmd:` / `agent:` / `hook:` / `plugin:`）。D6 决策延伸，统一走一张表简化
+- **2026-07-29 v5 D9**：[**已推翻，见 D10**] 所有 6 个业务模块的 enabled 状态都走 `mcp_server_state` KV 表
+- **2026-07-30 v5 D10 推翻 D6/D9**：用户的"停用"语义必须写到 Claude Code 实际读取的字段才生效。6 模块真停用位置：
+  - 插件：`~/.claude/settings.json` 的 `enabledPlugins[<name>@<marketplace>] = bool`（不是 installed_plugins.json）
+  - MCP：`~/.claude/settings.json` 的 `disabledMcpjsonServers[]` 黑名单
+  - Skills/Commands/Sub-Agents：`<name>/` 或 `<name>.md` 加 `.disabled` 后缀（实测 Claude Code 不读）
+  - Hooks：`settings.json.hooks[<event>]` 数组 splice 移除
+  - KV 表保留作 cache + profile_capture 读历史偏好，**不**是 UI 真实状态
+  - 启动时一次性 `runMigration` 把 KV → 真实文件同步
+  - 抽出共享 `electron/repo/settings-writer.ts` 统一原子写抽象（基于 D7 模式）
+  - 修正 profiles 模块的 KV prefix bug（mcp 用裸 `enabled:`，其余 5 用 `<prefix>:enabled:`）
 - **2026-07-29 macOS 适配**：`getDataDir()` 已做跨平台：Windows 用 `%APPDATA%`，macOS 用 `~/Library/Application Support`，Linux 用 `$XDG_CONFIG_HOME` 或 `~/.config`。`logFile()` 复用同一函数，不再有独立 fallback 路径。chokidar 需单独 `npm install`（package.json `dependencies` 已有，但 mac 首次 `npm install --ignore-scripts` 后需验证）
 
 ## 14. 用户语言

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-07-28T01:30:00.000Z",
+  "updatedAt": "2026-07-30T16:30:00.000Z",
   "hot": {
     "feedback": [],
     "decision": [],
@@ -11,6 +11,13 @@
   },
   "warm": {
     "project": [
+      {
+        "id": "2026-07-30-real-disable",
+        "title": "6 模块真停用 — 写真实文件",
+        "path": "2026-07-30-real-disable.md",
+        "tags": ["v5", "real-disable", "settings-writer", "migration", "profile-bug-fix"],
+        "summary": "推翻 V5 D6/D9 — 6 模块 toggle 写真实文件(settings.json / .disabled 后缀),KV 作 cache;抽 settings-writer 统一原子写抽象,加启动时一次性 migration;修 profiles KV prefix bug"
+      },
       {
         "id": "2026-07-28-cc-session-manager-v1-v2-v3",
         "title": "cc-session-manager 项目历程（v1 → v2 → v3）",
