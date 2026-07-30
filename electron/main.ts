@@ -242,8 +242,8 @@ app.whenReady().then(() => {
   ipcMain.handle('hook_delete', (_e, id: string) =>
     hooksRepo.deleteHook(id, hooksRepo.HOOK_EVENTS)
   );
-  ipcMain.handle('hook_toggle_enabled', (_e, id: string, enabled: boolean) => {
-    hooksRepo.setEnabled(db, id, enabled);
+  ipcMain.handle('hook_toggle_enabled', async (_e, id: string, enabled: boolean) => {
+    await hooksRepo.setEnabled(db, id, enabled, settingsPath, hooksRepo.HOOK_EVENTS);
   });
 
   // v5 wave-2 Plugins 模块 — 6 IPC channel。create/update/delete 改

@@ -1,20 +1,25 @@
 /**
- * electron/repo/hooks/state.ts — Hooks 模块 enabled 状态 KV 助手
+ * electron/repo/hooks/state.ts — Hooks 模块 enabled 状态
  *
- * 复用 mcp_server_state 表(CLAUDE.md v5 D1 / D6 决策延伸):3 列 KV 模型
- * (key PRIMARY KEY / value / updated_at)通用,key 前缀隔离:
- *   - 'hook:enabled:<id>' → 'true' / 'false' (用户 toggle)
+ * v5 wave-3 改造(2026-07-30 PRD real-disable):
+ * 用户 toggle "disable" = splice 移除该 hook 从 settings.json 的 hooks[<event>]
+ * 数组(PRD 决策:Claude Code 不读 disabled 标记字段,只有"数组里存在 = 启用")。
  *
- * 注意:虽然表名是 mcp_server_state,但本质是带 key 前缀隔离的通用 KV
- * 命名空间。Hooks 跟 MCP/Skills/Commands/Sub-Agents 复用同一张表,
- * 加一个新的启用维度 = 加一个 key 前缀,不再加新表。
+ * "enable" 不在本函数职责 — 重新加一个 hook 需要完整 HookEntry 信息
+ * (matcher + command),那是 hooks/writer.ts:createHook 的职责。本 toggle 只
+ * 承诺"disable" 路径,"enable" 通过 createHook 走 UI 显式创建流程。
  *
- * id 在 Hooks 模块是 `${event}-${index}` 而非 name(没有稳定 name),所以
- * key 用 id 作 hash 的载体,这一点跟其它 4 个模块(用 name)不同。
+ * mcp_server_state KV 表(hook:enabled:<id>)仍保留作 cache +
+ * profile_capture 读历史偏好。getEnabled 仍可从 KV 读(给 profile_capture
+ * 快照用),但 listHooks 不再以 KV 为准,而是看 settings.json 数组存在性。
+ *
+ * 路径注入:settingsPath 参数允许测试注入 fixture 路径(CLAUDE.md §13 D10)。
  */
 
 import type { DB } from '../../db/connection';
 import type { Statement } from 'better-sqlite3';
+import { setHookEnabled as writeSettingsHookSplice } from '../settings-writer';
+import type { HookEvent } from './types';
 
 const STMT_CACHE = new WeakMap<
   DB,
@@ -39,14 +44,59 @@ function stmts(db: DB) {
   return s;
 }
 
-/** 读 enabled 状态。无 key 默认 true(全新 hook 视为启用) */
+/** 从 id (格式 `${event}-${index}`) 拆出 event + index。 */
+function parseHookId(
+  id: string,
+  validEvents: readonly HookEvent[]
+): { event: HookEvent; index: number } {
+  const idx = id.lastIndexOf('-');
+  if (idx < 0) throw new Error(`Hook id "${id}" malformed`);
+  const event = id.slice(0, idx);
+  const indexStr = id.slice(idx + 1);
+  if (!validEvents.includes(event as HookEvent)) {
+    throw new Error(`Hook id "${id}" has unknown event "${event}"`);
+  }
+  const index = Number.parseInt(indexStr, 10);
+  if (!Number.isInteger(index) || index < 0) {
+    throw new Error(`Hook id "${id}" has invalid index`);
+  }
+  return { event: event as HookEvent, index };
+}
+
+/**
+ * 读 enabled 状态(从 KV 表)。**仅**给 profile_capture 用作"用户历史偏好"
+ * 快照,不是 UI 真实状态(UI 真实状态 = settings.json 数组存在性)。
+ *
+ * 无 key 默认 true(全新 hook 视为启用)。
+ */
 export function getEnabled(db: DB, id: string): boolean {
   const row = stmts(db).select.get(`hook:enabled:${id}`) as { value: string | null } | undefined;
   if (!row || row.value === null) return true;
   return row.value === 'true';
 }
 
-/** 写 enabled 状态到 KV 表 */
-export function setEnabled(db: DB, id: string, enabled: boolean): void {
-  stmts(db).upsert.run(`hook:enabled:${id}`, enabled ? 'true' : 'false', Date.now());
+/**
+ * 写真实 settings.json — disable = splice 移除。
+ * setEnabled(true) 抛错:enable 必须走 hooks/writer.ts:createHook 重新创建
+ * (需要完整 HookEntry 信息)。
+ *
+ * settingsPath 必传(scanner 不传,scanner 是读路径);测试可通过 settingsPath
+ * 注入 fixture。
+ */
+export async function setEnabled(
+  db: DB,
+  id: string,
+  enabled: boolean,
+  settingsPath: string,
+  validEvents: readonly HookEvent[]
+): Promise<void> {
+  const { event, index } = parseHookId(id, validEvents);
+  // 1. 写真实 settings.json(主操作,失败抛错)
+  await writeSettingsHookSplice(event, index, enabled, settingsPath);
+  // 2. 写 KV 表(cache,失败不抛错)
+  try {
+    stmts(db).upsert.run(`hook:enabled:${id}`, enabled ? 'true' : 'false', Date.now());
+  } catch {
+    /* KV 写失败不阻断主操作 */
+  }
 }

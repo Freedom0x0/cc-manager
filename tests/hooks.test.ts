@@ -1,11 +1,17 @@
 /**
  * tests/hooks.test.ts — v5 wave-2 Hooks 模块 5 case
  *
+ * v5 wave-3 改造(2026-07-30 PRD real-disable):
+ * enabled 状态从 settings.json 的 hooks[] 数组存在性读(PRD 决策:
+ * disable = splice 移除,enable = 通过 createHook 重建)。不再是
+ * mcp_server_state KV 表(D10 决策 — 真停用)。
+ *
  * Case 1: listHooks() on 不存在 settings.json → 返 []
  * Case 2: listHooks() on fixture settings.json → 解析 2 event 分组返 3 hook
  * Case 3: createHook 加到 PreToolUse 数组 + 原子写
  * Case 4: updateHook 改 matcher(**其他字段保留** — 重点测不破坏其他 event 数组)
  * Case 5: deleteHook 从 PreToolUse 数组移除(PostToolUse 不动)
+ * Case 6: setEnabled(false) → splice 移除该 hook(真停用硬证据)
  *
  * Fixture 设计(CLAUDE.md §13 D10):
  * - DB 用 initDB(':memory:') — 内存 DB,沙箱干净
@@ -60,8 +66,8 @@ test('listHooks returns [] when settings.json does not exist', async () => {
   closeDB(db);
 });
 
-// Case 2: fixture settings.json → 解析 2 event 分组返 3 hook + enabled 注入
-test('listHooks parses fixture settings.json and injects enabled state from KV', async () => {
+// Case 2: fixture settings.json → 解析 2 event 分组返 3 hook
+test('listHooks parses fixture settings.json (enabled is structural — array presence)', async () => {
   writeFixtureSettings({
     permissions: { allow: ['Bash'] }, // 其他字段保留的证据 — 后面 case 会原值读回
     hooks: {
@@ -74,7 +80,7 @@ test('listHooks parses fixture settings.json and injects enabled state from KV',
       ],
     },
   });
-  // 默认 enabled = true(KV 表无 key)
+  // enabled 推导:hooks[event] 数组中存在 → enabled=true(PRD 决策)
   const list = await listHooks(db, settingsPath);
   assert.strictEqual(list.length, 3, '应读出 3 个 hook(2 PreToolUse + 1 PostToolUse)');
   // id 顺序按 event 扁平化(PreToolUse 在前)
@@ -82,16 +88,11 @@ test('listHooks parses fixture settings.json and injects enabled state from KV',
   assert.strictEqual(list[0].event, 'PreToolUse');
   assert.strictEqual(list[0].matcher, 'Bash');
   assert.strictEqual(list[0].command, 'echo pre1');
-  assert.strictEqual(list[0].enabled, true, '默认 enabled=true(KV 表无 key)');
+  assert.strictEqual(list[0].enabled, true, 'hooks[] 中存在 → enabled=true');
   assert.strictEqual(list[1].id, 'PreToolUse-1');
   assert.strictEqual(list[2].id, 'PostToolUse-0');
   assert.strictEqual(list[2].matcher, undefined, 'PostToolUse-0 无 matcher');
   assert.strictEqual(list[2].command, 'echo post1');
-
-  // 设 enabled=false 后应读出来
-  setEnabled(db, 'PreToolUse-0', false);
-  const list2 = await listHooks(db, settingsPath);
-  assert.strictEqual(list2[0].enabled, false, 'KV 表写入后 enabled=false');
   closeDB(db);
 });
 
@@ -187,5 +188,40 @@ test('deleteHook removes entry from PreToolUse without touching PostToolUse', as
   const post = await getHook(db, 'PostToolUse-0', settingsPath);
   assert.ok(post, 'PostToolUse-0 应存在');
   assert.strictEqual(post?.command, 'echo post1');
+  closeDB(db);
+});
+
+// Case 6 (新增): setEnabled(false) → splice 移除该 hook(真停用硬证据)
+test('setEnabled(false) splices the hook from settings.json (real disable)', async () => {
+  writeFixtureSettings({
+    hooks: {
+      PreToolUse: [
+        { matcher: 'Bash', hooks: [{ type: 'command', command: 'echo pre1' }] },
+        { matcher: 'Read', hooks: [{ type: 'command', command: 'echo pre2' }] },
+      ],
+    },
+  });
+
+  // 停用 PreToolUse-0
+  await setEnabled(db, 'PreToolUse-0', false, settingsPath, HOOK_EVENTS);
+
+  // 1. settings.json 真变了:PreToolUse-0 被 splice
+  const raw = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  assert.strictEqual(
+    raw.hooks.PreToolUse.length,
+    1,
+    'PreToolUse 数组应剩 1 条(被停用那个被 splice)'
+  );
+  assert.strictEqual(
+    raw.hooks.PreToolUse[0].matcher,
+    'Read',
+    '剩余应是原 PreToolUse-1(Read)'
+  );
+
+  // 2. list 也不再有 PreToolUse-0
+  const list = await listHooks(db, settingsPath);
+  assert.strictEqual(list.length, 1, 'list 长度 = 1');
+  assert.strictEqual(list[0].id, 'PreToolUse-0', '原 PreToolUse-1 提升到 index 0');
+  assert.strictEqual(list[0].matcher, 'Read');
   closeDB(db);
 });

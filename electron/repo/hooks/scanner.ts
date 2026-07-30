@@ -27,7 +27,6 @@ import { existsSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 import type { DB } from '../../db/connection';
-import { getEnabled } from './state';
 import type { Hook, HookEntry, HookEvent } from './types';
 
 /** 默认生产路径 ~/.claude/settings.json。测试通过 settingsPath 参数覆盖。 */
@@ -36,13 +35,15 @@ export function defaultSettingsPath(): string {
 }
 
 /**
- * 读 ~/.claude/settings.json → 解析 hooks 字段 → 扁平化 → 注入 enabled
+ * 读 ~/.claude/settings.json → 解析 hooks 字段 → 扁平化 → enabled 恒为 true
+ * (因为 setEnabled(false) 已经 splice 移除,数组里存在 = 启用)
  * → 返 Hook[]。文件不存在或 JSON 损坏或 hooks 字段缺失返 []。
  *
- * @param db 已 initDB 的 SQLite handle(读 enabled KV)
+ * @param db 已 initDB 的 SQLite handle(保留作未来扩展,本函数不再读 KV)
  * @param settingsPath 可选:注入 fixture 路径(测试用);默认走 ~/.claude/settings.json
  */
 export async function listHooks(db: DB, settingsPath?: string): Promise<Hook[]> {
+  void db;
   const file = settingsPath ?? defaultSettingsPath();
   if (!existsSync(file)) return [];
   let raw: string;
@@ -73,7 +74,8 @@ export async function listHooks(db: DB, settingsPath?: string): Promise<Hook[]> 
         event,
         matcher: entry.matcher,
         command,
-        enabled: getEnabled(db, id),
+        // 真实 enabled 状态 = 在 settings.json 数组中存在(本分支已到)
+        enabled: true,
         scope: 'global',
       });
     });
