@@ -18,6 +18,7 @@ import * as hooksRepo from './repo/hooks';
 import * as pluginsRepo from './repo/plugins';
 import * as profilesRepo from './repo/profiles';
 import * as usageRepo from './repo/usage';
+import { runMigration } from './repo/migration';
 import { buildResumeCommand } from './resumer';
 import { startWatcher } from './watcher';
 import { defaultSettingsPath } from './repo/settings-writer';
@@ -72,12 +73,41 @@ function createWindow() {
   return win;
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   log('app ready, init DB...');
   const dataDir = getDataDir();
   const dbPath = path.join(dataDir, 'app.db');
   db = initDB(dbPath);
   log('DB ready at', dbPath);
+
+  // v5 wave-3 real-disable migration: KV → 真实文件 一次性同步
+  // 失败 best-effort(写真实文件失败 → 跳过该 entry,KV 保留,下次再试)
+  // UI 仍能从 KV 兜底读;profile_capture 也仍从 KV 读
+  try {
+    const mig = await runMigration(
+      db,
+      defaultSettingsPath(),
+      undefined,
+      hooksRepo.HOOK_EVENTS
+    );
+    const total =
+      mig.counts.mcp +
+      mig.counts.skill +
+      mig.counts.command +
+      mig.counts.agent +
+      mig.counts.hook +
+      mig.counts.plugin;
+    if (total > 0) {
+      log(
+        'migration: applied',
+        JSON.stringify(mig.counts),
+        'failures=',
+        mig.failures.length
+      );
+    }
+  } catch (e) {
+    log('migration error', e instanceof Error ? e.stack : String(e));
+  }
 
   try {
     const home = os.homedir();
