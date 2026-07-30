@@ -48,7 +48,9 @@
 
 ### macOS
 
-macOS 打包版(.dmg)在 v4.0 规划中,**目前请用开发模式**运行:
+macOS 装包配置(`electron-builder.json` mac target = `dmg` + `zip`,arm64 + x64 双架构)在 v3.1 已就绪,**待 mac 真机验证**。当前可用方式:
+
+**A. 开发模式**(`npm run dev`,无需装包):
 
 ```bash
 git clone https://github.com/Freedom0x0/cc-manager.git
@@ -59,6 +61,18 @@ node node_modules/electron/install.js
 npm run rebuild:sqlite     # 若不兼容见下方手动步骤
 npm run dev
 ```
+
+**B. 装包**(`npm run package:mac`,需 macOS + Xcode Command Line Tools):
+
+```bash
+npm install --ignore-scripts
+node node_modules/electron/install.js
+npm run rebuild:sqlite
+npm run package:mac
+# 产物:release/CC Manager-0.3.0-mac-{arm64,x64}.{dmg,zip}
+```
+
+> **未签名策略**(CLAUDE.md §13 D11 决策):v3.1 mac 装包不签名。Gatekeeper 会拦截,需**右键打开**(`Open With → Open`)首次允许即可。Developer ID / notarization 留到 v4.0。
 
 > 数据文件路径:`~/Library/Application Support/cc-session-manager/app.db`
 
@@ -213,12 +227,27 @@ npm run dev
 **数据文件路径**(macOS): `~/Library/Application Support/cc-session-manager/app.db`  
 **日志路径**(macOS): `~/Library/Application Support/cc-session-manager/app.log`
 
-> **注意**:`npm run package` / `npm run package:mac` 在 v4.0 前不在维护范围(Apple 签名 / notarization 留到 v4.0 处理)。开发模式(`npm run dev`)完全可用。
+> **未签名 mac 装包**(CLAUDE.md §13 D11 决策):首次双击 `.dmg` 时 Gatekeeper 会拦截,需**右键 → 打开**(或在「系统设置 → 隐私与安全性」点击「仍要打开」)。Developer ID 签名 + Apple notarization 留到 v4.0。
+
+### macOS 真机验证 checklist(待 mac 贡献者)
+
+> 以下步骤在 v3.1 配置就绪后,**未在 mac 机器上跑过**。欢迎有 mac 的贡献者按此跑一遍回填结果:
+
+1. **环境**: macOS 12+,Xcode Command Line Tools (`xcode-select --install`)
+2. **clone + 编译**: `npm install --ignore-scripts && node node_modules/electron/install.js && npm run rebuild:sqlite`
+3. **测试**: `npm test` — 期望 `143/143` 全绿
+4. **dev 模式**: `npm run dev` — 启应用,确认 6 模块 toggle 真实文件变化:
+   - MCP / 插件 / Hooks: `~/.claude/settings.json` 改
+   - Skills: `~/.claude/skills/<name>/` ↔ `<name>.disabled/`
+   - Commands/Sub-Agents: `<name>.md` ↔ `<name>.md.disabled`
+5. **装包**: `npm run package:mac` — 出 `.dmg` + `.zip` (arm64 + x64)
+6. **Gatekeeper**: 双击 `.dmg` → 右键 → 打开 → 验证首次运行 Gatekeeper 警告流程
+7. **回填**: 把跑测结果贴到 PR 评论或 issue,有问题开新 issue
 
 ### 跑测试
 
 ```bash
-npm test         # 109 个 case
+npm test         # 143 个 case
                  # 必须用 ELECTRON_RUN_AS_NODE(已配在 scripts.test)
 ```
 
