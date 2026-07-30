@@ -46,7 +46,8 @@ export function defaultSkillsDir(): string {
 export function parseFrontmatter(
   content: string
 ): { meta: Record<string, string>; body: string } {
-  const match = content.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+  // CRLF + LF 双支持:Windows SKILL.md 是 \r\n,Linux/macOS 是 \n
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
   if (!match) return { meta: {}, body: content };
   const meta: Record<string, string> = {};
   for (const line of match[1].split('\n')) {
@@ -76,8 +77,10 @@ export async function listSkills(db: DB, skillsDir?: string): Promise<Skill[]> {
   if (!existsSync(dir)) return [];
   let entries: string[];
   try {
+    // e.isDirectory() 对 symlink 返 false; 改用 lstat 判断,
+    // symlink 或目录都接受(后续 statSync 跟随后确认有 SKILL.md)
     entries = await readdir(dir, { withFileTypes: true })
-      .then((d) => d.filter((e) => e.isDirectory()).map((e) => e.name))
+      .then((d) => d.filter((e) => e.isDirectory() || e.isSymbolicLink()).map((e) => e.name))
       .catch(() => []);
   } catch {
     return [];
