@@ -77,8 +77,10 @@ export async function listSkills(db: DB, skillsDir?: string): Promise<Skill[]> {
   if (!existsSync(dir)) return [];
   let entries: string[];
   try {
+    // e.isDirectory() 对 symlink 返 false; 改用 lstat 判断,
+    // symlink 或目录都接受(后续 statSync 跟随后确认有 SKILL.md)
     entries = await readdir(dir, { withFileTypes: true })
-      .then((d) => d.filter((e) => e.isDirectory()).map((e) => e.name))
+      .then((d) => d.filter((e) => e.isDirectory() || e.isSymbolicLink()).map((e) => e.name))
       .catch(() => []);
   } catch {
     return [];
