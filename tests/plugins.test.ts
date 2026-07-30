@@ -4,8 +4,15 @@
  * 2026-07-30 重写:从假设的"`<name>/plugin.json` 目录"改为实际
  * `~/.claude/plugins/installed_plugins.json` 单文件。
  *
+ * v5 wave-3 改造(2026-07-30 PRD real-disable):
+ * enabled 状态从 settings.json 的 enabledPlugins 字段读(全库主键是
+ * `<name>@<marketplace>`),而不是 mcp_server_state KV 表(D10 决策:
+ * 真停用写到 Claude Code 实际读取的字段)。
+ *
  * Case 1: listPlugins() on 不存在文件 → 返 []
  * Case 2: listPlugins() on fixture 文件 → 返 fixture plugin + enabled 注入
+ *   Sub-case 2a: settings.json 无 enabledPlugins → 默认 enabled=true
+ *   Sub-case 2b: setEnabled(false) → 写 settings.json enabledPlugins
  * Case 3: createPlugin() 写 installed_plugins.json(必填字段校验通过)
  * Case 4: updatePlugin() 改 version(scope 保留)— 重点测不破坏其他字段
  * Case 5: createPlugin() 缺必填字段(没 version)→ throw(任务硬规则)
@@ -14,6 +21,7 @@
  * - DB 用 initDB(':memory:') — 内存 DB,沙箱干净
  * - installed_plugins.json 用 `os.tmpdir()` 临时路径,**不**碰真实
  *   ~/.claude/plugins/installed_plugins.json
+ * - settings.json (放 enabledPlugins) 也用 tmp 路径
  * - 通过 filePath 参数显式注入(不依赖环境变量)
  *
  * 与 Skill / Sub-Agent / Command / Hook 的最大差异:**严格 schema 校验**
@@ -39,11 +47,13 @@ let db: DB;
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ccsm-plugins-test-'));
 const installedPath = path.join(tmpDir, 'installed_plugins.json');
+const settingsPath = path.join(tmpDir, 'settings.json');
 
 beforeEach(() => {
   db = initDB(':memory:');
   // 每个 case 起始清空 fixture 文件
   fs.rmSync(installedPath, { force: true });
+  fs.rmSync(settingsPath, { force: true });
 });
 
 function writeFixtureFile(plugins: Record<string, unknown[]>): void {
@@ -55,13 +65,13 @@ function writeFixtureFile(plugins: Record<string, unknown[]>): void {
 
 // Case 1: 文件不存在 → 返 []
 test('listPlugins returns [] when installed_plugins.json does not exist', async () => {
-  const list = await listPlugins(db, installedPath);
+  const list = await listPlugins(db, installedPath, settingsPath);
   assert.deepStrictEqual(list, [], '不存在文件应返空数组');
   closeDB(db);
 });
 
-// Case 2: fixture 文件 → 返 fixture plugin + enabled 注入
-test('listPlugins reads installed_plugins.json and injects enabled state from KV', async () => {
+// Case 2a: fixture + settings.json 无 enabledPlugins → enabled = true
+test('listPlugins returns enabled=true when settings.json has no enabledPlugins', async () => {
   writeFixtureFile({
     'gh@claude-plugins-official': [
       {
@@ -75,8 +85,7 @@ test('listPlugins reads installed_plugins.json and injects enabled state from KV
     ],
   });
 
-  // 默认 enabled = true(KV 表无 key)
-  const list = await listPlugins(db, installedPath);
+  const list = await listPlugins(db, installedPath, settingsPath);
   assert.strictEqual(list.length, 1, '应读出 1 个 plugin');
   const p = list[0];
   assert.strictEqual(p.fullName, 'gh@claude-plugins-official');
@@ -86,12 +95,36 @@ test('listPlugins reads installed_plugins.json and injects enabled state from KV
   assert.strictEqual(p.scope, 'user');
   assert.strictEqual(p.installPath, 'C:/Users/.../gh/1.0.0');
   assert.strictEqual(p.gitCommitSha, 'abc1234567');
-  assert.strictEqual(p.enabled, true, '默认 enabled=true');
+  assert.strictEqual(p.enabled, true, '默认 enabled=true(settings.json 无该 key)');
+  closeDB(db);
+});
 
-  // 设 enabled=false 后应读出来
-  setEnabled(db, 'gh@claude-plugins-official', false);
-  const list2 = await listPlugins(db, installedPath);
-  assert.strictEqual(list2[0].enabled, false, 'KV 表写入后 enabled=false');
+// Case 2b: setEnabled(false) → 写 settings.json enabledPlugins → 后续 list 读到 false
+test('listPlugins reflects enabled=false after setEnabled writes settings.json', async () => {
+  writeFixtureFile({
+    'gh@claude-plugins-official': [
+      {
+        scope: 'user',
+        installPath: 'C:/Users/.../gh/1.0.0',
+        version: '1.2.0',
+        installedAt: '2026-07-01T06:16:31.254Z',
+        lastUpdated: '2026-07-01T06:16:31.254Z',
+        gitCommitSha: 'abc1234567',
+      },
+    ],
+  });
+
+  await setEnabled(db, 'gh@claude-plugins-official', false, settingsPath);
+  const list = await listPlugins(db, installedPath, settingsPath);
+  assert.strictEqual(list[0].enabled, false, 'setEnabled(false) 后 enabled=false');
+
+  // 真停用硬证据:settings.json.enabledPlugins 应含该 key = false
+  const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  assert.strictEqual(
+    settings.enabledPlugins['gh@claude-plugins-official'],
+    false,
+    'settings.json.enabledPlugins[fullName] 应为 false'
+  );
   closeDB(db);
 });
 
