@@ -255,39 +255,38 @@ export interface HookUpdatePatch {
  * → 注入 enabled(KV 表 key 前缀 'plugin:enabled:<name>')→ UI 渲染。
  * createPlugin 接收 PluginCreateInput;updatePlugin 接收 PluginUpdatePatch。
  *
- * 严格 schema 校验:必填 name/version/description,缺则 throw —
+ * 严格 schema 校验:必填 fullName/installPath/version/scope,缺则 throw —
  * wave-2-spec §2.3。
  *
- * 与 Skill 类似(都是子目录),但用 JSON plugin.json 而非 frontmatter .md;
- * 与 Command / SubAgent 不同(Command/SubAgent 是单文件 .md,Plugin 是目录 +
- * JSON 文件)。
+ * 2026-07-30 重写:从假设的"`<name>/plugin.json` 目录"改为实际
+ * `~/.claude/plugins/installed_plugins.json` 单文件。
+ * 字段:fullName (`name@marketplace`)、name (short)、marketplace、
+ * installPath (实际安装路径)、version、scope、installedAt、lastUpdated、
+ * gitCommitSha、enabled (KV 状态)。
  */
 export interface Plugin {
-  name: string;
-  path: string;
+  fullName: string;       // name@marketplace,主键
+  name: string;           // 解析后的 shortName
+  marketplace: string;    // 解析后的 marketplace 名
+  installPath: string;
   version: string;
-  description: string;
-  author?: string;
-  dependencies?: string[];
-  entry?: string;
-  enabled: boolean;
+  scope: 'user' | 'project';
+  installedAt: string;    // ISO
+  lastUpdated: string;    // ISO
+  gitCommitSha: string;
+  enabled: boolean;       // KV 状态
 }
 
 export interface PluginCreateInput {
-  name: string;
+  fullName: string;
+  installPath: string;
   version: string;
-  description: string;
-  author?: string;
-  dependencies?: string[];
-  entry?: string;
+  scope: 'user' | 'project';
 }
 
 export interface PluginUpdatePatch {
+  scope?: 'user' | 'project';
   version?: string;
-  description?: string;
-  author?: string;
-  dependencies?: string[];
-  entry?: string;
 }
 
 /**

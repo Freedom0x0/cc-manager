@@ -53,10 +53,11 @@ test('api.plugin* — 6 wrapper functions are exported', () => {
 test('types.ts exports Plugin interface (cross-layer contract)', () => {
   const typesSrc = fs.readFileSync(path.join(SRC, 'types.ts'), 'utf8');
   assert.match(typesSrc, /export\s+interface\s+Plugin\b/, 'types.ts 应导出 Plugin interface');
-  // 顺便验证关键字段都在(防字段意外改名):name / version / description / enabled
+  // 顺便验证关键字段都在(防字段意外改名):fullName / name / version / scope / enabled
+  // 2026-07-30 重写后 schema:fullName(name@marketplace) / name(short) / marketplace / installPath / version / scope / installedAt / lastUpdated / gitCommitSha / enabled
   const pluginBlock = typesSrc.match(/export\s+interface\s+Plugin\s*\{([^}]+)\}/);
   assert.ok(pluginBlock, '应能匹配 Plugin interface 体');
-  for (const field of ['name', 'path', 'version', 'description', 'enabled']) {
+  for (const field of ['fullName', 'name', 'version', 'scope', 'enabled']) {
     assert.ok(pluginBlock![1].includes(field), `Plugin 应包含字段 ${field}`);
   }
 });

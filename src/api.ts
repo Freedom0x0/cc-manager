@@ -108,13 +108,13 @@ export const api = {
     window.api.hookToggleEnabled(id, enabled),
   // v5 wave-2 Plugins module — 6 IPC wrappers
   pluginList: (): Promise<Plugin[]> => window.api.pluginList(),
-  pluginGet: (name: string): Promise<Plugin | null> => window.api.pluginGet(name),
+  pluginGet: (fullName: string): Promise<Plugin | null> => window.api.pluginGet(fullName),
   pluginCreate: (input: PluginCreateInput): Promise<void> => window.api.pluginCreate(input),
-  pluginUpdate: (name: string, patch: PluginUpdatePatch): Promise<void> =>
-    window.api.pluginUpdate(name, patch),
-  pluginDelete: (name: string): Promise<void> => window.api.pluginDelete(name),
-  pluginToggleEnabled: (name: string, enabled: boolean): Promise<void> =>
-    window.api.pluginToggleEnabled(name, enabled),
+  pluginUpdate: (fullName: string, patch: PluginUpdatePatch): Promise<void> =>
+    window.api.pluginUpdate(fullName, patch),
+  pluginDelete: (fullName: string): Promise<void> => window.api.pluginDelete(fullName),
+  pluginToggleEnabled: (fullName: string, enabled: boolean): Promise<void> =>
+    window.api.pluginToggleEnabled(fullName, enabled),
   // v5 wave-3 Profiles module — 6 IPC wrappers
   profileList: (): Promise<Profile[]> => window.api.profileList(),
   profileGet: (name: string): Promise<Profile | null> => window.api.profileGet(name),
