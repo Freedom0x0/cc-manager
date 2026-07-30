@@ -100,8 +100,13 @@ export const SubAgentsManager: React.FC = () => {
 
   const submitEdit = async () => {
     if (!editing) return;
+    let values: SubAgentFormValues;
     try {
-      const values = await editForm.validateFields();
+      values = await editForm.validateFields();
+    } catch {
+      return;
+    }
+    try {
       await api.subagentUpdate(editing.name, {
         description: values.description,
         argumentHint: values.argumentHint,
@@ -111,14 +116,19 @@ export const SubAgentsManager: React.FC = () => {
       setEditing(null);
       load();
     } catch (e) {
-      if (e instanceof Error) console.error('subagentUpdate failed', e);
-      message.error('更新失败');
+      console.error('subagentUpdate failed', e);
+      message.error(e instanceof Error ? e.message : '更新失败');
     }
   };
 
   const submitCreate = async () => {
+    let values: SubAgentFormValues;
     try {
-      const values = await createForm.validateFields();
+      values = await createForm.validateFields();
+    } catch {
+      return;
+    }
+    try {
       const input: SubAgentCreateInput = {
         name: values.name,
         description: values.description,
@@ -131,8 +141,8 @@ export const SubAgentsManager: React.FC = () => {
       createForm.resetFields();
       load();
     } catch (e) {
-      if (e instanceof Error) console.error('subagentCreate failed', e);
-      message.error('创建失败');
+      console.error('subagentCreate failed', e);
+      message.error(e instanceof Error ? e.message : '创建失败');
     }
   };
 

@@ -109,8 +109,13 @@ export const PluginsManager: React.FC = () => {
 
   const submitEdit = async () => {
     if (!editing) return;
+    let values: PluginFormValues;
     try {
-      const values = await editForm.validateFields();
+      values = await editForm.validateFields();
+    } catch {
+      return;
+    }
+    try {
       const deps = values.dependencies
         ? values.dependencies.split(',').map((s) => s.trim()).filter(Boolean)
         : undefined;
@@ -125,14 +130,19 @@ export const PluginsManager: React.FC = () => {
       setEditing(null);
       load();
     } catch (e) {
-      if (e instanceof Error) console.error('pluginUpdate failed', e);
-      message.error('更新失败');
+      console.error('pluginUpdate failed', e);
+      message.error(e instanceof Error ? e.message : '更新失败');
     }
   };
 
   const submitCreate = async () => {
+    let values: PluginFormValues;
     try {
-      const values = await createForm.validateFields();
+      values = await createForm.validateFields();
+    } catch {
+      return;
+    }
+    try {
       const deps = values.dependencies
         ? values.dependencies.split(',').map((s) => s.trim()).filter(Boolean)
         : undefined;
@@ -150,8 +160,8 @@ export const PluginsManager: React.FC = () => {
       createForm.resetFields();
       load();
     } catch (e) {
-      if (e instanceof Error) console.error('pluginCreate failed', e);
-      message.error('创建失败');
+      console.error('pluginCreate failed', e);
+      message.error(e instanceof Error ? e.message : '创建失败');
     }
   };
 

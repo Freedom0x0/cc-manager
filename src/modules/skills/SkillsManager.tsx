@@ -109,8 +109,14 @@ export const SkillsManager: React.FC = () => {
 
   const submitEdit = async () => {
     if (!editing) return;
+    let values: SkillFormValues;
     try {
-      const values = await editForm.validateFields();
+      values = await editForm.validateFields();
+    } catch {
+      // 表单字段验证失败 — antd 已在字段旁显示错误，无需额外 toast
+      return;
+    }
+    try {
       await api.skillUpdate(editing.name, {
         description: values.description,
         allowedTools: parseAllowedTools(values.allowedTools),
@@ -121,7 +127,7 @@ export const SkillsManager: React.FC = () => {
       setEditing(null);
       load();
     } catch (e) {
-      if (e instanceof Error) console.error('skillUpdate failed', e);
+      console.error('skillUpdate failed', e);
       message.error('更新失败');
     }
   };
@@ -145,8 +151,14 @@ export const SkillsManager: React.FC = () => {
   };
 
   const submitCreate = async () => {
+    let values: SkillFormValues;
     try {
-      const values = await createForm.validateFields();
+      values = await createForm.validateFields();
+    } catch {
+      // 表单字段验证失败 — antd 已在字段旁显示错误，无需额外 toast
+      return;
+    }
+    try {
       const input: SkillCreateInput = {
         name: values.name,
         description: values.description,
@@ -160,8 +172,8 @@ export const SkillsManager: React.FC = () => {
       createForm.resetFields();
       load();
     } catch (e) {
-      if (e instanceof Error) console.error('skillCreate failed', e);
-      message.error('创建失败');
+      console.error('skillCreate failed', e);
+      message.error(e instanceof Error ? e.message : '创建失败');
     }
   };
 

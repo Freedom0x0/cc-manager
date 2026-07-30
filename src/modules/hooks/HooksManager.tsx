@@ -98,8 +98,13 @@ export const HooksManager: React.FC = () => {
 
   const submitEdit = async () => {
     if (!editing) return;
+    let values: HookFormValues;
     try {
-      const values = await editForm.validateFields();
+      values = await editForm.validateFields();
+    } catch {
+      return;
+    }
+    try {
       await api.hookUpdate(editing.id, {
         matcher: values.matcher,
         command: values.command,
@@ -108,14 +113,19 @@ export const HooksManager: React.FC = () => {
       setEditing(null);
       load();
     } catch (e) {
-      if (e instanceof Error) console.error('hookUpdate failed', e);
-      message.error('更新失败');
+      console.error('hookUpdate failed', e);
+      message.error(e instanceof Error ? e.message : '更新失败');
     }
   };
 
   const submitCreate = async () => {
+    let values: HookFormValues;
     try {
-      const values = await createForm.validateFields();
+      values = await createForm.validateFields();
+    } catch {
+      return;
+    }
+    try {
       const input: HookCreateInput = {
         event: values.event,
         matcher: values.matcher,
@@ -127,8 +137,8 @@ export const HooksManager: React.FC = () => {
       createForm.resetFields();
       load();
     } catch (e) {
-      if (e instanceof Error) console.error('hookCreate failed', e);
-      message.error('创建失败');
+      console.error('hookCreate failed', e);
+      message.error(e instanceof Error ? e.message : '创建失败');
     }
   };
 

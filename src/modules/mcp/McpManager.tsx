@@ -100,8 +100,13 @@ export const McpManager: React.FC = () => {
 
   const submitEdit = async () => {
     if (!editing) return;
+    let values: McpFormValues;
     try {
-      const values = await editForm.validateFields();
+      values = await editForm.validateFields();
+    } catch {
+      return;
+    }
+    try {
       const args = values.args
         ? values.args.split(',').map((a) => a.trim()).filter(Boolean)
         : [];
@@ -114,15 +119,19 @@ export const McpManager: React.FC = () => {
       setEditing(null);
       load();
     } catch (e) {
-      if (e instanceof Error) console.error('mcpUpdate failed', e);
-      // antd Form 校验失败会自动显示,这里只兜底 IO 错误
-      message.error('更新失败');
+      console.error('mcpUpdate failed', e);
+      message.error(e instanceof Error ? e.message : '更新失败');
     }
   };
 
   const submitCreate = async () => {
+    let values: McpFormValues;
     try {
-      const values = await createForm.validateFields();
+      values = await createForm.validateFields();
+    } catch {
+      return;
+    }
+    try {
       const args = values.args
         ? values.args.split(',').map((a) => a.trim()).filter(Boolean)
         : [];
@@ -137,8 +146,8 @@ export const McpManager: React.FC = () => {
       createForm.resetFields();
       load();
     } catch (e) {
-      if (e instanceof Error) console.error('mcpCreate failed', e);
-      message.error('创建失败');
+      console.error('mcpCreate failed', e);
+      message.error(e instanceof Error ? e.message : '创建失败');
     }
   };
 
