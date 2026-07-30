@@ -24,7 +24,6 @@ import { existsSync } from 'fs';
 import { homedir } from 'os';
 import { join, basename } from 'path';
 import type { DB } from '../../db/connection';
-import { getEnabled } from './state';
 import type { Command } from './types';
 
 /** 默认生产路径 ~/.claude/commands。测试通过 commandsDir 参数覆盖。 */
@@ -82,6 +81,8 @@ export async function listCommands(db: DB, commandsDir?: string): Promise<Comman
   const out: Command[] = [];
   for (const filename of entries) {
     if (!filename.endsWith('.md')) continue;
+    // 跳过 .disabled 后缀(真停用) — Claude Code 不读
+    if (filename.endsWith('.md.disabled')) continue;
     const name = basename(filename, '.md');
     const filePath = join(dir, filename);
     if (!existsSync(filePath)) continue;
@@ -95,7 +96,8 @@ export async function listCommands(db: DB, commandsDir?: string): Promise<Comman
         path: filePath,
         description,
         argumentHint,
-        enabled: getEnabled(db, name),
+        // 真实 enabled = 在 commands 目录中存在(本分支已到 + 非 .disabled)
+        enabled: true,
         body,
       });
     } catch {

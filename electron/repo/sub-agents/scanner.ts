@@ -24,7 +24,6 @@ import { existsSync } from 'fs';
 import { homedir } from 'os';
 import { join, basename } from 'path';
 import type { DB } from '../../db/connection';
-import { getEnabled } from './state';
 import type { SubAgent } from './types';
 
 /** 默认生产路径 ~/.claude/agents。测试通过 agentsDir 参数覆盖。 */
@@ -82,6 +81,8 @@ export async function listSubAgents(db: DB, agentsDir?: string): Promise<SubAgen
   const out: SubAgent[] = [];
   for (const filename of entries) {
     if (!filename.endsWith('.md')) continue;
+    // 跳过 .disabled 后缀(真停用) — Claude Code 不读
+    if (filename.endsWith('.md.disabled')) continue;
     const name = basename(filename, '.md');
     const filePath = join(dir, filename);
     if (!existsSync(filePath)) continue;
@@ -95,7 +96,8 @@ export async function listSubAgents(db: DB, agentsDir?: string): Promise<SubAgen
         path: filePath,
         description,
         argumentHint,
-        enabled: getEnabled(db, name),
+        // 真实 enabled = 在 agents 目录中存在(本分支已到 + 非 .disabled)
+        enabled: true,
         body,
       });
     } catch {

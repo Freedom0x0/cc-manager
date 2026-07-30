@@ -193,8 +193,8 @@ app.whenReady().then(() => {
     skillsRepo.updateSkill(name, patch)
   );
   ipcMain.handle('skill_delete', (_e, name: string) => skillsRepo.deleteSkill(name));
-  ipcMain.handle('skill_toggle_enabled', (_e, name: string, enabled: boolean) => {
-    skillsRepo.setEnabled(db, name, enabled);
+  ipcMain.handle('skill_toggle_enabled', async (_e, name: string, enabled: boolean) => {
+    await skillsRepo.setEnabled(db, name, enabled);
   });
 
   // v5 wave-1 Commands 模块 — 6 IPC channel。create/update/delete 改
@@ -208,8 +208,8 @@ app.whenReady().then(() => {
     commandsRepo.updateCommand(name, patch)
   );
   ipcMain.handle('command_delete', (_e, name: string) => commandsRepo.deleteCommand(name));
-  ipcMain.handle('command_toggle_enabled', (_e, name: string, enabled: boolean) => {
-    commandsRepo.setEnabled(db, name, enabled);
+  ipcMain.handle('command_toggle_enabled', async (_e, name: string, enabled: boolean) => {
+    await commandsRepo.setEnabled(db, name, enabled);
   });
 
   // v5 wave-2 Sub-Agents 模块 — 6 IPC channel。create/update/delete 改
@@ -223,8 +223,8 @@ app.whenReady().then(() => {
     subAgentsRepo.updateSubAgent(name, patch)
   );
   ipcMain.handle('subagent_delete', (_e, name: string) => subAgentsRepo.deleteSubAgent(name));
-  ipcMain.handle('subagent_toggle_enabled', (_e, name: string, enabled: boolean) => {
-    subAgentsRepo.setEnabled(db, name, enabled);
+  ipcMain.handle('subagent_toggle_enabled', async (_e, name: string, enabled: boolean) => {
+    await subAgentsRepo.setEnabled(db, name, enabled);
   });
 
   // v5 wave-2 Hooks 模块 — 6 IPC channel。create/update/delete 改

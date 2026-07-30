@@ -57,22 +57,44 @@ test('listSubAgents returns [] when agents directory does not exist', async () =
   closeDB(db);
 });
 
-// Case 2: fixture 目录 → 返 fixture sub-agent + enabled 注入
-test('listSubAgents reads fixture directory and injects enabled state from KV', async () => {
+// Case 2: fixture 目录 → 返 fixture sub-agent(enabled 恒 true,因为 .disabled 跳过)
+test('listSubAgents reads fixture directory (enabled is structural — file presence)', async () => {
   writeFixtureSubAgent('explore', 'Read-only code exploration', 'Body content here');
-  // 默认 enabled = true(KV 表无 key)
   const list = await listSubAgents(db, agentsDir);
   assert.strictEqual(list.length, 1, '应读出 1 个 sub-agent');
   const a = list[0];
   assert.strictEqual(a.name, 'explore');
   assert.strictEqual(a.description, 'Read-only code exploration');
   assert.strictEqual(a.body, 'Body content here');
-  assert.strictEqual(a.enabled, true, '默认 enabled=true(KV 表无 key)');
+  assert.strictEqual(a.enabled, true, '.md 文件存在(非 .md.disabled) → enabled=true');
+  closeDB(db);
+});
 
-  // 设 enabled=false 后应读出来
-  setEnabled(db, 'explore', false);
+// Case 2b (新增): setEnabled(false) → mv 文件为 .md.disabled → list 跳过
+test('listSubAgents excludes .md.disabled files after setEnabled(false)', async () => {
+  writeFixtureSubAgent('explore', 'desc');
+  await setEnabled(db, 'explore', false, path.dirname(agentsDir));
+
+  // 1. 物理验证
+  assert.ok(!fs.existsSync(path.join(agentsDir, 'explore.md')), 'explore.md 应被 mv 走');
+  assert.ok(
+    fs.existsSync(path.join(agentsDir, 'explore.md.disabled')),
+    'explore.md.disabled 应存在'
+  );
+
+  // 2. list 跳过
+  const list = await listSubAgents(db, agentsDir);
+  assert.strictEqual(list.length, 0, '.md.disabled 不应出现在列表');
+
+  // 3. setEnabled(true) 恢复
+  await setEnabled(db, 'explore', true, path.dirname(agentsDir));
+  assert.ok(fs.existsSync(path.join(agentsDir, 'explore.md')), 'explore.md 应恢复');
+  assert.ok(
+    !fs.existsSync(path.join(agentsDir, 'explore.md.disabled')),
+    'explore.md.disabled 应消失'
+  );
   const list2 = await listSubAgents(db, agentsDir);
-  assert.strictEqual(list2[0].enabled, false, 'KV 表写入后 enabled=false');
+  assert.strictEqual(list2.length, 1, '恢复后 list 应有 1 个');
   closeDB(db);
 });
 

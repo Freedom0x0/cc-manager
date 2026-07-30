@@ -54,22 +54,50 @@ test('listSkills returns [] when skills directory does not exist', async () => {
   closeDB(db);
 });
 
-// Case 2: fixture 目录 → 返 fixture skill + enabled 注入
-test('listSkills reads fixture directory and injects enabled state from KV', async () => {
+// Case 2: fixture 目录 → 返 fixture skill(enabled 恒 true,因为 .disabled 跳过)
+test('listSkills reads fixture directory (enabled is structural — directory presence)', async () => {
   writeFixtureSkill('commit', 'Generate commit message', 'Body content here');
-  // 默认 enabled = true(KV 表无 key)
   const list = await listSkills(db, skillsDir);
   assert.strictEqual(list.length, 1, '应读出 1 个 skill');
   const s = list[0];
   assert.strictEqual(s.name, 'commit');
   assert.strictEqual(s.description, 'Generate commit message');
   assert.strictEqual(s.body, 'Body content here');
-  assert.strictEqual(s.enabled, true, '默认 enabled=true(KV 表无 key)');
+  assert.strictEqual(s.enabled, true, '目录存在(非 .disabled) → enabled=true');
+  closeDB(db);
+});
 
-  // 设 enabled=false 后应读出来
-  setEnabled(db, 'commit', false);
+// Case 2b (新增): setEnabled(false) → mv 目录为 .disabled → list 跳过
+test('listSkills excludes .disabled directories after setEnabled(false)', async () => {
+  writeFixtureSkill('commit', 'desc');
+  // setEnabled 写真实文件:disable = mv commit/ → commit.disabled/
+  await setEnabled(db, 'commit', false, path.dirname(skillsDir));
+
+  // 1. 物理验证:commit/ 不存在,commit.disabled/ 存在
+  assert.ok(!fs.existsSync(path.join(skillsDir, 'commit')), 'commit/ 应被 mv 走');
+  assert.ok(
+    fs.existsSync(path.join(skillsDir, 'commit.disabled')),
+    'commit.disabled/ 应存在'
+  );
+  // SKILL.md 内容保留
+  assert.ok(
+    fs.existsSync(path.join(skillsDir, 'commit.disabled', 'SKILL.md')),
+    'SKILL.md 应保留在 disabled 目录'
+  );
+
+  // 2. list 跳过 .disabled
+  const list = await listSkills(db, skillsDir);
+  assert.strictEqual(list.length, 0, '.disabled 目录不应出现在列表');
+
+  // 3. setEnabled(true) 恢复
+  await setEnabled(db, 'commit', true, path.dirname(skillsDir));
+  assert.ok(fs.existsSync(path.join(skillsDir, 'commit')), 'commit/ 应恢复');
+  assert.ok(
+    !fs.existsSync(path.join(skillsDir, 'commit.disabled')),
+    'commit.disabled/ 应消失'
+  );
   const list2 = await listSkills(db, skillsDir);
-  assert.strictEqual(list2[0].enabled, false, 'KV 表写入后 enabled=false');
+  assert.strictEqual(list2.length, 1, '恢复后 list 应有 1 个');
   closeDB(db);
 });
 

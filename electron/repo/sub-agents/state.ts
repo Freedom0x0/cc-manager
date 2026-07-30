@@ -1,17 +1,20 @@
 /**
- * electron/repo/sub-agents/state.ts — Sub-Agents 模块 enabled 状态 KV 助手
+ * electron/repo/sub-agents/state.ts — Sub-Agents 模块 enabled 状态
  *
- * 复用 mcp_server_state 表(CLAUDE.md v5 D1 / D6 决策延伸):3 列 KV 模型
- * (key PRIMARY KEY / value / updated_at)通用,key 前缀隔离:
- *   - 'agent:enabled:<name>' → 'true' / 'false' (用户 toggle)
+ * v5 wave-3 改造(2026-07-30 PRD real-disable):
+ * 用户的 enabled toggle = 改 ~/.claude/agents/<name>.md → <name>.md.disabled
+ * (PRD 决策:Claude Code 不读 .disabled 后缀文件)。
  *
- * 注意:虽然表名是 mcp_server_state,但本质是带 key 前缀隔离的通用 KV
- * 命名空间。Sub-Agents 跟 Skills/Commands/MCP 复用同一张表,加一个新的
- * 启用维度 = 加一个 key 前缀,不再加新表。
+ * mcp_server_state KV 表(agent:enabled:<name>)仍保留作 cache +
+ * profile_capture 读历史偏好。
+ *
+ * 路径注入:baseDir 参数允许测试注入 fixture 路径(CLAUDE.md §13 D10),
+ * 默认走 settings-writer.defaultClaudeDir() → ~/.claude。
  */
 
 import type { DB } from '../../db/connection';
 import type { Statement } from 'better-sqlite3';
+import { setDisabledSuffix as writeAgentsSuffix } from '../settings-writer';
 
 const STMT_CACHE = new WeakMap<
   DB,
@@ -36,14 +39,22 @@ function stmts(db: DB) {
   return s;
 }
 
-/** 读 enabled 状态。无 key 默认 true(全新 sub-agent 视为启用) */
 export function getEnabled(db: DB, name: string): boolean {
   const row = stmts(db).select.get(`agent:enabled:${name}`) as { value: string | null } | undefined;
   if (!row || row.value === null) return true;
   return row.value === 'true';
 }
 
-/** 写 enabled 状态到 KV 表 */
-export function setEnabled(db: DB, name: string, enabled: boolean): void {
-  stmts(db).upsert.run(`agent:enabled:${name}`, enabled ? 'true' : 'false', Date.now());
+export async function setEnabled(
+  db: DB,
+  name: string,
+  enabled: boolean,
+  baseDir?: string
+): Promise<void> {
+  await writeAgentsSuffix('agent', name, !enabled, baseDir);
+  try {
+    stmts(db).upsert.run(`agent:enabled:${name}`, enabled ? 'true' : 'false', Date.now());
+  } catch {
+    /* KV 写失败不阻断主操作 */
+  }
 }

@@ -25,7 +25,6 @@ import { existsSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 import type { DB } from '../../db/connection';
-import { getEnabled } from './state';
 import type { Skill } from './types';
 
 /** 默认生产路径 ~/.claude/skills。测试通过 skillsDir 参数覆盖。 */
@@ -87,6 +86,8 @@ export async function listSkills(db: DB, skillsDir?: string): Promise<Skill[]> {
   }
   const out: Skill[] = [];
   for (const name of entries) {
+    // 跳过 .disabled 后缀的目录(真停用) — 实测 Claude Code 不读
+    if (name.endsWith('.disabled')) continue;
     const skillDir = join(dir, name);
     const skillFile = join(skillDir, 'SKILL.md');
     if (!existsSync(skillFile)) continue;
@@ -103,7 +104,8 @@ export async function listSkills(db: DB, skillsDir?: string): Promise<Skill[]> {
         path: skillDir,
         description,
         allowedTools,
-        enabled: getEnabled(db, name),
+        // 真实 enabled = 在 skills 目录中存在(本分支已到 + 非 .disabled 后缀)
+        enabled: true,
         version: meta.version,
         body,
       });
