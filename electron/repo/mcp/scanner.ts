@@ -4,9 +4,9 @@
  * 只读 ~/.claude.json 的 mcpServers 字段(全局配置);project 级 MCP 配置
  * 留给未来(本 task 范围小,Simplicity First — D6)。
  *
- * 返回的 McpServer.enabled **不**从原文件读,而是从 mcp_server_state KV
- * 表读(`enabled:<name>` key)。原文件只存 command/args/env/description;
- * 用户的 toggle 状态独立存,避免破坏原文件 — D6 决策。
+ * v5 wave-3 改造(2026-07-30 PRD real-disable):
+ * enabled 状态从 settings.json 的 disabledMcpjsonServers 黑名单反推
+ * (getEnabledFromSettings)。**不**再以 KV 表为真理(避免假停用 — D10)。
  *
  * 容错:
  * - 文件不存在 → 返 [] (prd §1 边界 case)
@@ -14,8 +14,8 @@
  * - mcpServers 字段缺失 → 返 [] (视为空配置)
  *
  * 路径注入:`configPath` 参数允许测试注入 fixture 路径(避免碰真实
- * ~/.claude.json);生产调用方传 `join(homedir(), '.claude.json')` —
- * CLAUDE.md §13 D8 + D10。
+ * ~/.claude.json);`settingsPath` 注入 settings.json fixture 路径(避免碰
+ * 真实 ~/.claude/settings.json)— CLAUDE.md §13 D8 + D10。
  */
 
 import { readFile } from 'fs/promises';
@@ -23,7 +23,7 @@ import { existsSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 import type { DB } from '../../db/connection';
-import { getEnabled } from './state';
+import { getEnabledFromSettings } from './state';
 import type { McpServer } from './types';
 
 /** 默认生产路径 ~/.claude.json。测试通过 configPath 参数覆盖。 */
@@ -32,13 +32,22 @@ export function defaultMcpConfigPath(): string {
 }
 
 /**
- * 读 ~/.claude.json → 解析 mcpServers → 注入 enabled(KV 表) → 返 McpServer[]。
+ * 读 ~/.claude.json → 解析 mcpServers → 注入 enabled(从 settings.json 的
+ * disabledMcpjsonServers 反推)→ 返 McpServer[]。
  * 文件不存在或 JSON 损坏返 [];其他错误抛。
  *
- * @param db 已 initDB 的 SQLite handle(读 enabled KV)
+ * @param db 已 initDB 的 SQLite handle(保留作未来扩展,本函数不再读 KV)
  * @param configPath 可选:注入 fixture 路径(测试用);默认走 ~/.claude.json
+ * @param settingsPath 可选:注入 settings.json 路径(测试用);默认走
+ *   ~/.claude/settings.json(真停用字段的真实落点 — D10 决策)
  */
-export async function listMcpServers(db: DB, configPath?: string): Promise<McpServer[]> {
+export async function listMcpServers(
+  db: DB,
+  configPath?: string,
+  settingsPath?: string
+): Promise<McpServer[]> {
+  // db 参数保留(向后兼容,未来可能从 KV 读扩展字段)
+  void db;
   const file = configPath ?? defaultMcpConfigPath();
   if (!existsSync(file)) return [];
   let raw: string;
@@ -56,6 +65,7 @@ export async function listMcpServers(db: DB, configPath?: string): Promise<McpSe
     return [];
   }
   const servers = config.mcpServers ?? {};
+  const disabled = new Set(getEnabledFromSettings(settingsPath));
   return Object.entries(servers).map(([name, cfg]) => {
     const c = cfg as {
       command?: string;
@@ -69,7 +79,7 @@ export async function listMcpServers(db: DB, configPath?: string): Promise<McpSe
       args: c.args ?? [],
       env: c.env,
       description: c.description,
-      enabled: getEnabled(db, name),
+      enabled: !disabled.has(name),
       source: 'global' as const,
     };
   });
@@ -81,8 +91,9 @@ export async function listMcpServers(db: DB, configPath?: string): Promise<McpSe
 export async function getMcpServer(
   db: DB,
   name: string,
-  configPath?: string
+  configPath?: string,
+  settingsPath?: string
 ): Promise<McpServer | null> {
-  const list = await listMcpServers(db, configPath);
+  const list = await listMcpServers(db, configPath, settingsPath);
   return list.find((s) => s.name === name) ?? null;
 }

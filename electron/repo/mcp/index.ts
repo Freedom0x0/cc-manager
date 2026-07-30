@@ -10,5 +10,12 @@
 
 export { listMcpServers, getMcpServer, defaultMcpConfigPath } from './scanner';
 export { createMcpServer, updateMcpServer, deleteMcpServer } from './writer';
-export { getEnabled, setEnabled, getLastModified, setLastModified } from './state';
+export {
+  getEnabled,
+  setEnabled,
+  getLastModified,
+  setLastModified,
+  getEnabledFromSettings,
+  isDisabledInSettings,
+} from './state';
 export type { McpServer, McpCreateInput, McpUpdatePatch } from './types';
