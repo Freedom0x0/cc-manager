@@ -5,11 +5,11 @@
 **Claude Code 一站式配置中心** — 把散落在 `~/.claude/` 里的 MCP / Skills / Commands / Sub-Agents / Hooks / Plugins 集中管理,再加会话搜索、Profile 切换、用量仪表盘。
 
 [![Version](https://img.shields.io/badge/version-0.3.0-1677ff?style=flat-square)](./package.json)
-[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-1677ff?style=flat-square)](./electron-builder.json)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-1677ff?style=flat-square)](./electron-builder.json)
 [![License](https://img.shields.io/badge/license-MIT-22c55e?style=flat-square)](./LICENSE)
 [![Electron](https://img.shields.io/badge/electron-32-47848F?style=flat-square)](./package.json)
 
-**所有数据存在本地 SQLite,不联网。** Windows 10/11 64-bit,免安装,双击即用。
+**所有数据存在本地 SQLite,不联网。** Windows 10/11 64-bit 免安装双击即用；macOS Apple Silicon / Intel 均有 `.dmg` 安装包。
 
 </div>
 
@@ -37,35 +37,49 @@
 
 前往 [**Releases 页面**](https://github.com/Freedom0x0/cc-manager/releases) 下载最新版本:
 
-| 版本 | 文件 | 大小 |
-|---|---|---|
-| **v0.3.0**(最新) | `CC Manager-0.3.0-portable.exe` | ~80 MB |
-| v0.2.0 | `CC Manager-0.2.0-portable.exe` | ~80 MB |
-| v0.1.0 | `CC Manager-0.1.0-portable.exe` | ~80 MB |
+### Windows
 
-> Windows 10/11 64-bit,**免安装,双击运行**。数据文件位置: `%APPDATA%\cc-session-manager\app.db`
+| 版本 | 文件 | 大小 | 说明 |
+|---|---|---|---|
+| **v0.3.0**(最新) | `CC Manager-0.3.0-portable.exe` | ~80 MB | 免安装,双击运行 |
+| v0.2.0 | `CC Manager-0.2.0-portable.exe` | ~80 MB | 免安装,双击运行 |
+| v0.1.0 | `CC Manager-0.1.0-portable.exe` | ~80 MB | 免安装,双击运行 |
 
-### macOS 用户
+> 数据文件位置: `%APPDATA%\cc-session-manager\app.db`
 
-v0.3.0 没有 macOS 装包(等 v4.0 才会出 `.dmg`)。当前可用方式:
-- **开发模式**:克隆仓库后 `npm run dev`,需要 Node 22+(详见 [Build installers workflow](https://github.com/Freedom0x0/cc-manager/blob/main/.github/workflows/build-installers.yml))
-- 装包版(`.dmg`)留到 v4.0,届时会带 Apple 签名
+### macOS
+
+| 文件 | 架构 | 大小 | 适用机型 |
+|---|---|---|---|
+| `CC Manager-0.3.0-mac-arm64.dmg` | Apple Silicon (arm64) | ~114 MB | M1 / M2 / M3 / M4 |
+| `CC Manager-0.3.0-mac-x64.dmg` | Intel (x64) | ~119 MB | Intel MacBook / iMac |
+
+> 数据文件位置: `~/Library/Application Support/cc-session-manager/app.db`
+
+⚠️ **未签名应用** — 首次打开时 macOS Gatekeeper 会拦截,需要:
+1. 右键点击应用 → **打开** → 仍要打开;或
+2. 终端执行: `xattr -cr "/Applications/CC Manager.app"`
+
+> Apple 签名(notarization)将在后续版本加入。
 
 ---
 
 ## 🚀 快速开始
 
-1. 下载 `CC Manager-0.3.0-portable.exe`
-2. 放到任意目录(比如 `D:\Tools\`)
+1. 下载对应平台的安装包
+   - **Windows**: `CC Manager-0.3.0-portable.exe`
+   - **macOS (M1/M2/M3/M4)**: `CC Manager-0.3.0-mac-arm64.dmg`
+   - **macOS (Intel)**: `CC Manager-0.3.0-mac-x64.dmg`
+2. Windows:放到任意目录(比如 `D:\Tools\`),双击运行；macOS:打开 `.dmg`,拖入 Applications 文件夹
 3. 双击运行
 
 首次启动自动完成:
-- 创建数据文件 `%APPDATA%\cc-session-manager\app.db`
+- 创建数据文件(Windows: `%APPDATA%\cc-session-manager\app.db`; macOS: `~/Library/Application Support/cc-session-manager/app.db`)
 - 扫描 `C:\Users\<你>\.claude\projects\` 把所有 session 入库
 - 后续 `~/.claude/` 下的文件变化会自动同步到 UI
 - 左侧 9 Tab:会话 / MCP / Skills / Commands / Sub-Agents / Hooks / 插件 / Profiles / 用量分析
 
-**卸载**:直接删除 portable .exe 即可,数据留在 `%APPDATA%\cc-session-manager\`,可手动删除。
+**卸载**: Windows 直接删除 portable .exe; macOS 从 Applications 删除 app 即可。数据留在上述目录,可手动删除。
 
 ---
 
@@ -78,7 +92,7 @@ v0.3.0 没有 macOS 装包(等 v4.0 才会出 `.dmg`)。当前可用方式:
 
 ## 🔧 已知限制
 
-- ⚠️ **macOS 无装包版** — `.dmg` 在 v4.0 规划中(Apple 签名 / notarization);开发模式(`npm run dev`)可用
+- ⚠️ **macOS 未签名** — `.dmg` 可正常安装,但首次打开需绕过 Gatekeeper(右键→打开,或 `xattr -cr`)。Apple 签名 / notarization 将在后续版本加入
 - ⚠️ **frontmatter 解析简化** — Skills / Commands / Sub-Agents 支持标准 YAML `key: value` 单行,复杂 YAML 嵌套结构不识别(用 Claude Code 默认模板写的都能识别)
 - ⚠️ **continue session** — 返回 `claude --resume <id>` 命令字符串让你复制到终端执行,**不**在应用里直接启动 Claude Code(避免和已运行的 Claude Code 进程冲突)
 
