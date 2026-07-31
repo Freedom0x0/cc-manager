@@ -184,12 +184,26 @@ cc-session-manager/
 - **2026-07-30 v5 D10 推翻 D6/D9**：用户的"停用"语义必须写到 Claude Code 实际读取的字段才生效。6 模块真停用位置：
   - 插件：`~/.claude/settings.json` 的 `enabledPlugins[<name>@<marketplace>] = bool`（不是 installed_plugins.json）
   - MCP：`~/.claude/settings.json` 的 `disabledMcpjsonServers[]` 黑名单
-  - Skills/Commands/Sub-Agents：`<name>/` 或 `<name>.md` 加 `.disabled` 后缀（实测 Claude Code 不读）
+  - Skills/Commands/Sub-Agents: Skills **2026-07-31 修正为镜像目录方案** 见 D11;Commands/Agents 仍 `<name>.md` ↔ `<name>.md.disabled`(用户未报失败,保守保留)
   - Hooks：`settings.json.hooks[<event>]` 数组 splice 移除
   - KV 表保留作 cache + profile_capture 读历史偏好，**不**是 UI 真实状态
   - 启动时一次性 `runMigration` 把 KV → 真实文件同步
   - 抽出共享 `electron/repo/settings-writer.ts` 统一原子写抽象（基于 D7 模式）
   - 修正 profiles 模块的 KV prefix bug（mcp 用裸 `enabled:`，其余 5 用 `<prefix>:enabled:`）
+- **2026-07-31 v5 D11 修正 commit 5 skills 停用方案**：
+  - 原 commit 5 用 `.disabled` 后缀方案(mv `skills/<name>/` → `skills/<name>.disabled/`),
+    假设"Claude Code 不读 .disabled 后缀目录"。RD 阶段我自己跑过单次简单环境
+    实测通过,但 **2026-07-31 用户复测发现失败**(多 symlink / 不同 Claude Code
+    版本场景),skills 仍是"假停用"。
+  - **修正方案**:skills 改用**镜像目录** `mv skills/<name>/` ↔ `disabled_skills/<name>/`
+    (commit 9 / PR #2)。
+  - **优势**(不依赖隐式行为"不读后缀",依赖显式路径"只扫这个目录"):
+    1. scanner 只扫 `~/.claude/skills/`,自动跳过镜像目录
+    2. 跨 Claude Code 版本行为稳定
+    3. symlink skill 安全(挪走后 symlink target 路径不冲突)
+  - **保留** commands / agents 的 .md.disabled 方案(用户未报失败,保守不 over-surgery)
+  - **教训**:单次简单环境实测 ≠ 硬证据;commit 5 当初应该加"⚠️ 基于假设,需真机验证"
+  - commit 9 (origin PR #2) 已合并 main,所有人在 main HEAD 跑验证
 - **2026-07-29 macOS 适配**：`getDataDir()` 已做跨平台：Windows 用 `%APPDATA%`，macOS 用 `~/Library/Application Support`，Linux 用 `$XDG_CONFIG_HOME` 或 `~/.config`。`logFile()` 复用同一函数，不再有独立 fallback 路径。chokidar 需单独 `npm install`（package.json `dependencies` 已有，但 mac 首次 `npm install --ignore-scripts` 后需验证）
 
 ## 14. 用户语言
