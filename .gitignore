@@ -6,4 +6,6 @@ release/
 .DS_Store
 .vscode/
 .idea/
-.peaks/
+.peaks/_runtime/
+.peaks/PROJECT.md
+.claude/worktrees/
