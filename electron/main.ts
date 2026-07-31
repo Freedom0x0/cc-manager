@@ -306,13 +306,26 @@ app.whenReady().then(async () => {
   // v5 wave-3 Profiles 模块 — 6 IPC channel。profile 数据存
   // ~/.claude/profiles.json(单文件 JSON,原子写)。profile_apply 是核心
   // 事务化操作:备份当前 KV 表所有 enabled 状态 → 写 profile.config.enabled*
-  // → 验证 → 失败回滚(任务硬规则)。profile_capture 实时从 mcp_server_state
-  // KV 表读 6 个 enabled* 命名空间(mcp: / skill: / cmd: / agent: / hook: /
-  // plugin:)生成 config 快照(不缓存,每次 capture 重新读 KV)。
+  // → 验证 → 失败回滚(任务硬规则)。profile_capture 调 6 个 scanner 读
+  // 真实 enabled 全集(与 applyProfile 口径一致 — D15),不再走 KV 表
+  // (D10 KV 表只 cache 用户 toggle,未 toggle 默认 enabled=true 不进 KV)。
   ipcMain.handle('profile_list', () => profilesRepo.listProfiles());
   ipcMain.handle('profile_get', (_e, name: string) => profilesRepo.getProfile(name));
   ipcMain.handle('profile_capture', (_e, name: string, description: string) =>
-    profilesRepo.createProfile(db, { name, description })
+    profilesRepo.createProfile(
+      db,
+      { name, description },
+      undefined,
+      {
+        skillsDir: skillsRepo.defaultSkillsDir(),
+        disabledSkillsDir: skillsRepo.defaultDisabledSkillsDir(),
+        commandsDir: commandsRepo.defaultCommandsDir(),
+        agentsDir: subAgentsRepo.defaultAgentsDir(),
+        mcpConfigPath: mcpRepo.defaultMcpConfigPath(),
+        settingsPath,
+        installedPluginsPath: pluginsRepo.defaultInstalledPluginsPath(),
+      }
+    )
   );
   ipcMain.handle('profile_apply', async (_e, name: string) => {
     return profilesRepo.applyProfile(db, name, undefined, settingsPath);

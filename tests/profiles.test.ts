@@ -127,34 +127,117 @@ test('listProfiles reads fixture profiles.json', async () => {
   closeDB(db);
 });
 
-// Case 3: captureProfile 从 KV 表 enabled 状态生成(关键测试)
-test('captureProfile reads KV table and generates ProfileConfig', async () => {
-  // 在 KV 表 6 个命名空间各写 enabled=true / false 混合数据
+// Case 3 (D15 改造): captureProfile 从 6 个 scanner 拿真实 enabled 状态生成
+// D15(2026-07-31):从 KV 表 LIKE 查询改为 6 个 scanner 读真实文件 + KV 合并。
+// 旧 KV 路径漏掉「从未 toggle 过但默认 enabled=true 的项」,导致 profile 快照与
+// 6 模块 Manager 顶部 Tag 实时数有差额(用户报告「131 vs 140」)。走 scanner 后
+// 口径一致。
+test('captureProfile reads 6 scanners for true enabled state (D15)', async () => {
+  // 最小 fixture:1 个 skill + 1 个 command + 1 个 agent + 1 个 enabled plugin
+  // 不写 KV 表 — 验证 capture 走 scanner,即使 KV 空也应返这些 enabled=true 项
+  const claudeDir = path.join(tmpRoot, 'claude-dir-c3');
+  const skillsDir = path.join(claudeDir, 'skills');
+  const commandsDir = path.join(claudeDir, 'commands');
+  const agentsDir = path.join(claudeDir, 'agents');
+  const settingsPath = path.join(claudeDir, 'settings.json');
+  const mcpConfigPath = path.join(claudeDir, '.claude.json');
+  const installedPluginsPath = path.join(claudeDir, 'plugins', 'installed_plugins.json');
+  fs.mkdirSync(skillsDir, { recursive: true });
+  fs.mkdirSync(commandsDir, { recursive: true });
+  fs.mkdirSync(agentsDir, { recursive: true });
+  fs.mkdirSync(path.dirname(installedPluginsPath), { recursive: true });
+
+  fs.mkdirSync(path.join(skillsDir, 'commit-helper'), { recursive: true });
+  fs.writeFileSync(
+    path.join(skillsDir, 'commit-helper', 'SKILL.md'),
+    '---\ndescription: commit helper\n---\nbody'
+  );
+  fs.writeFileSync(
+    path.join(commandsDir, 'review.md'),
+    '---\ndescription: review\n---\nbody'
+  );
+  fs.writeFileSync(
+    path.join(agentsDir, 'explore.md'),
+    '---\ndescription: explore\n---\nbody'
+  );
+  // settings.json 空(无 hooks,无 disabledMcpjsonServers,无 enabledPlugins)
+  fs.writeFileSync(settingsPath, '{}');
+  // .claude.json 空 mcpServers
+  fs.writeFileSync(mcpConfigPath, '{}');
+  // installed_plugins.json:1 个 enabled plugin
+  fs.writeFileSync(
+    installedPluginsPath,
+    JSON.stringify({
+      version: 1,
+      plugins: {
+        'gh@claude-plugins-official': [
+          {
+            scope: 'user',
+            installPath: '/path/to/gh',
+            version: '1.0.0',
+            installedAt: '2026-07-31T00:00:00Z',
+            lastUpdated: '2026-07-31T00:00:00Z',
+            gitCommitSha: 'abc1234567890def',
+          },
+        ],
+      },
+    })
+  );
+
+  // KV 表空(模拟「用户从未 toggle 过」场景) — capture 不应只读 KV,应走 scanner
+  // 关键断言:即使 KV 空,scanner 仍返真实 enabled=true 项,3 个 + 1 plugin + 0 mcp + 0 hooks
+  const config = await captureProfileFromState(db, {
+    skillsDir,
+    commandsDir,
+    agentsDir,
+    mcpConfigPath,
+    settingsPath,
+    installedPluginsPath,
+  });
+  assert.deepStrictEqual(config.enabledSkills, ['commit-helper'], 'scanner 真实 enabled=true 的 skill');
+  assert.deepStrictEqual(config.enabledCommands, ['review'], 'scanner 真实 enabled=true 的 command');
+  assert.deepStrictEqual(config.enabledAgents, ['explore'], 'scanner 真实 enabled=true 的 agent');
+  assert.deepStrictEqual(config.enabledServers, [], '空 mcpServers');
+  assert.deepStrictEqual(config.enabledHooks, [], '空 settings.json');
+  assert.deepStrictEqual(
+    config.enabledPlugins,
+    ['gh@claude-plugins-official'],
+    'scanner 真实 enabled=true 的 plugin(来自 installed_plugins.json)'
+  );
+
+  // 同步 setKvEnabled 'filesystem' 进 KV(模拟「用户 toggle 过 MCP」)— KV 应被 scanner 覆盖
+  // scanner 读 .claude.json 空 mcpServers → filesystem 不在 enabledServers
+  // 这验证 D15 修正:D10 KV 表只 cache toggle 状态,scanner 读真实文件为准
   setKvEnabled(db, 'mcp', 'filesystem', true);
-  setKvEnabled(db, 'mcp', 'github', false);
-  setKvEnabled(db, 'skill', 'commit-helper', true);
-  setKvEnabled(db, 'cmd', 'review', true);
-  setKvEnabled(db, 'agent', 'explore', true);
-  setKvEnabled(db, 'hook', 'PreToolUse-0', true);
-  setKvEnabled(db, 'plugin', 'gh', true);
-  setKvEnabled(db, 'plugin', 'docker-tools', false);
+  const config2 = await captureProfileFromState(db, {
+    skillsDir,
+    commandsDir,
+    agentsDir,
+    mcpConfigPath,
+    settingsPath,
+    installedPluginsPath,
+  });
+  assert.deepStrictEqual(config2.enabledServers, [], 'KV 里有 filesystem,但 scanner 读 .claude.json 无此 server → 以 scanner 为准');
 
-  // 实时 capture
-  const config = captureProfileFromState(db);
-  assert.deepStrictEqual(config.enabledServers, ['filesystem'], 'enabled=true 的 server');
-  assert.deepStrictEqual(config.enabledSkills, ['commit-helper']);
-  assert.deepStrictEqual(config.enabledCommands, ['review']);
-  assert.deepStrictEqual(config.enabledAgents, ['explore']);
-  assert.deepStrictEqual(config.enabledHooks, ['PreToolUse-0']);
-  assert.deepStrictEqual(config.enabledPlugins, ['gh'], 'enabled=true 的 plugin');
-
-  // createProfile 完整流程(实时 capture + 写 profiles.json)
-  await createProfile(db, { name: 'captured', description: 'auto-captured' }, profilesPath);
+  // createProfile 完整流程(scanner capture + 写 profiles.json)
+  fs.rmSync(profilesPath, { force: true });
+  await createProfile(
+    db,
+    { name: 'captured', description: 'auto-captured from scanners' },
+    profilesPath,
+    {
+      skillsDir,
+      commandsDir,
+      agentsDir,
+      mcpConfigPath,
+      settingsPath,
+      installedPluginsPath,
+    }
+  );
   const list = await listProfiles(profilesPath);
   assert.strictEqual(list.length, 1);
   assert.strictEqual(list[0].name, 'captured');
-  assert.deepStrictEqual(list[0].config.enabledServers, ['filesystem']);
-  // createdAt / updatedAt 应该是 ISO 字符串
+  assert.deepStrictEqual(list[0].config.enabledSkills, ['commit-helper']);
   assert.match(list[0].createdAt, /^\d{4}-\d{2}-\d{2}T/, 'createdAt 应是 ISO');
   closeDB(db);
 });

@@ -234,6 +234,24 @@ cc-session-manager/
   - **真 bug**:`"review.md.disabled".endsWith(".md") === false`(末尾是 `led` 不是 `md`)!所以原写法 `if (!filename.endsWith('.md')) continue;` + 之前的 `if (filename.endsWith('.md.disabled')) continue;` 都依赖 endsWith 链 — D14 必须显式两种后缀都判断(`isDisabled || isEnabled`),不能写 `.endsWith('.md')` 当通用门。
   - **UI 影响**:`CommandsManager.tsx` / `SubAgentsManager.tsx` 不改(已直接 setCommands/setAgents,line 199/214 已渲染 enabled tag + Switch)。但新隐患:`foo.md` + `foo.md.disabled` 同名,UI 会渲染两次(去重逻辑缺失)。登记到 findings.md,本次不动 UI。
   - 4 文件改动:`commands/scanner.ts` +14/-3(B 档,改扫描逻辑) / `sub-agents/scanner.ts` +14/-3(同) / `tests/commands.test.ts` Case 3 改名 + 改断言(`excludes` → `includes with enabled=false`)(A 档) / `tests/sub-agents.test.ts` Case 3 同步(A 档)。`npm test` 150/150 全绿稳定 5 次,`tsc --noEmit` 0 报错。
+- **2026-07-31 v5 D15 captureProfileFromState 走 6 scanner 拿真实 enabled 全集**:
+  - 原 `captureProfileFromState(db)` 走 `mcp_server_state` KV 表 LIKE 查询 6 个 prefix(`enabled:` / `skill:enabled:` / `cmd:enabled:` / `agent:enabled:` / `hook:enabled:` / `plugin:enabled:`),过滤 `value='true'`。
+  - 触发:用户加 6 模块顶部 enabled 计数后手算 140,但 profiles 面板 profile "a01" 显示「131 项启用」,差额 9。对账验证:profile "a01" 131 = KV 表 value=true 总数 131(完全吻合);6 模块 Manager 顶部 140 = 6 scanner 真实 enabled 全集。
+  - 根因:D10 决策 KV 表「保留作 cache + profile_capture 读历史偏好,不**是 UI 真实状态」 —— KV 只记录用户主动 toggle,从未 toggle 但 scanner 默认 enabled=true 的项不进 KV(例 `installed_plugins.json` 装了一个 plugin 但用户没在 UI 上点过 enable/disable)。captureProfileFromState 走 KV 表 LIKE 漏掉这 9 项。
+  - **修正**:改 captureProfileFromState 走 6 个 scanner 读真实 enabled 全集,与 applyProfile writer.ts:280-295 口径一致(applyProfile 早已用 scanner 拿 curEnabled 全集做 D13 reverse-disable)。
+  - 关键决策:
+    - **签名加 CaptureOptions**(skillsDir / disabledSkillsDir / commandsDir / agentsDir / mcpConfigPath / settingsPath / installedPluginsPath),全部可选,未传走 `default*Dir()` 默认生产路径。
+    - **改 async**:6 scanner 并发 `Promise.all`,原 sync 实现 → async 是 B 档改函数签名。
+    - **createProfile 加第 4 参数 `captureOpts?`** 透传给 captureProfileFromState(测试 fixture 用,生产 = 默认路径)。
+    - **main.ts `profile_capture` handler 显式传 6 个 `default*Dir()`** —— 即便传默认路径,显式声明 = 测试可控 + 阅读清晰。
+    - **IPC 契约不变**:`profile_capture` 还是 `(name, description)`,handler 内部多拼路径不外露。`preload.ts` / `api.ts` / `mock.ts` 全未动。
+  - **口径对比**(D15 后):
+    - captureProfileFromState(6 scanner) = profile.config.enabledXxx.length 求和 = **当前实时 enabled** (140)
+    - applyProfile writer.ts:280 (6 scanner 拿 curEnabled) = **同上** (140)
+    - KV 表 LIKE 查询已废弃,captureProfileFromState 不再走 KV。
+  - 4 文件改动:`electron/repo/profiles/writer.ts` captureProfileFromState async 化 + 加 CaptureOptions + createProfile 加 captureOpts 参数(B 档) / `electron/main.ts` profile_capture handler 显式传 6 default 路径(A 档,IPC 契约不变) / `tests/profiles.test.ts` Case 3 重写为「走 6 scanner」+ 钉死 KV 漏项场景(B 档) / `CLAUDE.md` +15(D15 决策,本段)。
+  - **验证**:`npm test` 150/150 全绿稳定 2 次,`tsc --noEmit` + `tsc -p tsconfig.electron.json --noEmit` 双 0 错。
+  - **教训(共 3 条)**:(1) D10 决策 KV 是 cache,但 captureProfileFromState 当时没意识到 —— D15 修正 capture 走 scanner。(2) KV 表「记录用户 toggle」语义 vs scanner「真实状态」语义口径不同,任何读 KV 当 UI 真实状态的代码都是潜在 bug。 (3) 测试 fixture 要看 schema 必填字段:plugins `validateVersion` 必填 6 字段(scope/installPath/version/installedAt/lastUpdated/gitCommitSha),漏 gitCommitSha → listPlugins 返空 → capture 漏项。
 - **2026-07-29 macOS 适配**：`getDataDir()` 已做跨平台：Windows 用 `%APPDATA%`，macOS 用 `~/Library/Application Support`，Linux 用 `$XDG_CONFIG_HOME` 或 `~/.config`。`logFile()` 复用同一函数，不再有独立 fallback 路径。chokidar 需单独 `npm install`（package.json `dependencies` 已有，但 mac 首次 `npm install --ignore-scripts` 后需验证）
 
 ## 14. 用户语言

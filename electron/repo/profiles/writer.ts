@@ -45,12 +45,12 @@ import type { DB } from '../../db/connection';
 import { backupEnabledStates, restoreEnabledStates } from './state';
 import { setMcpDisabled, setPluginEnabled, setHookEnabled, setDisabledSuffix, defaultClaudeDir } from '../settings-writer';
 import { HOOK_EVENTS, type HookEvent } from '../hooks/types';
-import { listSkills } from '../skills/scanner';
-import { listCommands } from '../commands/scanner';
-import { listSubAgents } from '../sub-agents/scanner';
-import { listMcpServers } from '../mcp/scanner';
-import { listPlugins } from '../plugins/scanner';
-import { listHooks } from '../hooks/scanner';
+import { listSkills, defaultSkillsDir, defaultDisabledSkillsDir } from '../skills/scanner';
+import { listCommands, defaultCommandsDir } from '../commands/scanner';
+import { listSubAgents, defaultAgentsDir } from '../sub-agents/scanner';
+import { listMcpServers, defaultMcpConfigPath } from '../mcp/scanner';
+import { listHooks, defaultSettingsPath } from '../hooks/scanner';
+import { listPlugins, defaultInstalledPluginsPath } from '../plugins/scanner';
 
 function resolvePath(profilesPath?: string): string {
   return profilesPath ?? defaultProfilesPath();
@@ -80,29 +80,57 @@ async function atomicWriteJson(
 }
 
 /**
- * 实时从 mcp_server_state KV 表读 6 个 enabled* 命名空间,生成 ProfileConfig
- * 快照。v5 wave-3 修正(2026-07-30):原代码用 'mcp:enabled:%' 但实际
- * mcp/state.ts 写 'enabled:'(无 mcp: 前缀),导致 MCP enabled 永远
- * capture 不到。这里按 6 模块实际 writer 用的 prefix 读。
+ * 实时从 6 个 scanner 读真实 enabled 状态(走真实文件 + KV 合并,与 applyProfile
+ * 口径一致 — 见 writer.ts:280-295 applyProfile 内 6 scanner 路径),生成
+ * ProfileConfig 快照。
+ *
+ * v5 D15(2026-07-31):从 KV 表 LIKE 查询改为 6 个 scanner 读真实 enabled。
+ * 原 KV 路径漏掉「从未 toggle 过但默认 enabled=true 的项」(D10 KV 表只
+ * 记录用户主动 toggle 的,UI 默认 enabled 不写 KV),导致 profile 快照
+ * (例「a01」131 项)与 6 模块 Manager 顶部 Tag 当前实时数(140)有差额。
+ * 走 scanner 后口径一致,差额消失。
+ *
+ * 6 个 scanner 都是 IO + Promise.all 并发;opts 全部可选,未传走 default*Dir()
+ * 默认生产路径(与 main.ts 启动时一致)。
  */
-export function captureProfileFromState(db: DB): ProfileConfig {
-  const stmt = db.prepare("SELECT key, value FROM mcp_server_state WHERE key LIKE ?");
-  const collect = (like: string, prefix: string): string[] => {
-    const rows = stmt.all(like) as { key: string; value: string }[];
-    const out: string[] = [];
-    for (const row of rows) {
-      if (row.value !== 'true') continue;
-      out.push(row.key.slice(prefix.length));
-    }
-    return out;
-  };
+export interface CaptureOptions {
+  skillsDir?: string;
+  disabledSkillsDir?: string;
+  commandsDir?: string;
+  agentsDir?: string;
+  mcpConfigPath?: string;
+  settingsPath?: string;
+  installedPluginsPath?: string;
+}
+
+export async function captureProfileFromState(
+  db: DB,
+  opts?: CaptureOptions
+): Promise<ProfileConfig> {
+  const base = opts?.mcpConfigPath ? opts.mcpConfigPath.replace(/[\\/][^\\/]+$/, '') : defaultClaudeDir();
+  const skillsDir = opts?.skillsDir ?? join(base, 'skills');
+  const disabledSkillsDir = opts?.disabledSkillsDir ?? defaultDisabledSkillsDir();
+  const commandsDir = opts?.commandsDir ?? join(base, 'commands');
+  const agentsDir = opts?.agentsDir ?? join(base, 'agents');
+  const mcpConfigPath = opts?.mcpConfigPath ?? defaultMcpConfigPath();
+  const settingsPath = opts?.settingsPath ?? defaultSettingsPath();
+  const installedPluginsPath = opts?.installedPluginsPath ?? defaultInstalledPluginsPath();
+
+  const [skills, commands, agents, mcp, hooks, plugins] = await Promise.all([
+    listSkills(db, skillsDir, { disabledSkillsDir }),
+    listCommands(db, commandsDir),
+    listSubAgents(db, agentsDir),
+    listMcpServers(db, mcpConfigPath, settingsPath),
+    listHooks(db, settingsPath),
+    listPlugins(db, installedPluginsPath, settingsPath),
+  ]);
   return {
-    enabledServers: collect('enabled:%', 'enabled:'),
-    enabledSkills: collect('skill:enabled:%', 'skill:enabled:'),
-    enabledCommands: collect('cmd:enabled:%', 'cmd:enabled:'),
-    enabledAgents: collect('agent:enabled:%', 'agent:enabled:'),
-    enabledHooks: collect('hook:enabled:%', 'hook:enabled:'),
-    enabledPlugins: collect('plugin:enabled:%', 'plugin:enabled:'),
+    enabledServers: mcp.filter((s) => s.enabled).map((s) => s.name),
+    enabledSkills: skills.filter((s) => s.enabled).map((s) => s.name),
+    enabledCommands: commands.filter((c) => c.enabled).map((c) => c.name),
+    enabledAgents: agents.filter((a) => a.enabled).map((a) => a.name),
+    enabledHooks: hooks.filter((h) => h.enabled).map((h) => h.id),
+    enabledPlugins: plugins.filter((p) => p.enabled).map((p) => p.fullName),
   };
 }
 
@@ -506,7 +534,8 @@ async function rollbackRealFile(
 export async function createProfile(
   db: DB,
   input: ProfileCreateInput,
-  profilesPath?: string
+  profilesPath?: string,
+  captureOpts?: CaptureOptions
 ): Promise<void> {
   if (typeof input.name !== 'string' || input.name.length === 0) {
     throw new Error('Profile: missing required field "name"');
@@ -519,7 +548,7 @@ export async function createProfile(
   if (existing.some((p) => p.name === input.name)) {
     throw new Error(`Profile "${input.name}" already exists`);
   }
-  const config = captureProfileFromState(db);
+  const config = await captureProfileFromState(db, captureOpts);
   const now = new Date().toISOString();
   const profile: Profile = {
     name: input.name,
