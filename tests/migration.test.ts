@@ -130,9 +130,14 @@ test('runMigration: KV skill=false renames skill directory to .disabled', async 
   const result = await runMigration(db, settingsPath, claudeDir, HOOK_EVENTS);
   assert.strictEqual(result.counts.skill, 1);
   assert.ok(!fs.existsSync(skillDir), 'skills/old/ 应被 mv 走');
+  // commit 9 修复:skills 改用镜像目录方案,旧 .disabled/ 方案实测失败
   assert.ok(
-    fs.existsSync(path.join(claudeDir, 'skills', 'old.disabled')),
-    'skills/old.disabled/ 应存在'
+    fs.existsSync(path.join(claudeDir, 'disabled_skills', 'old')),
+    'disabled_skills/old/ 镜像目录应存在(commit 9 镜像目录方案)'
+  );
+  assert.ok(
+    !fs.existsSync(path.join(claudeDir, 'skills', 'old.disabled')),
+    'skills/ 目录内不应有 old.disabled/ 残留(commit 5 旧方案)'
   );
   closeDB(db);
   fs.rmSync(tmpRoot, { recursive: true, force: true });

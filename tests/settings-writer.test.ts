@@ -10,7 +10,7 @@
  * Case 7: setPluginEnabled('a@b', false) → 重读 enabledPlugins['a@b'] === false
  * Case 8: setMcpDisabled('x', true) → 数组含 'x'；再 setMcpDisabled('x', false) → 数组不含
  * Case 9: setHookEnabled('PreToolUse', 0, false) → hooks.PreToolUse 被 splice
- * Case 10: setDisabledSuffix('skill', 'foo', true) → foo.disabled/ 存在 / foo/ 不存在
+ * Case 10: setDisabledSuffix('skill', 'foo', true) → disabled_skills/foo/ 存在 / skills/foo/ 不存在(commit 9 镜像目录方案)
  * Case 11: setDisabledSuffix('command', 'bar.md', true) → bar.md.disabled 存在 / bar.md 不存在
  * Case 12: 并发 writeSettings → 最终内容是其中一个完整版本（不撕裂）
  *
@@ -262,9 +262,9 @@ test('setHookEnabled(true) is not supported (use createHook instead)', async () 
 });
 
 // ---------------------------------------------------------------------------
-// Case 10: setDisabledSuffix → skill（目录）
+// Case 10: setDisabledSuffix → skill（目录，镜像目录方案 commit 9）
 // ---------------------------------------------------------------------------
-test('setDisabledSuffix(skill, true) renames directory foo/ → foo.disabled/', async () => {
+test('setDisabledSuffix(skill, true) moves foo/ to ~/.claude/disabled_skills/foo/', async () => {
   const skillsDir = path.join(claudeDir, 'skills');
   const skillDir = path.join(skillsDir, 'foo');
   fs.mkdirSync(skillDir, { recursive: true });
@@ -275,24 +275,32 @@ test('setDisabledSuffix(skill, true) renames directory foo/ → foo.disabled/', 
   assert.strictEqual(
     fs.existsSync(skillDir),
     false,
-    '原 foo/ 目录应不存在'
+    '原 skills/foo/ 目录应不存在'
   );
+  const disabledSkillsDir = path.join(claudeDir, 'disabled_skills');
   assert.strictEqual(
-    fs.existsSync(path.join(skillsDir, 'foo.disabled')),
+    fs.existsSync(path.join(disabledSkillsDir, 'foo')),
     true,
-    'foo.disabled/ 目录应存在'
+    'disabled_skills/foo/ 镜像目录应存在'
   );
   // 文件内容保留
   assert.strictEqual(
-    fs.readFileSync(path.join(skillsDir, 'foo.disabled', 'SKILL.md'), 'utf8'),
+    fs.readFileSync(path.join(disabledSkillsDir, 'foo', 'SKILL.md'), 'utf8'),
     '# foo',
-    'SKILL.md 内容保留'
+    'SKILL.md 内容保留在镜像目录'
+  );
+  // 关键:skills/ 目录内**没有** foo.disabled/ 残留(commit 5 旧方案的行为)
+  assert.strictEqual(
+    fs.existsSync(path.join(skillsDir, 'foo.disabled')),
+    false,
+    'skills/ 目录内不应有 foo.disabled/ 残留'
   );
 });
 
-test('setDisabledSuffix(skill, false) restores foo.disabled/ → foo/', async () => {
+test('setDisabledSuffix(skill, false) restores disabled_skills/foo/ → skills/foo/', async () => {
   const skillsDir = path.join(claudeDir, 'skills');
-  const disabledDir = path.join(skillsDir, 'foo.disabled');
+  const disabledSkillsDir = path.join(claudeDir, 'disabled_skills');
+  const disabledDir = path.join(disabledSkillsDir, 'foo');
   fs.mkdirSync(disabledDir, { recursive: true });
   fs.writeFileSync(path.join(disabledDir, 'SKILL.md'), '# foo', 'utf8');
 
@@ -301,12 +309,12 @@ test('setDisabledSuffix(skill, false) restores foo.disabled/ → foo/', async ()
   assert.strictEqual(
     fs.existsSync(path.join(skillsDir, 'foo')),
     true,
-    'foo/ 应恢复'
+    'skills/foo/ 应恢复'
   );
   assert.strictEqual(
     fs.existsSync(disabledDir),
     false,
-    'foo.disabled/ 应消失'
+    'disabled_skills/foo/ 应消失'
   );
 });
 
@@ -348,11 +356,12 @@ test('setDisabledSuffix(command, false) restores bar.md.disabled → bar.md', as
 
 test('setDisabledSuffix is no-op when target state already matches', async () => {
   // 已 disabled 状态下再调 disabled=true → no-op 不抛错
-  const skillsDir = path.join(claudeDir, 'skills');
-  fs.mkdirSync(path.join(skillsDir, 'foo.disabled'), { recursive: true });
+  // commit 9 后:disabled 状态 = 在 disabled_skills/<name>/
+  const disabledSkillsDir = path.join(claudeDir, 'disabled_skills');
+  fs.mkdirSync(path.join(disabledSkillsDir, 'foo'), { recursive: true });
   await setDisabledSuffix('skill', 'foo', true, claudeDir);
   assert.strictEqual(
-    fs.existsSync(path.join(skillsDir, 'foo.disabled')),
+    fs.existsSync(path.join(disabledSkillsDir, 'foo')),
     true,
     '已 disabled 状态再 disable 应 no-op'
   );

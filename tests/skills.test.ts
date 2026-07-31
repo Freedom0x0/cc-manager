@@ -67,34 +67,40 @@ test('listSkills reads fixture directory (enabled is structural — directory pr
   closeDB(db);
 });
 
-// Case 2b (新增): setEnabled(false) → mv 目录为 .disabled → list 跳过
-test('listSkills excludes .disabled directories after setEnabled(false)', async () => {
+// Case 2b (新增): setEnabled(false) → mv 到镜像目录 → list 跳过
+test('listSkills excludes disabled skills moved to disabled_skills/ mirror (commit 9)', async () => {
   writeFixtureSkill('commit', 'desc');
-  // setEnabled 写真实文件:disable = mv commit/ → commit.disabled/
+  // setEnabled 写真实文件:disable = mv skills/commit/ → disabled_skills/commit/
   await setEnabled(db, 'commit', false, path.dirname(skillsDir));
 
-  // 1. 物理验证:commit/ 不存在,commit.disabled/ 存在
-  assert.ok(!fs.existsSync(path.join(skillsDir, 'commit')), 'commit/ 应被 mv 走');
+  // 1. 物理验证:commit/ 不存在,disabled_skills/commit/ 存在
+  assert.ok(!fs.existsSync(path.join(skillsDir, 'commit')), 'skills/commit/ 应被 mv 走');
+  const disabledSkillsDir = path.join(path.dirname(skillsDir), 'disabled_skills');
   assert.ok(
-    fs.existsSync(path.join(skillsDir, 'commit.disabled')),
-    'commit.disabled/ 应存在'
+    fs.existsSync(path.join(disabledSkillsDir, 'commit')),
+    'disabled_skills/commit/ 镜像目录应存在'
   );
-  // SKILL.md 内容保留
+  // SKILL.md 内容保留在镜像目录
   assert.ok(
-    fs.existsSync(path.join(skillsDir, 'commit.disabled', 'SKILL.md')),
-    'SKILL.md 应保留在 disabled 目录'
+    fs.existsSync(path.join(disabledSkillsDir, 'commit', 'SKILL.md')),
+    'SKILL.md 应保留在镜像目录'
+  );
+  // 关键:skills/ 目录内**没有** commit.disabled/ 残留
+  assert.ok(
+    !fs.existsSync(path.join(skillsDir, 'commit.disabled')),
+    'skills/ 目录内不应有 commit.disabled/ 残留(commit 5 旧方案)'
   );
 
-  // 2. list 跳过 .disabled
+  // 2. list 跳过(只扫 skills/ 目录,镜像目录自动不扫)
   const list = await listSkills(db, skillsDir);
-  assert.strictEqual(list.length, 0, '.disabled 目录不应出现在列表');
+  assert.strictEqual(list.length, 0, '镜像目录不应出现在 list');
 
   // 3. setEnabled(true) 恢复
   await setEnabled(db, 'commit', true, path.dirname(skillsDir));
-  assert.ok(fs.existsSync(path.join(skillsDir, 'commit')), 'commit/ 应恢复');
+  assert.ok(fs.existsSync(path.join(skillsDir, 'commit')), 'skills/commit/ 应恢复');
   assert.ok(
-    !fs.existsSync(path.join(skillsDir, 'commit.disabled')),
-    'commit.disabled/ 应消失'
+    !fs.existsSync(path.join(disabledSkillsDir, 'commit')),
+    'disabled_skills/commit/ 应消失'
   );
   const list2 = await listSkills(db, skillsDir);
   assert.strictEqual(list2.length, 1, '恢复后 list 应有 1 个');

@@ -276,19 +276,22 @@ export async function setHookEnabled(
 }
 
 /**
- * 改 skills/commands/agents 的 .disabled 后缀。
- * - disabled=true → mv `<name>/` (skill) / `<name>.md` (command/agent)
- *   → `<name>.disabled/` (skill) / `<name>.md.disabled` (command/agent)
- * - disabled=false → 反向 mv
+ * 改 skills/commands/agents 的停用位置。
+ * - skills: mv `~/.claude/skills/<name>/` ↔ `~/.claude/disabled_skills/<name>/`
+ *   (commit 9 修复:原 .disabled 后缀方案实测失败,镜像目录方案跨版本稳定)
+ * - commands/agents: mv `<name>.md` ↔ `<name>.md.disabled`(commit 5,实测 OK)
  *
- * 目标已处于目标状态时 no-op（不抛错），避免 UI 重复点击报"已存在"。
- * 目标处于"既不是启用也不是禁用"（其它诡异后缀）状态 → 抛错让上层处理。
+ * disabled=true → mv 到停用位置(镜像目录自动 mkdir -p)
+ * disabled=false → mv 回启用位置
  *
- * 路径处理：
- * - skills 是目录（<name>/SKILL.md 等），整目录 mv
- * - commands/agents 是单文件 <name>.md，单文件 mv
- * - 如果 source 路径不存在但目标是 disabled 状态（false 调用）→ 抛错
- *   （不能"启用"一个不存在的 skill）
+ * 目标已处于目标状态时 no-op(不抛错),避免 UI 重复点击报"已存在"。
+ * 如果 source 路径不存在但目标是 disabled 状态(false 调用)→ 抛错
+ * (不能"启用"一个不存在的 skill/command/agent)。
+ *
+ * 镜像目录方案优势(commit 9 决策):
+ * 1. scanner 只扫 `~/.claude/skills/`,自动跳过 `~/.claude/disabled_skills/`
+ * 2. symlink skill 也安全 — 挪走后 symlink target 路径不冲突
+ * 3. 跨 Claude Code 版本行为稳定(不依赖"不读后缀"的隐式约定)
  */
 export async function setDisabledSuffix(
   kind: DisableKind,
@@ -300,41 +303,62 @@ export async function setDisabledSuffix(
     throw new Error(`Invalid ${kind} name "${name}"`);
   }
   const base = baseDir ?? defaultClaudeDir();
-  const folderForKind = kind === 'skill' ? 'skills' : kind === 'command' ? 'commands' : 'agents';
-  const dir = join(base, folderForKind);
 
   let src: string;
   let dst: string;
 
   if (kind === 'skill') {
-    // skills 是目录：<name>/ ↔ <name>.disabled/
-    src = join(dir, name);
-    dst = join(dir, `${name}.disabled`);
+    // skills 用镜像目录方案(commit 9 修复,2026-07-31):
+    // 原 commit 5 用 .disabled 后缀方案实测失败 — Claude Code 仍加载。
+    // 改为挪到 ~/.claude/disabled_skills/<name>/ 镜像目录。
+    // 优势:scanner 只扫 ~/.claude/skills/(自动跳过镜像目录),跨版本稳定,
+    // symlink skill 也安全(挪走后 target 路径不冲突)。
+    const skillsDir = join(base, 'skills');
+    const disabledSkillsDir = join(base, 'disabled_skills');
+    if (disabled) {
+      src = join(skillsDir, name);
+      dst = join(disabledSkillsDir, name);
+    } else {
+      // 启用:反向 — 从镜像目录挪回
+      src = join(disabledSkillsDir, name);
+      dst = join(skillsDir, name);
+    }
   } else {
-    // commands/agents 是单文件：<name>.md ↔ <name>.md.disabled
-    src = join(dir, `${name}.md`);
-    dst = join(dir, `${name}.md.disabled`);
+    // commands/agents 用 .md.disabled(commit 5,实测 OK 保留)
+    const folderForKind = kind === 'command' ? 'commands' : 'agents';
+    const dir = join(base, folderForKind);
+    if (disabled) {
+      src = join(dir, `${name}.md`);
+      dst = join(dir, `${name}.md.disabled`);
+    } else {
+      src = join(dir, `${name}.md.disabled`);
+      dst = join(dir, `${name}.md`);
+    }
   }
 
-  const { rename } = await import('fs/promises');
+  const { rename, mkdir } = await import('fs/promises');
 
   if (disabled) {
     if (existsSync(dst)) {
-      // 已 disabled → no-op
+      // 已 disabled → no-op(dst = disabledSkillsDir/<name> 存在)
       return;
     }
     if (!existsSync(src)) {
       throw new Error(`${kind} "${name}" not found at ${src}`);
     }
+    // 镜像目录不存在 → 自动创建(避免首次写入 ENOENT)
+    await mkdir(dirname(dst), { recursive: true });
     await rename(src, dst);
   } else {
-    if (existsSync(src)) {
-      // 已 enabled → no-op
+    if (existsSync(dst)) {
+      // 已 enabled → no-op(dst = skillsDir/<name> 存在)
       return;
     }
-    if (!existsSync(dst)) {
-      throw new Error(`Disabled ${kind} "${name}" not found at ${dst}`);
+    if (!existsSync(src)) {
+      throw new Error(`Disabled ${kind} "${name}" not found at ${src}`);
     }
-    await rename(dst, src);
+    // 启用 = 从镜像目录挪回主目录,确保主目录父级存在(测试时可能裸 mk)
+    await mkdir(dirname(dst), { recursive: true });
+    await rename(src, dst);
   }
 }
