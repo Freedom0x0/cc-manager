@@ -227,39 +227,44 @@ export async function applyProfile(
     }
     // 4. 写真实文件(best-effort) — 写每个 name 前备份真实状态用于回滚
     const realFileErrors: string[] = [];
-    const tasks: Array<Promise<void>> = [];
+    // D13 race fix(2026-07-31):按写入目标分组,避免 settings.json read-modify-write
+    // 并发丢更新。settings writers(MCP/Plugin/Hook)都写 ~/.claude/settings.json,
+    // 并发 RMW 会 lost update;串行执行。fs writers(skill/command/agent)
+    // 各写不同路径(mv),可并发。
+    const tasksSettings: Array<Promise<void>> = [];
+    const tasksFs: Array<Promise<void>> = [];
     // === 正向 enable(profile.config.enabledX 里的项 → 启用)===
     // MCP
     for (const n of profile.config.enabledServers) {
       const prevDisabled = prevMcpDisabled(n, settings);
       realFileBackups.push({ kind: 'mcp', name: n, prev: prevDisabled });
-      tasks.push(setMcpDisabled(n, false, settings).catch((e) => {
+      tasksSettings.push(setMcpDisabled(n, false, settings).catch((e) => {
         realFileErrors.push(`mcp:${n}: ${e?.message || String(e)}`);
       }));
     }
     // Plugin
     for (const n of profile.config.enabledPlugins) {
       realFileBackups.push({ kind: 'plugin', name: n, prev: prevPluginEnabled(n, settings) });
-      tasks.push(setPluginEnabled(n, true, settings).catch((e) => {
+      tasksSettings.push(setPluginEnabled(n, true, settings).catch((e) => {
         realFileErrors.push(`plugin:${n}: ${e?.message || String(e)}`);
       }));
     }
     // Skill/Command/Agent — enabled=true 表示"应有 .md(无 .disabled)"
     for (const n of profile.config.enabledSkills) {
       realFileBackups.push({ kind: 'skill', name: n, prev: prevFileEnabled('skill', n, base) });
-      tasks.push(setDisabledSuffix('skill', n, false, base).catch((e) => {
+      tasksFs.push(setDisabledSuffix('skill', n, false, base).catch((e) => {
         realFileErrors.push(`skill:${n}: ${e?.message || String(e)}`);
       }));
     }
     for (const n of profile.config.enabledCommands) {
       realFileBackups.push({ kind: 'command', name: n, prev: prevFileEnabled('command', n, base) });
-      tasks.push(setDisabledSuffix('command', n, false, base).catch((e) => {
+      tasksFs.push(setDisabledSuffix('command', n, false, base).catch((e) => {
         realFileErrors.push(`command:${n}: ${e?.message || String(e)}`);
       }));
     }
     for (const n of profile.config.enabledAgents) {
       realFileBackups.push({ kind: 'agent', name: n, prev: prevFileEnabled('agent', n, base) });
-      tasks.push(setDisabledSuffix('agent', n, false, base).catch((e) => {
+      tasksFs.push(setDisabledSuffix('agent', n, false, base).catch((e) => {
         realFileErrors.push(`agent:${n}: ${e?.message || String(e)}`);
       }));
     }
@@ -305,7 +310,7 @@ export async function applyProfile(
       if (targetServers.has(n)) continue;
       const prevDisabled = prevMcpDisabled(n, settings);
       realFileBackups.push({ kind: 'mcp', name: n, prev: prevDisabled });
-      tasks.push(setMcpDisabled(n, true, settings).catch((e) => {
+      tasksSettings.push(setMcpDisabled(n, true, settings).catch((e) => {
         realFileErrors.push(`mcp(→disable):${n}: ${e?.message || String(e)}`);
       }));
     }
@@ -314,7 +319,7 @@ export async function applyProfile(
       if (targetPlugins.has(n)) continue;
       const prevEnabled = prevPluginEnabled(n, settings);
       realFileBackups.push({ kind: 'plugin', name: n, prev: prevEnabled });
-      tasks.push(setPluginEnabled(n, false, settings).catch((e) => {
+      tasksSettings.push(setPluginEnabled(n, false, settings).catch((e) => {
         realFileErrors.push(`plugin(→disable):${n}: ${e?.message || String(e)}`);
       }));
     }
@@ -323,7 +328,7 @@ export async function applyProfile(
       if (targetSkills.has(n)) continue;
       const prevEnabled = prevFileEnabled('skill', n, base);
       realFileBackups.push({ kind: 'skill', name: n, prev: prevEnabled });
-      tasks.push(setDisabledSuffix('skill', n, true, base).catch((e) => {
+      tasksFs.push(setDisabledSuffix('skill', n, true, base).catch((e) => {
         realFileErrors.push(`skill(→disable):${n}: ${e?.message || String(e)}`);
       }));
     }
@@ -332,7 +337,7 @@ export async function applyProfile(
       if (targetCommands.has(n)) continue;
       const prevEnabled = prevFileEnabled('command', n, base);
       realFileBackups.push({ kind: 'command', name: n, prev: prevEnabled });
-      tasks.push(setDisabledSuffix('command', n, true, base).catch((e) => {
+      tasksFs.push(setDisabledSuffix('command', n, true, base).catch((e) => {
         realFileErrors.push(`command(→disable):${n}: ${e?.message || String(e)}`);
       }));
     }
@@ -341,7 +346,7 @@ export async function applyProfile(
       if (targetAgents.has(n)) continue;
       const prevEnabled = prevFileEnabled('agent', n, base);
       realFileBackups.push({ kind: 'agent', name: n, prev: prevEnabled });
-      tasks.push(setDisabledSuffix('agent', n, true, base).catch((e) => {
+      tasksFs.push(setDisabledSuffix('agent', n, true, base).catch((e) => {
         realFileErrors.push(`agent(→disable):${n}: ${e?.message || String(e)}`);
       }));
     }
@@ -363,11 +368,13 @@ export async function applyProfile(
       const event = parsed.event as HookEvent;
       const prevPresent = prevHookPresent(event, parsed.index, settings);
       realFileBackups.push({ kind: 'hook', name: h.id, prev: prevPresent });
-      tasks.push(setHookEnabled(event, parsed.index, false, settings).catch((e) => {
+      tasksSettings.push(setHookEnabled(event, parsed.index, false, settings).catch((e) => {
         realFileErrors.push(`hook(→disable):${h.id}: ${e?.message || String(e)}`);
       }));
     }
-    await Promise.all(tasks);
+    // D13 race fix:settings.json 写入串行(避免 RMW 丢更新);fs mv 并发(各写不同路径)
+    await Promise.all(tasksFs);
+    for (const t of tasksSettings) await t;
     if (realFileErrors.length > 0) {
       // 真实文件部分失败 → 整体回滚(KV + 真实文件)
       throw new Error(

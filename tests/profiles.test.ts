@@ -171,6 +171,12 @@ test('applyProfile writes enabled=true to KV table and verifies', async () => {
   );
   // 真实 skill 已存在(enabled=true 实际状态)
 
+  // fixture settings.json:filesystem 在黑名单(模拟"当前 disabled"状态),
+  // 避免 applyProfile 写真实文件时 fallback 到生产 ~/.claude/settings.json
+  // (D13 race fix 教训 — Case 4 之前没传 settingsPath,污染生产 settings.json)
+  const settingsPath = path.join(claudeDir, 'settings.json');
+  fs.writeFileSync(settingsPath, JSON.stringify({ disabledMcpjsonServers: ['filesystem'] }));
+
   // 先在 KV 表写一些 enabled=false 的项(模拟当前 disabled 状态)
   setKvEnabled(db, 'mcp', 'filesystem', false);
   setKvEnabled(db, 'skill', 'commit-helper', false);
@@ -198,7 +204,7 @@ test('applyProfile writes enabled=true to KV table and verifies', async () => {
     })
   );
 
-  const result = await applyProfile(db, 'enable-fs', profilesPath, undefined, claudeDir);
+  const result = await applyProfile(db, 'enable-fs', profilesPath, settingsPath, claudeDir);
   assert.strictEqual(result.ok, true);
   assert.ok(typeof result.appliedAt === 'number');
   assert.deepStrictEqual(result.realFileErrors, [], '真实文件无错误');
