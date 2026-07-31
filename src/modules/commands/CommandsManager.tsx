@@ -16,6 +16,7 @@ import {
   EditOutlined,
   DeleteOutlined,
   ReloadOutlined,
+  SearchOutlined,
 } from '@ant-design/icons';
 import { api } from '../../api';
 import type { Command, CommandCreateInput } from '../../types';
@@ -34,6 +35,7 @@ export const CommandsManager: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState<Command | null>(null);
   const [creating, setCreating] = useState(false);
+  const [query, setQuery] = useState('');
   const [editForm] = Form.useForm<CommandFormValues>();
   const [createForm] = Form.useForm<CommandFormValues>();
 
@@ -136,6 +138,12 @@ export const CommandsManager: React.FC = () => {
     }
   };
 
+  const enabledCount = commands.filter((c) => c.enabled).length;
+  const disabledCount = commands.length - enabledCount;
+  const filtered = query
+    ? commands.filter((c) => c.name.toLowerCase().includes(query.toLowerCase()))
+    : commands;
+
   return (
     <div style={{ padding: 24, height: '100%', overflow: 'auto' }}>
       <div
@@ -147,12 +155,25 @@ export const CommandsManager: React.FC = () => {
         }}
       >
         <div>
-          <h2 style={{ margin: 0 }}>Commands</h2>
+          <Space size="middle" align="center">
+            <h2 style={{ margin: 0 }}>Commands</h2>
+            <Tag color="blue">
+              {enabledCount}/{disabledCount}
+            </Tag>
+          </Space>
           <div style={{ color: '#6b7280', fontSize: 12, marginTop: 4 }}>
             读取 ~/.claude/commands/*.md · 启用状态独立存于 mcp_server_state KV 表
           </div>
         </div>
         <Space>
+          <Input
+            allowClear
+            placeholder="搜索 name"
+            prefix={<SearchOutlined />}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            style={{ width: 200 }}
+          />
           <Button icon={<ReloadOutlined />} onClick={load} loading={loading}>
             刷新
           </Button>
@@ -164,11 +185,13 @@ export const CommandsManager: React.FC = () => {
 
       {commands.length === 0 && !loading ? (
         <Empty description="暂无 Command,点右上角'新建'添加" />
+      ) : filtered.length === 0 ? (
+        <Empty description={`没有匹配 "${query}" 的 Command`} />
       ) : (
         <List<Command>
           loading={loading}
           bordered
-          dataSource={commands}
+          dataSource={filtered}
           renderItem={(c) => (
             <List.Item
               key={c.name}

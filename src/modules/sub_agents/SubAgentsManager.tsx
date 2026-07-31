@@ -16,6 +16,7 @@ import {
   EditOutlined,
   DeleteOutlined,
   ReloadOutlined,
+  SearchOutlined,
 } from '@ant-design/icons';
 import { api } from '../../api';
 import type { SubAgent, SubAgentCreateInput } from '../../types';
@@ -34,6 +35,7 @@ export const SubAgentsManager: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState<SubAgent | null>(null);
   const [creating, setCreating] = useState(false);
+  const [query, setQuery] = useState('');
   const [editForm] = Form.useForm<SubAgentFormValues>();
   const [createForm] = Form.useForm<SubAgentFormValues>();
 
@@ -136,6 +138,12 @@ export const SubAgentsManager: React.FC = () => {
     }
   };
 
+  const enabledCount = agents.filter((a) => a.enabled).length;
+  const disabledCount = agents.length - enabledCount;
+  const filtered = query
+    ? agents.filter((a) => a.name.toLowerCase().includes(query.toLowerCase()))
+    : agents;
+
   return (
     <div style={{ padding: 24, height: '100%', overflow: 'auto' }}>
       <div
@@ -147,12 +155,25 @@ export const SubAgentsManager: React.FC = () => {
         }}
       >
         <div>
-          <h2 style={{ margin: 0 }}>Sub-Agents</h2>
+          <Space size="middle" align="center">
+            <h2 style={{ margin: 0 }}>Sub-Agents</h2>
+            <Tag color="blue">
+              {enabledCount}/{disabledCount}
+            </Tag>
+          </Space>
           <div style={{ color: '#6b7280', fontSize: 12, marginTop: 4 }}>
             读取 ~/.claude/agents/*.md · 启用状态独立存于 mcp_server_state KV 表
           </div>
         </div>
         <Space>
+          <Input
+            allowClear
+            placeholder="搜索 name"
+            prefix={<SearchOutlined />}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            style={{ width: 200 }}
+          />
           <Button icon={<ReloadOutlined />} onClick={load} loading={loading}>
             刷新
           </Button>
@@ -164,11 +185,13 @@ export const SubAgentsManager: React.FC = () => {
 
       {agents.length === 0 && !loading ? (
         <Empty description="暂无 Sub-Agent,点右上角'新建'添加" />
+      ) : filtered.length === 0 ? (
+        <Empty description={`没有匹配 "${query}" 的 Sub-Agent`} />
       ) : (
         <List<SubAgent>
           loading={loading}
           bordered
-          dataSource={agents}
+          dataSource={filtered}
           renderItem={(a) => (
             <List.Item
               key={a.name}

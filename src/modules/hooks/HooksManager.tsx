@@ -17,6 +17,7 @@ import {
   EditOutlined,
   DeleteOutlined,
   ReloadOutlined,
+  SearchOutlined,
 } from '@ant-design/icons';
 import { api } from '../../api';
 import type { Hook, HookCreateInput } from '../../types';
@@ -33,6 +34,7 @@ export const HooksManager: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState<Hook | null>(null);
   const [creating, setCreating] = useState(false);
+  const [query, setQuery] = useState('');
   const [editForm] = Form.useForm<HookFormValues>();
   const [createForm] = Form.useForm<HookFormValues>();
 
@@ -132,6 +134,12 @@ export const HooksManager: React.FC = () => {
     }
   };
 
+  const enabledCount = hooks.filter((h) => h.enabled).length;
+  const disabledCount = hooks.length - enabledCount;
+  const filtered = query
+    ? hooks.filter((h) => h.id.toLowerCase().includes(query.toLowerCase()))
+    : hooks;
+
   return (
     <div style={{ padding: 24, height: '100%', overflow: 'auto' }}>
       <div
@@ -143,12 +151,25 @@ export const HooksManager: React.FC = () => {
         }}
       >
         <div>
-          <h2 style={{ margin: 0 }}>Hooks</h2>
+          <Space size="middle" align="center">
+            <h2 style={{ margin: 0 }}>Hooks</h2>
+            <Tag color="blue">
+              {enabledCount}/{disabledCount}
+            </Tag>
+          </Space>
           <div style={{ color: '#6b7280', fontSize: 12, marginTop: 4 }}>
             读取 ~/.claude/settings.json 的 hooks 字段 · 启用状态独立存于 mcp_server_state KV 表
           </div>
         </div>
         <Space>
+          <Input
+            allowClear
+            placeholder="搜索 id"
+            prefix={<SearchOutlined />}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            style={{ width: 200 }}
+          />
           <Button icon={<ReloadOutlined />} onClick={load} loading={loading}>
             刷新
           </Button>
@@ -160,11 +181,13 @@ export const HooksManager: React.FC = () => {
 
       {hooks.length === 0 && !loading ? (
         <Empty description="暂无 Hook,点右上角'新建'添加" />
+      ) : filtered.length === 0 ? (
+        <Empty description={`没有匹配 "${query}" 的 Hook`} />
       ) : (
         <List<Hook>
           loading={loading}
           bordered
-          dataSource={hooks}
+          dataSource={filtered}
           renderItem={(h) => (
             <List.Item
               key={h.id}

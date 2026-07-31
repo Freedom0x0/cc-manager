@@ -16,6 +16,7 @@ import {
   EditOutlined,
   DeleteOutlined,
   ReloadOutlined,
+  SearchOutlined,
 } from '@ant-design/icons';
 import { api } from '../../api';
 import type { Skill, SkillCreateInput } from '../../types';
@@ -35,6 +36,7 @@ export const SkillsManager: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState<Skill | null>(null);
   const [creating, setCreating] = useState(false);
+  const [query, setQuery] = useState('');
   const [editForm] = Form.useForm<SkillFormValues>();
   const [createForm] = Form.useForm<SkillFormValues>();
 
@@ -150,6 +152,12 @@ export const SkillsManager: React.FC = () => {
     }
   };
 
+  const enabledCount = skills.filter((s) => s.enabled).length;
+  const disabledCount = skills.length - enabledCount;
+  const filtered = query
+    ? skills.filter((s) => s.name.toLowerCase().includes(query.toLowerCase()))
+    : skills;
+
   return (
     <div style={{ padding: 24, height: '100%', overflow: 'auto' }}>
       <div
@@ -161,12 +169,25 @@ export const SkillsManager: React.FC = () => {
         }}
       >
         <div>
-          <h2 style={{ margin: 0 }}>Skills</h2>
+          <Space size="middle" align="center">
+            <h2 style={{ margin: 0 }}>Skills</h2>
+            <Tag color="blue">
+              {enabledCount}/{disabledCount}
+            </Tag>
+          </Space>
           <div style={{ color: '#6b7280', fontSize: 12, marginTop: 4 }}>
             读取 ~/.claude/skills/ · 启用状态独立存于 mcp_server_state KV 表
           </div>
         </div>
         <Space>
+          <Input
+            allowClear
+            placeholder="搜索 name"
+            prefix={<SearchOutlined />}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            style={{ width: 200 }}
+          />
           <Button icon={<ReloadOutlined />} onClick={load} loading={loading}>
             刷新
           </Button>
@@ -178,11 +199,13 @@ export const SkillsManager: React.FC = () => {
 
       {skills.length === 0 && !loading ? (
         <Empty description="暂无 Skill,点右上角'新建'添加" />
+      ) : filtered.length === 0 ? (
+        <Empty description={`没有匹配 "${query}" 的 Skill`} />
       ) : (
         <List<Skill>
           loading={loading}
           bordered
-          dataSource={skills}
+          dataSource={filtered}
           renderItem={(s) => (
             <List.Item
               key={s.name}

@@ -17,6 +17,7 @@ import {
   EditOutlined,
   DeleteOutlined,
   ReloadOutlined,
+  SearchOutlined,
 } from '@ant-design/icons';
 import { api } from '../../api';
 import type { Plugin, PluginCreateInput } from '../../types';
@@ -59,6 +60,7 @@ export const PluginsManager: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState<Plugin | null>(null);
   const [creating, setCreating] = useState(false);
+  const [query, setQuery] = useState('');
   const [editForm] = Form.useForm<{ scope: 'user' | 'project'; version: string }>();
   const [createForm] = Form.useForm<{
     fullName: string;
@@ -163,6 +165,12 @@ export const PluginsManager: React.FC = () => {
     }
   };
 
+  const enabledCount = plugins.filter((p) => p.enabled).length;
+  const disabledCount = plugins.length - enabledCount;
+  const filtered = query
+    ? plugins.filter((p) => p.fullName.toLowerCase().includes(query.toLowerCase()))
+    : plugins;
+
   return (
     <div style={{ padding: 24, height: '100%', overflow: 'auto' }}>
       <div
@@ -174,12 +182,25 @@ export const PluginsManager: React.FC = () => {
         }}
       >
         <div>
-          <h2 style={{ margin: 0 }}>插件</h2>
+          <Space size="middle" align="center">
+            <h2 style={{ margin: 0 }}>插件</h2>
+            <Tag color="blue">
+              {enabledCount}/{disabledCount}
+            </Tag>
+          </Space>
           <div style={{ color: '#6b7280', fontSize: 12, marginTop: 4 }}>
             读取 ~/.claude/plugins/installed_plugins.json · 严格 schema 校验 · 启用状态独立存于 mcp_server_state KV 表
           </div>
         </div>
         <Space>
+          <Input
+            allowClear
+            placeholder="搜索 fullName"
+            prefix={<SearchOutlined />}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            style={{ width: 200 }}
+          />
           <Button icon={<ReloadOutlined />} onClick={load} loading={loading}>
             刷新
           </Button>
@@ -191,11 +212,13 @@ export const PluginsManager: React.FC = () => {
 
       {plugins.length === 0 && !loading ? (
         <Empty description="暂未安装插件,可点右上角'新建'手动添加" />
+      ) : filtered.length === 0 ? (
+        <Empty description={`没有匹配 "${query}" 的插件`} />
       ) : (
         <List<Plugin>
           loading={loading}
           bordered
-          dataSource={plugins}
+          dataSource={filtered}
           renderItem={(p) => (
             <List.Item
               key={p.fullName}

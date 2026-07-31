@@ -16,6 +16,7 @@ import {
   EditOutlined,
   DeleteOutlined,
   ReloadOutlined,
+  SearchOutlined,
 } from '@ant-design/icons';
 import { api } from '../../api';
 import type { McpServer } from '../../types';
@@ -34,6 +35,7 @@ export const McpManager: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState<McpServer | null>(null);
   const [creating, setCreating] = useState(false);
+  const [query, setQuery] = useState('');
   const [editForm] = Form.useForm<McpFormValues>();
   const [createForm] = Form.useForm<McpFormValues>();
 
@@ -142,6 +144,12 @@ export const McpManager: React.FC = () => {
     }
   };
 
+  const enabledCount = servers.filter((s) => s.enabled).length;
+  const disabledCount = servers.length - enabledCount;
+  const filtered = query
+    ? servers.filter((s) => s.name.toLowerCase().includes(query.toLowerCase()))
+    : servers;
+
   return (
     <div style={{ padding: 24, height: '100%', overflow: 'auto' }}>
       <div
@@ -153,12 +161,25 @@ export const McpManager: React.FC = () => {
         }}
       >
         <div>
-          <h2 style={{ margin: 0 }}>MCP Servers</h2>
+          <Space size="middle" align="center">
+            <h2 style={{ margin: 0 }}>MCP Servers</h2>
+            <Tag color="blue">
+              {enabledCount}/{disabledCount}
+            </Tag>
+          </Space>
           <div style={{ color: '#6b7280', fontSize: 12, marginTop: 4 }}>
             读取 ~/.claude.json · 启用状态独立存于 mcp_server_state KV 表
           </div>
         </div>
         <Space>
+          <Input
+            allowClear
+            placeholder="搜索 name"
+            prefix={<SearchOutlined />}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            style={{ width: 200 }}
+          />
           <Button icon={<ReloadOutlined />} onClick={load} loading={loading}>
             刷新
           </Button>
@@ -170,11 +191,13 @@ export const McpManager: React.FC = () => {
 
       {servers.length === 0 && !loading ? (
         <Empty description="暂无 MCP server,点右上角'新建'添加" />
+      ) : filtered.length === 0 ? (
+        <Empty description={`没有匹配 "${query}" 的 MCP server`} />
       ) : (
         <List<McpServer>
           loading={loading}
           bordered
-          dataSource={servers}
+          dataSource={filtered}
           renderItem={(s) => (
             <List.Item
               key={s.name}
