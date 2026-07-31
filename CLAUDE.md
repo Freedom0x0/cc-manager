@@ -2,6 +2,8 @@
 
 > 我是这个项目的唯一全栈开发工程师。**任何对前端的修改都必须同步检查后端是否需要改，反之亦然。** 没有"只动前端"或"只动后端"的小修改 —— 改一处前，永远先想一遍三层链路（IPC contract / 数据模型 / 业务规则）。
 >
+> **例外**：只读视图的本地过滤（搜索框 / 计数 / 排序）不触发三层链路检查，因为它不修改状态、不调用 IPC、不改变数据。改 enabled 计数 / 排序 / 搜索 key 等只读视图字段，不需要同步动后端。
+>
 > **平台策略**：Windows 优先（v2.0 / v2.1 / v3.0 三波全部产出 Windows installer）。macOS 适配延后到 v4.0（详见 `docs/superpowers/specs/2026-07-28-cc-manager-modules-design.md` §15）。开发模式（`npm run dev`）跨平台可用。
 
 ---
@@ -137,6 +139,8 @@ cc-session-manager/
 - commit message 写**为什么**，不写**做了什么**（diff 自己看）
 - commit 前必跑 `npm test` 全绿
 - 重大改动（schema / IPC 协议）单独 commit，附数据迁移说明
+- **`commit` 可以由 Claude 代跑**（测试全绿 + type check 0 错 + message 已与用户对齐后）
+- **`push` 必须由用户亲手跑**（CLAUDE.md 改这条 2026-07-31：commit 是本地动作可逆，push 是对外发布，影响 main 上所有人）
 
 ## 12. 禁止事项
 
