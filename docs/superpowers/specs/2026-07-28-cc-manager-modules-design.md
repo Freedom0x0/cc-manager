@@ -71,10 +71,10 @@ cc-session-manager/
 │   ├── App.tsx                      # antd Tabs 导航壳子（不再写业务）
 │   ├── api.ts / global.d.ts / types.ts / mock.ts
 │   ├── components/
-│   │   ├── GlobalSearchBar.tsx      # 新增：顶部跨模块搜索
-│   │   ├── ProjectSelector.tsx      # 新增：选 active project
 │   │   ├── WatcherStatusIndicator.tsx  # 新增：watcher 状态
 │   │   └── （v4 的 7 个组件迁到 modules/sessions/）
+│   │   # ⚠️ 2026-07-31 撤销：GlobalSearchBar.tsx（顶部跨模块搜索）+
+│   │   #   ProjectSelector.tsx（选 active project）已删，见 §8 与 D16
 │   ├── modules/
 │   │   ├── _template/
 │   │   ├── sessions/                # 从 src/components 迁入
@@ -87,13 +87,12 @@ cc-session-manager/
 │   │   ├── profiles/                # 波 3
 │   │   └── analytics/               # 波 3
 │   └── hooks/
-│       ├── useSearch.ts             # 已有
-│       └── useGlobalSearch.ts       # 新增
+│       └── useSearch.ts             # 已有
+│       # ⚠️ 2026-07-31 撤销：useGlobalSearch.ts 从未实现,全局搜索已撤销(§8 / D16)
 └── tests/
     ├── （v4 的 7 个测试保留）
     ├── _helpers/sandbox.ts          # 新增：tmpdir 沙盒
     ├── watcher.test.ts              # 新增
-    ├── global-search.test.ts        # 新增
     ├── template.test.ts             # 新增：验证 _template 可用
     └── <module>/<name>.test.ts      # 每模块 5 类测试
 ```
@@ -273,9 +272,10 @@ CREATE TABLE IF NOT EXISTS watcher_state (
 
 | channel | 参数 | 返回 |
 |---|---|---|
-| `global_search` | `(query: string, limit?: number)` | `GlobalSearchHit[]` |
 | `watcher_rescan_all` | `()` | `{ ok: boolean, scanned: number }` |
 | `watcher_get_status` | `()` | `WatcherStatus` |
+
+> ⚠️ **2026-07-31 撤销**：`global_search` channel 已删（见 §8 / CLAUDE.md D16）。
 
 ### 5.8 关键 IPC 设计原则
 
@@ -414,7 +414,19 @@ export function startWatcher(db: DB): FSWatcher {
 
 UI 用 antd Table 展示 + 一键"接受 / 拒绝 / 保留现状"。
 
-## 8. 顶部全局搜索
+## 8. 顶部全局搜索 —— ⚠️ 2026-07-31 撤销，不再实现
+
+**本节整体作废。** 波 0 只落了一个写死 `disabled` 的 `Input.Search` 空壳，波 1-3 全部做完（v3.0 已发）都没接上，标注「波 1+ 启用」成了过期文案。2026-07-31 决定**撤销该功能**，删组件 + 删整条 `global_search` 后端链（详见 CLAUDE.md §13 D16）。
+
+撤销理由：
+- 会话 Tab 内的 `SearchBar` 已提供全文搜索（含项目 / 时间筛选），顶部再来一份是功能重叠
+- 6 个模块管理器已各自有顶部本地 name 搜索（commit `0b2353c`），跨模块搜索的实际需求没出现
+- 原 §8.2 的 SQL 引用 `mcp_metadata` / `skill_metadata` / `command_metadata` **三张表从未存在**（实际只有 projects / sessions / messages / watcher_state / mcp_server_state 5 张）。按 D15 口径，真实 enabled 状态在 6 个 scanner 而非 KV 表 —— 这段 SQL 从写下起就不可实现
+
+以下为原始设计，仅作历史记录保留：
+
+<details>
+<summary>原 §8 设计（已作废）</summary>
 
 ### 8.1 UI
 
@@ -438,6 +450,8 @@ SELECT 'project', name, id, NULL, 1 FROM projects WHERE is_archived = 0 AND name
 
 每波扩展覆盖的模块表。
 
+</details>
+
 ## 9. 波次时间线
 
 ### 波 0：模块化骨架（3 天）
@@ -446,7 +460,7 @@ SELECT 'project', name, id, NULL, 1 FROM projects WHERE is_archived = 0 AND name
 |---|---|
 | 1 | 抽 `_template/`（electron + src）+ App.tsx 改造为导航壳子 |
 | 2 | `watcher.ts` 主控 + `registerIpcHandlers(db)` 函数 + watcher_state 表 |
-| 3 | GlobalSearchBar 骨架（只搜 sessions）+ 5 个 template test |
+| 3 | GlobalSearchBar 骨架（只搜 sessions）+ 5 个 template test ~~已撤销,见 §8~~ |
 
 产出：可运行的 v1.1 骨架，App.tsx 9 Tab 占位。
 
@@ -462,7 +476,7 @@ SELECT 'project', name, id, NULL, 1 FROM projects WHERE is_archived = 0 AND name
 | 7 | Commands: scanner + command_metadata + CommandsManager + CRUD + 5 测试 |
 | 8 | Commands 高级: Markdown 编辑器 + 模板导入（抄 everything-claude-code 5-10 个）+ 2 测试 |
 | 9 | 会话增强: usage_get_summary/cost/tool_frequency + 4 测试 |
-| 10 | 全局搜索扩展 + npm test 全绿 + npm run package:portable → v2.0 |
+| 10 | ~~全局搜索扩展~~(已撤销,见 §8) + npm test 全绿 + npm run package:portable → v2.0 |
 
 ### 波 2：Sub-Agents + Hooks + 插件（7 天）
 
@@ -471,7 +485,7 @@ SELECT 'project', name, id, NULL, 1 FROM projects WHERE is_archived = 0 AND name
 | 1 | Sub-Agents: scanner + agent_metadata + SubAgentsManager + 模板导入（抄 everything-claude-code 9 个）+ 4 测试 |
 | 2 | Hooks: scanner + hook_metadata + HooksManager（事件筛选 + matcher 编辑 + preview "这会触发：xxx"）+ 4 测试 |
 | 3-4 | 插件: scanner + plugin_metadata + PluginsManager + 调 `claude plugin install/uninstall`（spawn 子进程）+ 5 测试 |
-| 5-6 | 集成: watcher 覆盖新目录 + 全局搜索覆盖 + UI 收尾 + 4 集成测试 |
+| 5-6 | 集成: watcher 覆盖新目录 + ~~全局搜索覆盖~~(已撤销,见 §8) + UI 收尾 + 4 集成测试 |
 | 7 | npm test + npm run package:portable → v2.1 |
 
 ### 波 3：Profiles + 用量分析（5 天）

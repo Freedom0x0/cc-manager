@@ -114,7 +114,7 @@ npm run package:mac
 - Windows 创建 `%APPDATA%\cc-session-manager\app.db`
 - macOS 创建 `~/Library/Application Support/cc-session-manager/app.db`
 - 扫描 `~/.claude/projects/` 把所有 session 入库
-- 顶部 3 组件:全局搜索 / 项目选择 / Watcher 状态
+- 顶部:Watcher 状态指示器
 - 左侧 9 Tab:会话 / MCP / Skills / Commands / Sub-Agents / Hooks / 插件 / Profiles / 用量分析
 
 ## 🧩 9 Tab 业务模块
@@ -186,7 +186,7 @@ cc-manager/
 | 来源 | 数量 | 备注 |
 |---|---|---|
 | 基线 (v1+) | 13 | list/list_project_tree/list_sessions 等 |
-| watcher (v5) | 3 | global_search + watcher_rescan_all + watcher_get_status |
+| watcher (v5) | 2 | watcher_rescan_all + watcher_get_status |
 | wave-1 业务模块 | 18 | MCP / Skills / Commands 各 6 |
 | wave-2 业务模块 | 18 | Sub-Agents / Hooks / 插件 各 6 |
 | wave-3 业务模块 | 12 | Profiles / 用量分析 各 6 |

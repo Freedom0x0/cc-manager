@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### v5 D16 — 撤销顶部「全局搜索」+「选择项目」
+
+- **删** `GlobalSearchBar.tsx` / `ProjectSelector.tsx` —— 波 0 的 `disabled` 占位空壳,placeholder 标「波 1+ 启用」,但波 1/2/3 全做完(v3.0 已发)都没接上,是过期承诺
+- **删整条 `global_search` 后端链**(照 D5「0 引用不留死代码」):`repo/search.ts:globalSearch()` + `GlobalSearchHit` 类型(src/types.ts 与 repo 各一份) / `main.ts` handler / `preload.ts` / `global.d.ts` / `api.ts` / `mock.ts` / `tests/global-search.test.ts` / `package.json` 测试列表
+- **保留** `search.ts:search()` —— 会话 Tab 的 FTS5 全文搜索仍在用,与本次无关
+- spec §8 整节标作废(原设计折叠保留);顺带发现 §8.2 的 SQL 引用 `mcp_metadata` / `skill_metadata` / `command_metadata` **三张表从未存在**,该设计从写下起就不可实现
+- 测试 150 → 147
+
 ### v5 amendment — platform strategy
 
 - **Platform**: Windows-first. v2.0 / v2.1 / v3.0 produce Windows installers (NSIS + Portable) only.

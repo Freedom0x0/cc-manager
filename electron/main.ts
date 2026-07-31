@@ -165,9 +165,6 @@ app.whenReady().then(async () => {
         fromMs !== null && toMs !== null ? { from: fromMs, to: toMs } : null
       )
   );
-  ipcMain.handle('global_search', (_e, query: string, limit: number) =>
-    searchRepo.globalSearch(db, query, limit)
-  );
   ipcMain.handle('watcher_rescan_all', () => ({ ok: true }));
   ipcMain.handle('watcher_get_status', () => {
     const status = watcherStateRepo.getState(db, 'status') as 'starting' | 'idle' | 'error' | null;

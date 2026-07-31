@@ -103,8 +103,6 @@ contextBridge.exposeInMainWorld('api', {
     fromMs: number | null,
     toMs: number | null
   ) => ipcRenderer.invoke('search_messages', query, projectIds, fromMs, toMs),
-  globalSearch: (query: string, limit: number) =>
-    ipcRenderer.invoke('global_search', query, limit),
   watcherRescanAll: () => ipcRenderer.invoke('watcher_rescan_all'),
   watcherGetStatus: () => ipcRenderer.invoke('watcher_get_status'),
   softDeleteSession: (sessionId: string) => ipcRenderer.invoke('soft_delete_session', sessionId),

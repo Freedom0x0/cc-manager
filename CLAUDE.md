@@ -32,7 +32,7 @@ cc-session-manager/
 │   ├── api.ts                      # 包装 window.api
 │   ├── types.ts                    # 跨层共享类型
 │   ├── mock.ts + mock-data.ts      # 浏览器 dev mock（仅 vite serve 模式）
-│   ├── components/                 # 6 个 antd 组件
+│   ├── components/                 # 跨模块共享组件(WatcherStatusIndicator / ComingSoon)
 │   └── hooks/useSearch.ts
 ├── tests/                          # node --test（用 ELECTRON_RUN_AS_NODE 跑）
 ├── scripts/screenshot.ts           # Playwright 截屏
@@ -252,6 +252,15 @@ cc-session-manager/
   - 4 文件改动:`electron/repo/profiles/writer.ts` captureProfileFromState async 化 + 加 CaptureOptions + createProfile 加 captureOpts 参数(B 档) / `electron/main.ts` profile_capture handler 显式传 6 default 路径(A 档,IPC 契约不变) / `tests/profiles.test.ts` Case 3 重写为「走 6 scanner」+ 钉死 KV 漏项场景(B 档) / `CLAUDE.md` +15(D15 决策,本段)。
   - **验证**:`npm test` 150/150 全绿稳定 2 次,`tsc --noEmit` + `tsc -p tsconfig.electron.json --noEmit` 双 0 错。
   - **教训(共 3 条)**:(1) D10 决策 KV 是 cache,但 captureProfileFromState 当时没意识到 —— D15 修正 capture 走 scanner。(2) KV 表「记录用户 toggle」语义 vs scanner「真实状态」语义口径不同,任何读 KV 当 UI 真实状态的代码都是潜在 bug。 (3) 测试 fixture 要看 schema 必填字段:plugins `validateVersion` 必填 6 字段(scope/installPath/version/installedAt/lastUpdated/gitCommitSha),漏 gitCommitSha → listPlugins 返空 → capture 漏项。
+- **2026-07-31 v5 D16 撤销顶部「全局搜索」+「选择项目」两个占位组件**:
+  - 波 0 在 Header 放了 3 个组件(README 原文「顶部 3 组件」),其中 `GlobalSearchBar.tsx`(17 行)和 `ProjectSelector.tsx`(14 行)都是写死 `disabled` 的空壳,placeholder 文案「(波 1+ 启用)」。波 1/2/3 全做完、v3.0 已发,这俩**从未接上**,文案成了过期承诺。
+  - **决定撤销,不实现**。理由:
+    1. 会话 Tab 内 `SearchBar` 已有全文搜索(含项目 / 时间筛选),顶部全局搜索功能重叠
+    2. 6 模块管理器已各有顶部本地 name 搜索(commit `0b2353c`),跨模块搜索需求未出现
+    3. 左侧 `ProjectTree` 已能选项目;顶部再来一个 selector 要么是重复 UI(须状态提升),要么是「全局 active project 过滤」——后者需给 5 个 scanner 加 project 级扫描(现只有 plugins scanner 有 scope 字段),是新一波的量级,收益不明
+  - **连带删整条 `global_search` 后端链**(照 D5「0 引用孤儿组件直接 git rm」先例,不留死代码):`repo/search.ts` 的 `globalSearch()` + `GlobalSearchHit` 接口 / `main.ts` handler / `preload.ts` invoke / `global.d.ts` Api 字段 / `src/types.ts` 的 `GlobalSearchHit` / `api.ts` 包装 / `mock.ts` 实现 / `tests/global-search.test.ts`(3 case) / `package.json` 测试列表。**`search.ts` 的 `search()`(会话全文搜索,在用)不动**。测试 150 → 147。
+  - **spec §8 整节标作废**,原设计移入 `<details>` 折叠保留作历史。发现 §8.2 的 SQL 引用 `mcp_metadata` / `skill_metadata` / `command_metadata` **三张表从未存在**(实际只有 projects / sessions / messages / watcher_state / mcp_server_state 5 张),按 D15 口径真实 enabled 在 6 scanner 而非 KV 表 —— 这段 SQL 从写下起就不可实现,是 spec 早于实现、后续未回写的典型。
+  - **教训**:占位组件必须带「兑现期限」。写死 `disabled` + 「波 N 启用」的空壳,若到期未接,要么接、要么删,不能一直挂着 —— 用户看到灰控件会以为是 bug,而非未实现。下次加占位 UI,宁可**不放**,也不放一个不能点的。
 - **2026-07-29 macOS 适配**：`getDataDir()` 已做跨平台：Windows 用 `%APPDATA%`，macOS 用 `~/Library/Application Support`，Linux 用 `$XDG_CONFIG_HOME` 或 `~/.config`。`logFile()` 复用同一函数，不再有独立 fallback 路径。chokidar 需单独 `npm install`（package.json `dependencies` 已有，但 mac 首次 `npm install --ignore-scripts` 后需验证）
 
 ## 14. 用户语言

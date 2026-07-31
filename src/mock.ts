@@ -217,21 +217,6 @@ if (typeof window !== 'undefined' && !window.api) {
       );
       return ok(hits);
     },
-    globalSearch: (query, limit) => {
-      if (query.length === 0) return ok([]);
-      const normalized = query.toLowerCase();
-      return ok(
-        testProjects
-          .filter((project) => project.name.toLowerCase().includes(normalized))
-          .slice(0, limit)
-          .map((project) => ({
-            id: String(project.id),
-            kind: 'project' as const,
-            title: project.name,
-            subtitle: project.path,
-          }))
-      );
-    },
     watcherRescanAll: () => ok({ ok: true as const }),
     watcherGetStatus: () => ok({ status: 'idle' as const }),
     softDeleteSession: (id) => {

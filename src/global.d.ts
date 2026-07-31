@@ -9,7 +9,6 @@ import type {
   SearchHit,
   ProjectTreeNode,
   ResumeCommand,
-  GlobalSearchHit,
   WatcherStatus,
   McpServer,
   McpCreateInput,
@@ -52,7 +51,6 @@ export type Api = {
     fromMs: number | null,
     toMs: number | null
   ): Promise<SearchHit[]>;
-  globalSearch(query: string, limit: number): Promise<GlobalSearchHit[]>;
   watcherRescanAll(): Promise<{ ok: true }>;
   watcherGetStatus(): Promise<WatcherStatus>;
   softDeleteSession(sessionId: string): Promise<void>;

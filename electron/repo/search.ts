@@ -1,31 +1,6 @@
 import { DB } from '../db/connection';
 import { SearchHit, MessageRow } from './types';
 
-export interface GlobalSearchHit {
-  id: string;
-  kind: 'project' | 'session' | 'message';
-  title: string;
-  subtitle?: string;
-}
-
-export function globalSearch(db: DB, query: string, limit: number): GlobalSearchHit[] {
-  if (query.length === 0) return [];
-
-  const rows = db.prepare(`
-    SELECT id, name AS title, project_path AS subtitle
-    FROM projects
-    WHERE name LIKE ?
-    LIMIT ?
-  `).all(`%${query}%`, limit) as Array<{ id: number; title: string; subtitle: string }>;
-
-  return rows.map((row) => ({
-    id: String(row.id),
-    kind: 'project',
-    title: row.title,
-    subtitle: row.subtitle,
-  }));
-}
-
 export function search(
   db: DB,
   query: string,

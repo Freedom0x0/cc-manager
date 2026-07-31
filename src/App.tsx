@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { ConfigProvider, App as AntApp, Layout, Tabs } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
-import { GlobalSearchBar } from './components/GlobalSearchBar';
-import { ProjectSelector } from './components/ProjectSelector';
 import { WatcherStatusIndicator } from './components/WatcherStatusIndicator';
 import { ComingSoon } from './components/ComingSoon';
 import { SessionsPane } from './modules/sessions/SessionsModule';
@@ -81,9 +79,7 @@ function App() {
           padding: '0 24px',
         }}
       >
-        <div style={{ fontWeight: 700, fontSize: 16, marginRight: 8 }}>cc-session-manager</div>
-        <GlobalSearchBar />
-        <ProjectSelector />
+        <div style={{ fontWeight: 700, fontSize: 16 }}>cc-session-manager</div>
         <div style={{ marginLeft: 'auto' }}>
           <WatcherStatusIndicator />
         </div>

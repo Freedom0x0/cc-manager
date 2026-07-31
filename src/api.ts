@@ -5,7 +5,6 @@ import type {
   MessageRow,
   SearchHit,
   ResumeCommand,
-  GlobalSearchHit,
   WatcherStatus,
   McpServer,
   McpCreateInput,
@@ -49,8 +48,6 @@ export const api = {
     fromMs: number | null,
     toMs: number | null
   ): Promise<SearchHit[]> => window.api.searchMessages(query, projectIds, fromMs, toMs),
-  globalSearch: (query: string, limit: number): Promise<GlobalSearchHit[]> =>
-    window.api.globalSearch(query, limit),
   watcherRescanAll: (): Promise<{ ok: true }> => window.api.watcherRescanAll(),
   watcherGetStatus: (): Promise<WatcherStatus> => window.api.watcherGetStatus(),
   softDeleteSession: (sessionId: string): Promise<void> => window.api.softDeleteSession(sessionId),
