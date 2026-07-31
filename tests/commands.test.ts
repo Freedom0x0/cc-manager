@@ -68,7 +68,7 @@ test('listCommands reads fixture directory (enabled is structural — file prese
 });
 
 // Case 2b (新增): setEnabled(false) → mv 文件为 .md.disabled → list 跳过
-test('listCommands excludes .md.disabled files after setEnabled(false)', async () => {
+test('listCommands includes .md.disabled files with enabled=false after setEnabled(false)', async () => {
   writeFixtureCommand('review', 'desc');
   // setEnabled 写真实文件:disable = mv review.md → review.md.disabled
   await setEnabled(db, 'review', false, path.dirname(commandsDir));
@@ -80,9 +80,11 @@ test('listCommands excludes .md.disabled files after setEnabled(false)', async (
     'review.md.disabled 应存在'
   );
 
-  // 2. list 跳过 .md.disabled
+  // 2. list **包含** .md.disabled,标 enabled=false(D14 改造 — 与 skills 镜像方案对称)
   const list = await listCommands(db, commandsDir);
-  assert.strictEqual(list.length, 0, '.md.disabled 不应出现在列表');
+  assert.strictEqual(list.length, 1, '.md.disabled 应出现在列表,enabled=false');
+  assert.strictEqual(list[0].name, 'review', 'name 应是 review(去掉 .md.disabled 后缀)');
+  assert.strictEqual(list[0].enabled, false, 'enabled=false 反映 .md.disabled 后缀');
 
   // 3. setEnabled(true) 恢复
   await setEnabled(db, 'review', true, path.dirname(commandsDir));
@@ -93,6 +95,7 @@ test('listCommands excludes .md.disabled files after setEnabled(false)', async (
   );
   const list2 = await listCommands(db, commandsDir);
   assert.strictEqual(list2.length, 1, '恢复后 list 应有 1 个');
+  assert.strictEqual(list2[0].enabled, true, '恢复后 enabled=true');
   closeDB(db);
 });
 

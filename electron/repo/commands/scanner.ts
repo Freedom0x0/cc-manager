@@ -63,10 +63,17 @@ export function parseFrontmatter(
 }
 
 /**
- * 读 ~/.claude/commands/<name>.md → 解析 frontmatter → 注入 enabled
- * → 返 Command[]。commandsDir 不存在或空目录返 []。
+ * 读 ~/.claude/commands/<name>.md(enabled)+ ~/.claude/commands/<name>.md.disabled
+ * (disabled) → 解析 frontmatter → 注入 enabled(文件后缀决定)→ 返 Command[]。
+ * commandsDir 不存在或空目录返 []。
  *
- * @param db 已 initDB 的 SQLite handle(读 enabled KV)
+ * v5 D14 改造(2026-07-31):之前跳过 .md.disabled 后缀文件,导致 UI 上看不到
+ * 停用的 command,跟 skills 的 disabled_skills/ 镜像方案(D12)对称 — 同
+ * "写完不算完,UI 也要双向验证"教训。Command enable 路径(.md ↔ .md.disabled)
+ * 跟 skills 镜像方案等价,scanner 也应返 disabled 项以便 UI 显式展示。
+ *
+ * @param db 已 initDB 的 SQLite handle(scanner 不再读 KV,enabled 由文件
+ *           后缀决定;DB 保留以便未来切回 KV source of truth)
  * @param commandsDir 可选:注入 fixture 路径(测试用);默认走 ~/.claude/commands
  */
 export async function listCommands(db: DB, commandsDir?: string): Promise<Command[]> {
@@ -80,10 +87,13 @@ export async function listCommands(db: DB, commandsDir?: string): Promise<Comman
   }
   const out: Command[] = [];
   for (const filename of entries) {
-    if (!filename.endsWith('.md')) continue;
-    // 跳过 .disabled 后缀(真停用) — Claude Code 不读
-    if (filename.endsWith('.md.disabled')) continue;
-    const name = basename(filename, '.md');
+    // 只处理 .md(enabled)和 .md.disabled(disabled)两种文件
+    // 注意:"review.md.disabled".endsWith(".md") === false(末尾是 "led")
+    // 所以必须显式判断两种后缀
+    const isDisabled = filename.endsWith('.md.disabled');
+    const isEnabled = !isDisabled && filename.endsWith('.md');
+    if (!isDisabled && !isEnabled) continue;
+    const name = basename(filename, isDisabled ? '.md.disabled' : '.md');
     const filePath = join(dir, filename);
     if (!existsSync(filePath)) continue;
     try {
@@ -96,8 +106,8 @@ export async function listCommands(db: DB, commandsDir?: string): Promise<Comman
         path: filePath,
         description,
         argumentHint,
-        // 真实 enabled = 在 commands 目录中存在(本分支已到 + 非 .disabled)
-        enabled: true,
+        // enabled 由文件后缀决定(.md = true, .md.disabled = false)。
+        enabled: !isDisabled,
         body,
       });
     } catch {

@@ -71,7 +71,7 @@ test('listSubAgents reads fixture directory (enabled is structural — file pres
 });
 
 // Case 2b (新增): setEnabled(false) → mv 文件为 .md.disabled → list 跳过
-test('listSubAgents excludes .md.disabled files after setEnabled(false)', async () => {
+test('listSubAgents includes .md.disabled files with enabled=false after setEnabled(false)', async () => {
   writeFixtureSubAgent('explore', 'desc');
   await setEnabled(db, 'explore', false, path.dirname(agentsDir));
 
@@ -82,9 +82,11 @@ test('listSubAgents excludes .md.disabled files after setEnabled(false)', async 
     'explore.md.disabled 应存在'
   );
 
-  // 2. list 跳过
+  // 2. list **包含** .md.disabled,标 enabled=false(D14 改造)
   const list = await listSubAgents(db, agentsDir);
-  assert.strictEqual(list.length, 0, '.md.disabled 不应出现在列表');
+  assert.strictEqual(list.length, 1, '.md.disabled 应出现在列表,enabled=false');
+  assert.strictEqual(list[0].name, 'explore', 'name 应是 explore(去掉 .md.disabled 后缀)');
+  assert.strictEqual(list[0].enabled, false, 'enabled=false 反映 .md.disabled 后缀');
 
   // 3. setEnabled(true) 恢复
   await setEnabled(db, 'explore', true, path.dirname(agentsDir));
@@ -95,6 +97,7 @@ test('listSubAgents excludes .md.disabled files after setEnabled(false)', async 
   );
   const list2 = await listSubAgents(db, agentsDir);
   assert.strictEqual(list2.length, 1, '恢复后 list 应有 1 个');
+  assert.strictEqual(list2[0].enabled, true, '恢复后 enabled=true');
   closeDB(db);
 });
 

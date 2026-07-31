@@ -63,10 +63,15 @@ export function parseFrontmatter(
 }
 
 /**
- * 读 ~/.claude/agents/<name>.md → 解析 frontmatter → 注入 enabled
- * → 返 SubAgent[]。agentsDir 不存在或空目录返 []。
+ * 读 ~/.claude/agents/<name>.md(enabled)+ ~/.claude/agents/<name>.md.disabled
+ * (disabled) → 解析 frontmatter → 注入 enabled(文件后缀决定)→ 返 SubAgent[]。
+ * agentsDir 不存在或空目录返 []。
  *
- * @param db 已 initDB 的 SQLite handle(读 enabled KV)
+ * v5 D14 改造(2026-07-31):跟 commands scanner 同步,返 disabled 项以便 UI
+ * 显式展示 — 与 skills 镜像方案(D12)对称,同"写完不算完"教训。
+ *
+ * @param db 已 initDB 的 SQLite handle(scanner 不再读 KV,enabled 由文件
+ *           后缀决定;DB 保留以便未来切回 KV source of truth)
  * @param agentsDir 可选:注入 fixture 路径(测试用);默认走 ~/.claude/agents
  */
 export async function listSubAgents(db: DB, agentsDir?: string): Promise<SubAgent[]> {
@@ -80,10 +85,13 @@ export async function listSubAgents(db: DB, agentsDir?: string): Promise<SubAgen
   }
   const out: SubAgent[] = [];
   for (const filename of entries) {
-    if (!filename.endsWith('.md')) continue;
-    // 跳过 .disabled 后缀(真停用) — Claude Code 不读
-    if (filename.endsWith('.md.disabled')) continue;
-    const name = basename(filename, '.md');
+    // 只处理 .md(enabled)和 .md.disabled(disabled)两种文件
+    // 注意:"review.md.disabled".endsWith(".md") === false(末尾是 "led")
+    // 所以必须显式判断两种后缀
+    const isDisabled = filename.endsWith('.md.disabled');
+    const isEnabled = !isDisabled && filename.endsWith('.md');
+    if (!isDisabled && !isEnabled) continue;
+    const name = basename(filename, isDisabled ? '.md.disabled' : '.md');
     const filePath = join(dir, filename);
     if (!existsSync(filePath)) continue;
     try {
@@ -96,8 +104,8 @@ export async function listSubAgents(db: DB, agentsDir?: string): Promise<SubAgen
         path: filePath,
         description,
         argumentHint,
-        // 真实 enabled = 在 agents 目录中存在(本分支已到 + 非 .disabled)
-        enabled: true,
+        // enabled 由文件后缀决定(.md = true, .md.disabled = false)。
+        enabled: !isDisabled,
         body,
       });
     } catch {

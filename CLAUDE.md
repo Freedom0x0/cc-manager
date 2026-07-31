@@ -223,6 +223,13 @@ cc-session-manager/
   - **回滚**:`prevFileEnabled`/`prevMcpDisabled`/`prevPluginEnabled`/`prevHookPresent` 现有函数复用,reverse-disable 写入前也备份 prev。中途失败按 `rollbackRealFile` 路径回滚。**writer.ts 回滚吞异常 bug(task #13)仍待修**。
   - **capture 不动**:`captureProfileFromState` 仍读 KV 表 value='true' 的项;应用时反查当前全集足够。`enabledX` 双列(profile.config 同时记 enabled+disabled)作为下次 sprint 处理。
   - 1 文件改动:`electron/repo/profiles/writer.ts` applyProfile 改造(B 档,改函数体 + 加 reverse-disable 循环 + 加 fixture 路径解析)。`tests/profiles.test.ts` Case 6 必须传 baseDir(否则 listMcpServers 扫生产 ~/.claude.json,把用户的 playwright MCP reverse-disable 加进黑名单 → 污染生产路径),新增 Case 7/8/9 钉死 3 模块 reverse-disable 行为。`npm test` 150/150 全绿,`tsc --noEmit` 0 报错。
+- **2026-07-31 v5 D14 commands/agents scanner 同步改造 — 返 disabled 项**:
+  - 原 commands/scanner.ts:84-85 / sub-agents/scanner.ts:84-85 跳过 `.md.disabled` 后缀文件 → scanner 只返 enabled 项,UI 上看不到停用的 command/sub-agent。
+  - 改为 scanner **包含** `.md.disabled`,标 `enabled=false`,name 是去掉 `.md.disabled` 后缀的形式(跟 skills 镜像方案 D12 对称)。
+  - 触发:跟 D12 同一根因 — commit 5 `.disabled` 后缀方案在"写"路径走通,UI 上"启用/停用"切换也能跑,但 scanner 跳过后 UI 看不到停用的项,无法反向启用。v5 D10 决策的"对称写接口必须 UI 双向验证"教训,D12 修了 skills,D14 补 commands/agents。
+  - **真 bug**:`"review.md.disabled".endsWith(".md") === false`(末尾是 `led` 不是 `md`)!所以原写法 `if (!filename.endsWith('.md')) continue;` + 之前的 `if (filename.endsWith('.md.disabled')) continue;` 都依赖 endsWith 链 — D14 必须显式两种后缀都判断(`isDisabled || isEnabled`),不能写 `.endsWith('.md')` 当通用门。
+  - **UI 影响**:`CommandsManager.tsx` / `SubAgentsManager.tsx` 不改(已直接 setCommands/setAgents,line 199/214 已渲染 enabled tag + Switch)。但新隐患:`foo.md` + `foo.md.disabled` 同名,UI 会渲染两次(去重逻辑缺失)。登记到 findings.md,本次不动 UI。
+  - 4 文件改动:`commands/scanner.ts` +14/-3(B 档,改扫描逻辑) / `sub-agents/scanner.ts` +14/-3(同) / `tests/commands.test.ts` Case 3 改名 + 改断言(`excludes` → `includes with enabled=false`)(A 档) / `tests/sub-agents.test.ts` Case 3 同步(A 档)。`npm test` 150/150 全绿稳定 5 次,`tsc --noEmit` 0 报错。
 - **2026-07-29 macOS 适配**：`getDataDir()` 已做跨平台：Windows 用 `%APPDATA%`，macOS 用 `~/Library/Application Support`，Linux 用 `$XDG_CONFIG_HOME` 或 `~/.config`。`logFile()` 复用同一函数，不再有独立 fallback 路径。chokidar 需单独 `npm install`（package.json `dependencies` 已有，但 mac 首次 `npm install --ignore-scripts` 后需验证）
 
 ## 14. 用户语言
