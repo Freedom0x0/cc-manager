@@ -204,6 +204,17 @@ cc-session-manager/
   - **保留** commands / agents 的 .md.disabled 方案(用户未报失败,保守不 over-surgery)
   - **教训**:单次简单环境实测 ≠ 硬证据;commit 5 当初应该加"⚠️ 基于假设,需真机验证"
   - commit 9 (origin PR #2) 已合并 main,所有人在 main HEAD 跑验证
+- **2026-07-31 v5 D12 commit 9 教训续(单次合并修复)**：
+  - commit 9 (`9c39e3f`) 修了"写"(`setDisabledSuffix` 走 `disabled_skills/<name>/` 镜像目录),但**没修"读"** —— `scanner.listSkills()` 仍然只读 `~/.claude/skills/`,导致用户停用后被挪到 `disabled_skills/<name>/`,主目录不再有它,**UI 列表里完全消失,没法点"启用"搬回去**。
+  - 触发:用户 2026-07-31 报告"skills 列表不显示停用的,我没法重新启用"。
+  - **修复方案(单次合并)**:在 `scanner.listSkills(db, skillsDir?, opts?)` 加第三参 `opts.disabledSkillsDir`,合并主目录+镜像目录扫描,`enabled` 由"目录来源"决定(主=true / 镜像=false)。同名冲突主目录赢 + `console.warn`(避免覆盖用户看不出来的覆盖行为)。同时 `main.ts` 的 `skill_list` / `skill_get` handler 显式注入 `disabledSkillsDir` 让 production 路径生效。
+  - 关键决策:
+    - **向后兼容**:`opts` 可选;`opts` 不传 → 仍只扫主目录(老单参调用路径)。`main.ts` handler 显式注入生产路径 `defaultDisabledSkillsDir()`,扫描前 `existsSync` 跳过,镜像目录首次未建时静默。
+    - **scanner 不排序**:排序是 UI 关注,`SkillsManager.load()` 内 `localeCompare(name)` 一处搞定,真 IPC 和 mock 走同一路径,行为统一。
+    - **4 个新 case** 钉死:合并扫描返 enabled=false / 同名冲突主目录赢 + warn / 单参向后兼容 / 镜像目录缺失静默。`tests/skills.test.ts` 现 9 case。
+    - **IPC 链路零改动**:`preload.ts` / `global.d.ts` / `src/api.ts` / `src/mock.ts` 全未动(`skillList/skillGet` 签名不变),靠可选 opts 在 repo 层注入,避免改 IPC 契约放大动作面。
+  - **教训(二)**:`写完不算完,UI 也要验`。commit 9 验证只测了 `setEnabled(false)` 把文件挪对了 + `listSkills()` 不再列它,**没在 UI 上点"启用"反向走一遍**。下次写"对称写"的接口(enable/disable / create/delete) 必须在 UI 双向验证,不能只验一半。
+  - 6 文件改动 `+/-`: `scanner.ts` +113/-48(B 档,改函数签名) / `index.ts` +2/-1(A 档) / `main.ts` +9/-3(A 档,handler 注入 opts) / `SkillsManager.tsx` +4(A 档,UI 排序) / `tests/skills.test.ts` +91(A 档,TDD 红→绿) / `CLAUDE.md` +12(D12 决策追加,本段)。`npm test` 147/147 全绿,`tsc --noEmit` 0 报错。
 - **2026-07-29 macOS 适配**：`getDataDir()` 已做跨平台：Windows 用 `%APPDATA%`，macOS 用 `~/Library/Application Support`，Linux 用 `$XDG_CONFIG_HOME` 或 `~/.config`。`logFile()` 复用同一函数，不再有独立 fallback 路径。chokidar 需单独 `npm install`（package.json `dependencies` 已有，但 mac 首次 `npm install --ignore-scripts` 后需验证）
 
 ## 14. 用户语言

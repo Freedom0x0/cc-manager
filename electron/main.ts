@@ -216,8 +216,16 @@ app.whenReady().then(async () => {
   // ~/.claude/skills/<name>/SKILL.md(原子写);list/get 注入 enabled 状态
   // (从 mcp_server_state KV 表读,key 前缀 'skill:enabled:<name>');
   // toggle_enabled 写 KV 表(不污染原文件 — D6 决策延伸)。
-  ipcMain.handle('skill_list', () => skillsRepo.listSkills(db));
-  ipcMain.handle('skill_get', (_e, name: string) => skillsRepo.getSkill(db, name));
+  // commit 12(与 commit 10 同步):list/get handler 显式注入 disabledSkillsDir,
+  // 让 scanner 合并扫描镜像目录;否则 opts undefined → 跳过镜像目录,
+  // UI 仍然看不到停用的 skill,与 commit 10 修复意图不符。
+  // create/update/delete 不动(opts 跟它们无关,只读主目录)。
+  ipcMain.handle('skill_list', () =>
+    skillsRepo.listSkills(db, undefined, { disabledSkillsDir: skillsRepo.defaultDisabledSkillsDir() })
+  );
+  ipcMain.handle('skill_get', (_e, name: string) =>
+    skillsRepo.getSkill(db, name, undefined, { disabledSkillsDir: skillsRepo.defaultDisabledSkillsDir() })
+  );
   ipcMain.handle('skill_create', (_e, input) => skillsRepo.createSkill(input));
   ipcMain.handle('skill_update', (_e, name: string, patch) =>
     skillsRepo.updateSkill(name, patch)

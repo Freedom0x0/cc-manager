@@ -42,6 +42,10 @@ export const SkillsManager: React.FC = () => {
     setLoading(true);
     try {
       const list = await api.skillList();
+      // commit 10:按 name localeCompare 排序,UI 一致性;
+      // mock 和真 IPC 都走这条路径,行为统一。scanner 不排(后端语义
+      // 是"扫描结果",顺序不该带 UI 偏好)。
+      list.sort((a, b) => a.name.localeCompare(b.name));
       setSkills(list);
     } catch (e) {
       console.error('skillList failed', e);
