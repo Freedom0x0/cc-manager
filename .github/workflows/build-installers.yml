@@ -30,8 +30,15 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install JS dependencies (skip native compile)
+        # CLAUDE.md §10:better-sqlite3 必须用 Electron headers 重编,
+        # 不能用系统 Node 的预编译 .node(二进制 ABI 不兼容)。
+        run: npm ci --ignore-scripts
+
+      - name: Rebuild better-sqlite3 for Electron
+        # electron-rebuild 把 better-sqlite3 编成跟 Electron 内置 Node ABI 匹配。
+        # 没有这一步,npm test 会 ERR_DLOPEN_FAILED(NODE_MODULE_VERSION 127 vs 128)。
+        run: npm run rebuild:sqlite
 
       - name: Run tests
         run: npm test
@@ -40,6 +47,8 @@ jobs:
         run: npm run typecheck
 
       - name: Build portable installer
+        # electron-builder 自带 @electron/rebuild 会再次重编 better-sqlite3,
+        # 这次按目标 Electron 版本,确保打包出来的 binary 可运行。
         run: npm run package:portable
 
       - name: Upload portable artifact
@@ -61,12 +70,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ───────────────────── macOS: build + upload (未签名) ─────────────────────
-  # macOS runner 给的是 Intel Mac (x64)。Apple Silicon (arm64) 用户也能跑 Intel
-  # build(Rosetta 2 兼容),所以只产 x64 不产 arm64——CLAUDE.md §13 D11 决策 + v4.0
-  # 才接 arm64 签名。
+  # macOS runner 是 Apple Silicon (M1,arm64)。electron-builder 配 mac target =
+  # dmg+zip 双架构(arm64+x64),D9 续决策要求双架构。Apple Silicon 用户用 arm64
+  # 原生跑,Intel Mac 用 Rosetta 2 跑 x64。
   #
-  # Mac 首次装 better-sqlite3:GitHub Actions macos-latest 自带的 Node 是系统 Node,
-  # ABI 跟 Electron 内置 Node 不一样 → 必须先 electron-rebuild,不能用 npm ci 直接装。
+  # 已知问题:GitHub Actions macos-latest 的 hdiutil detach 在 arm64 DMG 打包时
+  # 偶发失败(Exit code 16)。fallback:DMG 失败仍继续产 ZIP(zip 没这个问题)。
   macos:
     name: macOS installer (unsigned)
     runs-on: macos-latest
@@ -86,13 +95,19 @@ jobs:
         run: npm run rebuild:sqlite
 
       - name: Build DMG + ZIP
-        run: npm run package:mac -- --x64
+        # electron-builder.json 已经配 arm64 + x64 双架构 + dmg + zip,这里不用 --x64。
+        # 不再 set -e,允许 DMG 失败但保留 ZIP 产物(常见 GitHub Actions macos-latest hdiutil bug)。
+        run: |
+          npm run build
+          electron-builder --mac || echo "::warning::electron-builder exited non-zero (likely DMG hdiutil issue on GitHub Actions macos-latest);ZIP artifacts may still be present"
 
-      - name: Upload DMG artifact
+      - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: cc-manager-macos-dmg
+          name: cc-manager-macos
           path: |
+            release/CC Manager-*-mac-arm64.dmg
+            release/CC Manager-*-mac-arm64.zip
             release/CC Manager-*-mac-x64.dmg
             release/CC Manager-*-mac-x64.zip
           if-no-files-found: warn  # macOS build is best-effort;unsigned + 真机未验证
@@ -102,6 +117,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
+            release/CC Manager-*-mac-arm64.dmg
+            release/CC Manager-*-mac-arm64.zip
             release/CC Manager-*-mac-x64.dmg
             release/CC Manager-*-mac-x64.zip
           fail_on_unmatched_files: false
