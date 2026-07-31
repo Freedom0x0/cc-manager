@@ -1,0 +1,109 @@
+# Build CC Manager installers on push tag or manual dispatch.
+#
+# - tag v*   → 同时跑 Windows + macOS 双 build,把产物挂到 GitHub release
+# - manual   → 在 Actions 页面点 "Run workflow",只 build 不发 release(供调试)
+# - push PR  → 不触发(避免每次 PR 都跑 5-10 分钟的 mac build)
+#
+# Mac 产物未签名(CLAUDE.md §13 D11 决策):Gatekeeper 首启拦截 + 右键打开。
+# v4.0 才会接 Apple Developer ID + notarization。
+name: Build installers
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write   # 允许 softprops/action-gh-release 创建/更新 release
+
+jobs:
+  # ───────────────────── Windows: build + test + upload ─────────────────────
+  windows:
+    name: Windows installer
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Build portable installer
+        run: npm run package:portable
+
+      - name: Upload portable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cc-manager-windows-portable
+          path: release/CC Manager-*-portable.exe
+          if-no-files-found: error
+
+      - name: Upload to GitHub release (tag only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/CC Manager-*-portable.exe
+            release/CC Manager-*-x64.exe
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ───────────────────── macOS: build + upload (未签名) ─────────────────────
+  # macOS runner 给的是 Intel Mac (x64)。Apple Silicon (arm64) 用户也能跑 Intel
+  # build(Rosetta 2 兼容),所以只产 x64 不产 arm64——CLAUDE.md §13 D11 决策 + v4.0
+  # 才接 arm64 签名。
+  #
+  # Mac 首次装 better-sqlite3:GitHub Actions macos-latest 自带的 Node 是系统 Node,
+  # ABI 跟 Electron 内置 Node 不一样 → 必须先 electron-rebuild,不能用 npm ci 直接装。
+  macos:
+    name: macOS installer (unsigned)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install JS dependencies (skip native compile)
+        run: npm ci --ignore-scripts
+
+      - name: Rebuild better-sqlite3 for Electron
+        # CLAUDE.md §10:macOS 系统 Node ABI ≠ Electron Node ABI,需 electron-rebuild
+        run: npm run rebuild:sqlite
+
+      - name: Build DMG + ZIP
+        run: npm run package:mac -- --x64
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cc-manager-macos-dmg
+          path: |
+            release/CC Manager-*-mac-x64.dmg
+            release/CC Manager-*-mac-x64.zip
+          if-no-files-found: warn  # macOS build is best-effort;unsigned + 真机未验证
+
+      - name: Upload to GitHub release (tag only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/CC Manager-*-mac-x64.dmg
+            release/CC Manager-*-mac-x64.zip
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
