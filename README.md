@@ -6,6 +6,34 @@
 
 > **平台说明**:Windows 提供打包好的 `.exe` 直接下载；macOS 目前支持**开发模式**(`npm run dev`),打包版(`.dmg`)在 v4.0 规划中。
 
+## 🤝 v3.1 真停用待验证(欢迎帮验)
+
+2026-07-30 推 v3.1 真停用(8 commit + 1 docs commit = 9 commit):
+- 6 模块 toggle 写真实文件(settings.json / .disabled 后缀 / .md.disabled)
+- 启动时一次性 KV → 真实文件迁移
+- profiles 修正 KV prefix bug
+
+**Plugins 模块的真停用**基于"settings.json.enabledPlugins[<fullName>] = false"的推断,**未真机验证 Claude Code 是否真的不加载该 plugin**。需要 Windows + Claude Code 环境(已装至少 1 个 plugin) 跑下面 7 步验:
+
+1. **Clone v3.1 分支**:
+   ```bash
+   git clone -b mac-adapter-2026-07-30 https://github.com/Freedom0x0/cc-manager.git
+   cd cc-manager
+   ```
+2. **装 deps** (Windows): `npm install && npm run rebuild:sqlite`
+3. **测试**: `npm test` — 期望 `143/143` 全绿
+4. **构建 Windows 测试版**: `npm run package:portable` → 产物 `release/CC Manager-0.3.0-portable.exe`
+5. **跑应用 + 找 1 个已装 plugin** (建议用 `playwright@claude-plugins-official` 或其它本机已装的)
+6. **点 toggle 关闭** → 检查:
+   - `~/.claude/settings.json` 出现 `enabledPlugins["<fullName>"]: false` (写盘验证)
+   - **关闭 Claude Code 重启** → 跑 `claude /plugin list` 或观察 `claude` 启动日志
+   - 验证该 plugin **是否真的不加载** ⚠️ **这是关键证据**
+7. **回填**: 验证结果(真/假 + 任何异常)开 issue 或 PR 评论,标 `v3.1-verification`
+
+**mac 贡献者额外跑**: README §macOS 真机验证 checklist 7 步(含 `npm run package:mac` 出 DMG + Gatekeeper 流程)。
+
+**未验证时**: 不要 merge PR `mac-adapter-2026-07-30` 到 main(branch 留作 v3.1 docs 草稿,等验证结果)。
+
 ## ✨ 特性
 
 ### 核心
