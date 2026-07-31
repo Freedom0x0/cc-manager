@@ -40,7 +40,7 @@ KV 表写入 100% 成功、UI 100% 正确、109 个测试 100% 全绿,但 Claude
 |---|---|---|
 | 插件 | `~/.claude/settings.json` | `enabledPlugins[name@marketplace] = bool` |
 | MCP | `~/.claude/settings.json` | `disabledMcpjsonServers[]` 黑名单 |
-| Skills | `~/.claude/skills/<name>/` | mv → `<name>.disabled/`(实测 Claude Code 不读) |
+| Skills | `~/.claude/skills/<name>/` | mv → `~/.claude/disabled_skills/<name>/`(commit 9 镜像目录方案,2026-07-31 真机验失败修正) |
 | Commands | `~/.claude/commands/<name>.md` | mv → `<name>.md.disabled` |
 | Sub-Agents | `~/.claude/agents/<name>.md` | mv → `<name>.md.disabled` |
 | Hooks | `settings.json.hooks[<event>]` | splice 移除(enable 需 createHook 重建) |
@@ -83,14 +83,28 @@ capture 不到 MCP 状态。修正:6 模块 capture/apply/backup/restore 全部�
 - 6 模块真停用硬证据(每个模块的 Case 2b / 6):toggle 后重读磁盘验证
   settings.json.disabledMcpjsonServers / enabledPlugins / hooks[] 数组 /
   .disabled 目录 / .md.disabled 文件
-- 实测:`mv foo foo.disabled && claude -p "/foo 可用吗?"` → NO,
-  `/skills` 命令列表 grep 无输出
+- 实测(commit 5 当时,2026-07-30):`mv foo foo.disabled && claude -p "/foo 可用吗?"` → NO,
+  `/skills` 命令列表 grep 无输出(单次 Windows + 简单 skill 通过)
+- **2026-07-31 复测发现**:`.disabled` 后缀方案在更复杂环境(多 symlink /
+  不同 Claude Code 版本)不稳定 → commit 9 改用镜像目录方案
+  `disabled_skills/<name>/`。scanner 只扫 `skills/`,镜像目录自动不扫,
+  跨版本稳定,symlink 安全
 
 ## 为什么不在 v2.0/v2.1 做
 
 - v2.0/v2.1 focus 在 build / schema / waves,没用户发现"假停用" —
   KV 写成功的乐观更新 + message.success 让 UI 看起来工作正常
 - 2026-07-30 用户问"停用没有真的停用"才暴露根因
+
+## commit 9 教训(2026-07-31)
+
+- 即使 RD 阶段我自己跑过单 skill 实测通过,**不**代表所有环境稳定
+- 验证强度:1 个 skill / 单次 / 简单环境 = "初步证据",不是"硬证据"
+- 修复方向:换**不依赖隐式行为**的方案(.disabled 后缀是"赌 Claude Code
+  不读"),改**依赖显式路径**的方案(镜像目录 = "Claude Code 只扫
+  这个目录"是文档明确的)
+- **教训**:commit 5 当时应该加"⚠️ 基于 .disabled 后缀不被读假设,需真机
+  验证",没加是披露不充分
 
 ## 相关 commit
 

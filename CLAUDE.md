@@ -179,7 +179,8 @@ cc-session-manager/
 - **2026-07-28 v5 D5**：`ProjectList.tsx` 全代码库 0 引用孤儿组件，`git rm` 删（不留死代码）
 - **2026-07-28 v5 D6**：enabled 状态走 KV 表（`mcp_server_state.enabled:<name>` 或 `skill:` / `cmd:` 前缀），不复用原文件（避免污染 `~/.claude.json` / SKILL.md / commands/*.md 的语义）。这是 wave-1 v2.0 的核心约束 — 用户 toggle 不破坏原文件结构
 - **2026-07-29 v5 D7**：`~/.claude/settings.json` 和 `~/.claude/plugins/<name>/plugin.json` 等 JSON 配置走原子写（tmp + rename），失败 catch unlink tmp 残留 + 保留原文件。Hook / 插件模块的 create/update/delete 都走此模式，不破坏原文件其他字段
-- **2026-07-29 v5 D9**：[**已推翻，见 D10**] 所有 6 个业务模块的 enabled 状态都走 `mcp_server_state` KV 表
+- **2026-07-29 v5 D9**：[**v3.1 部分实现, 详见 D9 续**] electron-builder 配置**预留** `mac.target: ["dmg", "zip"]`,v4.0 启用 `--mac`,v2.0-v3.0 只跑 `--win`
+- **2026-07-30 v5 D9 续**：v3.1 mac 装包配置已就绪(`electron-builder.json` mac target = dmg+zip, arm64+x64;`package:mac` 脚本已加;`getDataDir()` macOS 分支早就有 — D8 决策)。但 **mac 真机验证 deferred**(需要 mac 贡献者跑 `npm test` + `npm run dev` + `npm run package:mac` + Gatekeeper 流程)。未签名(D11)留到 v4.0 做 Developer ID + notarization。完整 checklist 见 README §macOS 真机验证 checklist。
 - **2026-07-30 v5 D10 推翻 D6/D9**：用户的"停用"语义必须写到 Claude Code 实际读取的字段才生效。6 模块真停用位置：
   - 插件：`~/.claude/settings.json` 的 `enabledPlugins[<name>@<marketplace>] = bool`（不是 installed_plugins.json）
   - MCP：`~/.claude/settings.json` 的 `disabledMcpjsonServers[]` 黑名单

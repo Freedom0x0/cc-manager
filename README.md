@@ -6,6 +6,34 @@
 
 > **平台说明**:Windows 提供打包好的 `.exe` 直接下载；macOS 目前支持**开发模式**(`npm run dev`),打包版(`.dmg`)在 v4.0 规划中。
 
+## 🤝 v3.1 真停用待验证(欢迎帮验)
+
+2026-07-30 推 v3.1 真停用(8 commit + 1 docs commit = 9 commit):
+- 6 模块 toggle 写真实文件(settings.json / .disabled 后缀 / .md.disabled)
+- 启动时一次性 KV → 真实文件迁移
+- profiles 修正 KV prefix bug
+
+**Plugins 模块的真停用**基于"settings.json.enabledPlugins[<fullName>] = false"的推断,**未真机验证 Claude Code 是否真的不加载该 plugin**。需要 Windows + Claude Code 环境(已装至少 1 个 plugin) 跑下面 7 步验:
+
+1. **Clone v3.1 分支**:
+   ```bash
+   git clone -b mac-adapter-2026-07-30 https://github.com/Freedom0x0/cc-manager.git
+   cd cc-manager
+   ```
+2. **装 deps** (Windows): `npm install && npm run rebuild:sqlite`
+3. **测试**: `npm test` — 期望 `143/143` 全绿
+4. **构建 Windows 测试版**: `npm run package:portable` → 产物 `release/CC Manager-0.3.0-portable.exe`
+5. **跑应用 + 找 1 个已装 plugin** (建议用 `playwright@claude-plugins-official` 或其它本机已装的)
+6. **点 toggle 关闭** → 检查:
+   - `~/.claude/settings.json` 出现 `enabledPlugins["<fullName>"]: false` (写盘验证)
+   - **关闭 Claude Code 重启** → 跑 `claude /plugin list` 或观察 `claude` 启动日志
+   - 验证该 plugin **是否真的不加载** ⚠️ **这是关键证据**
+7. **回填**: 验证结果(真/假 + 任何异常)开 issue 或 PR 评论,标 `v3.1-verification`
+
+**mac 贡献者额外跑**: README §macOS 真机验证 checklist 7 步(含 `npm run package:mac` 出 DMG + Gatekeeper 流程)。
+
+**未验证时**: 不要 merge PR `mac-adapter-2026-07-30` 到 main(branch 留作 v3.1 docs 草稿,等验证结果)。
+
 ## ✨ 特性
 
 ### 核心
@@ -48,7 +76,9 @@
 
 ### macOS
 
-macOS 打包版(.dmg)在 v4.0 规划中,**目前请用开发模式**运行:
+macOS 装包配置(`electron-builder.json` mac target = `dmg` + `zip`,arm64 + x64 双架构)在 v3.1 已就绪,**待 mac 真机验证**。当前可用方式:
+
+**A. 开发模式**(`npm run dev`,无需装包):
 
 ```bash
 git clone https://github.com/Freedom0x0/cc-manager.git
@@ -59,6 +89,18 @@ node node_modules/electron/install.js
 npm run rebuild:sqlite     # 若不兼容见下方手动步骤
 npm run dev
 ```
+
+**B. 装包**(`npm run package:mac`,需 macOS + Xcode Command Line Tools):
+
+```bash
+npm install --ignore-scripts
+node node_modules/electron/install.js
+npm run rebuild:sqlite
+npm run package:mac
+# 产物:release/CC Manager-0.3.0-mac-{arm64,x64}.{dmg,zip}
+```
+
+> **未签名策略**(CLAUDE.md §13 D11 决策):v3.1 mac 装包不签名。Gatekeeper 会拦截,需**右键打开**(`Open With → Open`)首次允许即可。Developer ID / notarization 留到 v4.0。
 
 > 数据文件路径:`~/Library/Application Support/cc-session-manager/app.db`
 
@@ -213,12 +255,27 @@ npm run dev
 **数据文件路径**(macOS): `~/Library/Application Support/cc-session-manager/app.db`  
 **日志路径**(macOS): `~/Library/Application Support/cc-session-manager/app.log`
 
-> **注意**:`npm run package` / `npm run package:mac` 在 v4.0 前不在维护范围(Apple 签名 / notarization 留到 v4.0 处理)。开发模式(`npm run dev`)完全可用。
+> **未签名 mac 装包**(CLAUDE.md §13 D11 决策):首次双击 `.dmg` 时 Gatekeeper 会拦截,需**右键 → 打开**(或在「系统设置 → 隐私与安全性」点击「仍要打开」)。Developer ID 签名 + Apple notarization 留到 v4.0。
+
+### macOS 真机验证 checklist(待 mac 贡献者)
+
+> 以下步骤在 v3.1 配置就绪后,**未在 mac 机器上跑过**。欢迎有 mac 的贡献者按此跑一遍回填结果:
+
+1. **环境**: macOS 12+,Xcode Command Line Tools (`xcode-select --install`)
+2. **clone + 编译**: `npm install --ignore-scripts && node node_modules/electron/install.js && npm run rebuild:sqlite`
+3. **测试**: `npm test` — 期望 `143/143` 全绿
+4. **dev 模式**: `npm run dev` — 启应用,确认 6 模块 toggle 真实文件变化:
+   - MCP / 插件 / Hooks: `~/.claude/settings.json` 改
+   - Skills: `~/.claude/skills/<name>/` ↔ `<name>.disabled/`
+   - Commands/Sub-Agents: `<name>.md` ↔ `<name>.md.disabled`
+5. **装包**: `npm run package:mac` — 出 `.dmg` + `.zip` (arm64 + x64)
+6. **Gatekeeper**: 双击 `.dmg` → 右键 → 打开 → 验证首次运行 Gatekeeper 警告流程
+7. **回填**: 把跑测结果贴到 PR 评论或 issue,有问题开新 issue
 
 ### 跑测试
 
 ```bash
-npm test         # 109 个 case
+npm test         # 143 个 case
                  # 必须用 ELECTRON_RUN_AS_NODE(已配在 scripts.test)
 ```
 
