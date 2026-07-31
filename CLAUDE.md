@@ -215,6 +215,14 @@ cc-session-manager/
     - **IPC 链路零改动**:`preload.ts` / `global.d.ts` / `src/api.ts` / `src/mock.ts` 全未动(`skillList/skillGet` 签名不变),靠可选 opts 在 repo 层注入,避免改 IPC 契约放大动作面。
   - **教训(二)**:`写完不算完,UI 也要验`。commit 9 验证只测了 `setEnabled(false)` 把文件挪对了 + `listSkills()` 不再列它,**没在 UI 上点"启用"反向走一遍**。下次写"对称写"的接口(enable/disable / create/delete) 必须在 UI 双向验证,不能只验一半。
   - 6 文件改动 `+/-`: `scanner.ts` +113/-48(B 档,改函数签名) / `index.ts` +2/-1(A 档) / `main.ts` +9/-3(A 档,handler 注入 opts) / `SkillsManager.tsx` +4(A 档,UI 排序) / `tests/skills.test.ts` +91(A 档,TDD 红→绿) / `CLAUDE.md` +12(D12 决策追加,本段)。`npm test` 147/147 全绿,`tsc --noEmit` 0 报错。
+- **2026-07-31 v5 D13 applyProfile 完整替代语义**:
+  - 原 applyProfile(wave-3)只保证 `profile.config.enabledX` 列表里的项启用,**其他项不动**(writer.ts:206-211 注释明示"保守 — 不破坏未指定的 MCP 状态")。
+  - 改为**完整替代**:调 6 个 scanner 拿当前 enabled 全集,`current ∖ target` → 反向 disable 写真实文件(settings.json 黑名单 / enabledPlugins=false / .disabled 后缀 / disabled_skills/ 镜像)。
+  - 触发:用户 2026-07-31 报告"8 skills 停 4 存 P1 → 8 全启 → apply P1 → 期望 4 启 4 停,实际 8 全启",违反 spec §7.3 profile_diff 暗示的"完整快照"语义、UI 文案"会改变所有 6 类组件"也明示完整替代、wave-3 改造只补"写真实文件"未补"反向 disable"是历史遗留。
+  - **Hooks 限制**:`setHookEnabled(true)` 不存在(需 createHook 重建完整 HookEntry),所以 hook enable 维持 skip;hook 反向 disable 用 `setHookEnabled(event, index, false)` splice,索引错位风险接受为已知限制。
+  - **回滚**:`prevFileEnabled`/`prevMcpDisabled`/`prevPluginEnabled`/`prevHookPresent` 现有函数复用,reverse-disable 写入前也备份 prev。中途失败按 `rollbackRealFile` 路径回滚。**writer.ts 回滚吞异常 bug(task #13)仍待修**。
+  - **capture 不动**:`captureProfileFromState` 仍读 KV 表 value='true' 的项;应用时反查当前全集足够。`enabledX` 双列(profile.config 同时记 enabled+disabled)作为下次 sprint 处理。
+  - 1 文件改动:`electron/repo/profiles/writer.ts` applyProfile 改造(B 档,改函数体 + 加 reverse-disable 循环 + 加 fixture 路径解析)。`tests/profiles.test.ts` Case 6 必须传 baseDir(否则 listMcpServers 扫生产 ~/.claude.json,把用户的 playwright MCP reverse-disable 加进黑名单 → 污染生产路径),新增 Case 7/8/9 钉死 3 模块 reverse-disable 行为。`npm test` 150/150 全绿,`tsc --noEmit` 0 报错。
 - **2026-07-29 macOS 适配**：`getDataDir()` 已做跨平台：Windows 用 `%APPDATA%`，macOS 用 `~/Library/Application Support`，Linux 用 `$XDG_CONFIG_HOME` 或 `~/.config`。`logFile()` 复用同一函数，不再有独立 fallback 路径。chokidar 需单独 `npm install`（package.json `dependencies` 已有，但 mac 首次 `npm install --ignore-scripts` 后需验证）
 
 ## 14. 用户语言

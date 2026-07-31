@@ -33,7 +33,7 @@
 
 import { writeFile, rename, unlink, mkdir } from 'fs/promises';
 import { existsSync, readFileSync } from 'fs';
-import { dirname } from 'path';
+import { dirname, join } from 'path';
 import { defaultProfilesPath, listProfiles } from './scanner';
 import type {
   Profile,
@@ -43,8 +43,14 @@ import type {
 } from './types';
 import type { DB } from '../../db/connection';
 import { backupEnabledStates, restoreEnabledStates } from './state';
-import { setMcpDisabled, setPluginEnabled, setHookEnabled, setDisabledSuffix } from '../settings-writer';
-import { HOOK_EVENTS } from '../hooks/types';
+import { setMcpDisabled, setPluginEnabled, setHookEnabled, setDisabledSuffix, defaultClaudeDir } from '../settings-writer';
+import { HOOK_EVENTS, type HookEvent } from '../hooks/types';
+import { listSkills } from '../skills/scanner';
+import { listCommands } from '../commands/scanner';
+import { listSubAgents } from '../sub-agents/scanner';
+import { listMcpServers } from '../mcp/scanner';
+import { listPlugins } from '../plugins/scanner';
+import { listHooks } from '../hooks/scanner';
 
 function resolvePath(profilesPath?: string): string {
   return profilesPath ?? defaultProfilesPath();
@@ -166,6 +172,14 @@ function listProfilesSync(file: string): Profile[] {
  * 写完 KV 后并发调 6 个真实文件 setter(best-effort 事务 — 6 个 I/O
  * 不能原子化,失败聚合 throw,KV + 真实文件一起 restore)。
  *
+ * v5 D13 改造(2026-07-31):从"保守不动(只保证列出的 enabled)"改成
+ * "完整替代" — 调 6 个 scanner 拿当前 enabled 全集,current ∖ target
+ * 走反向 disable。spec §7.3 profile_diff 暗示完整快照语义,UI 文案
+ * "会改变所有 6 类组件"也明示,wave-3 改造只补了"写真实文件"未补
+ * "反向 disable"是历史遗留。Hooks enable 路径不存在(需 createHook
+ * 重建),维持 apply 时 skip + 反向 disable 用 setHookEnabled(false)
+ * splice 的行为。
+ *
  * 返回:{ ok: true, appliedAt, realFileErrors } on 成功。
  * profile 不存在 / 写盘失败 / 验证失败 → throw(已自动回滚)。
  */
@@ -182,7 +196,20 @@ export async function applyProfile(
   if (!profile) {
     throw new Error(`Profile "${name}" not found`);
   }
-  // 1. 备份当前所有 enabled 状态
+  // 0. 解析 fixture 路径(测试注入或生产默认)
+  const base = baseDir ?? defaultClaudeDir();
+  const settings = settingsPath ?? join(defaultClaudeDir(), 'settings.json');
+  const skillsDir = join(base, 'skills');
+  const commandsDir = join(base, 'commands');
+  const agentsDir = join(base, 'agents');
+  // MCP config (~/.claude.json) 在 base 父级 —— baseDir 是 ~/.claude 时,
+  // 父级 = ~ (homedir)。测试 fixture 时 baseDir = claudeDir,父级 = tmpRoot。
+  // 这种情况 fixture 文件必须在 tmpRoot/.claude.json —— 见 Case 9 fixture。
+  // 生产用 homedir() 直接拼更准确,这里用 base/.. 兼容两种。
+  const mcpConfigPath = join(base, '..', '.claude.json');
+  const installedPluginsPath = join(base, 'plugins', 'installed_plugins.json');
+
+  // 1. 备份当前所有 enabled 状态(KV + 真实文件 prev)
   const backup = backupEnabledStates(db);
   const realFileBackups: Array<{ kind: 'mcp' | 'plugin' | 'skill' | 'command' | 'agent' | 'hook'; name: string; prev: boolean }> = [];
   try {
@@ -201,43 +228,38 @@ export async function applyProfile(
     // 4. 写真实文件(best-effort) — 写每个 name 前备份真实状态用于回滚
     const realFileErrors: string[] = [];
     const tasks: Array<Promise<void>> = [];
+    // === 正向 enable(profile.config.enabledX 里的项 → 启用)===
     // MCP
     for (const n of profile.config.enabledServers) {
-      // 这里 capture 时只记录 enabled=true 的 — 所以 MCP 应该 enable
-      // 但 profile.apply 的语义是"应用 enabled 列表",所以 MCP 应当被加入
-      // 黑名单的**反集**(从黑名单移除)。然而 capture 只 capture enabled=true
-      // → 推论:不在 enabledServers 里的 MCP 应该被 disable。
-      // 简化:apply 只保证 enabledServers 里的 MCP 启用,其他 MCP 不动
-      // (保守 — 不破坏用户未在 profile 里指定的 MCP 状态)。
-      const prevDisabled = prevMcpDisabled(n, settingsPath);
+      const prevDisabled = prevMcpDisabled(n, settings);
       realFileBackups.push({ kind: 'mcp', name: n, prev: prevDisabled });
-      tasks.push(setMcpDisabled(n, false, settingsPath).catch((e) => {
+      tasks.push(setMcpDisabled(n, false, settings).catch((e) => {
         realFileErrors.push(`mcp:${n}: ${e?.message || String(e)}`);
       }));
     }
     // Plugin
     for (const n of profile.config.enabledPlugins) {
-      realFileBackups.push({ kind: 'plugin', name: n, prev: prevPluginEnabled(n, settingsPath) });
-      tasks.push(setPluginEnabled(n, true, settingsPath).catch((e) => {
+      realFileBackups.push({ kind: 'plugin', name: n, prev: prevPluginEnabled(n, settings) });
+      tasks.push(setPluginEnabled(n, true, settings).catch((e) => {
         realFileErrors.push(`plugin:${n}: ${e?.message || String(e)}`);
       }));
     }
     // Skill/Command/Agent — enabled=true 表示"应有 .md(无 .disabled)"
     for (const n of profile.config.enabledSkills) {
-      realFileBackups.push({ kind: 'skill', name: n, prev: prevFileEnabled('skill', n, baseDir) });
-      tasks.push(setDisabledSuffix('skill', n, false, baseDir).catch((e) => {
+      realFileBackups.push({ kind: 'skill', name: n, prev: prevFileEnabled('skill', n, base) });
+      tasks.push(setDisabledSuffix('skill', n, false, base).catch((e) => {
         realFileErrors.push(`skill:${n}: ${e?.message || String(e)}`);
       }));
     }
     for (const n of profile.config.enabledCommands) {
-      realFileBackups.push({ kind: 'command', name: n, prev: prevFileEnabled('command', n, baseDir) });
-      tasks.push(setDisabledSuffix('command', n, false, baseDir).catch((e) => {
+      realFileBackups.push({ kind: 'command', name: n, prev: prevFileEnabled('command', n, base) });
+      tasks.push(setDisabledSuffix('command', n, false, base).catch((e) => {
         realFileErrors.push(`command:${n}: ${e?.message || String(e)}`);
       }));
     }
     for (const n of profile.config.enabledAgents) {
-      realFileBackups.push({ kind: 'agent', name: n, prev: prevFileEnabled('agent', n, baseDir) });
-      tasks.push(setDisabledSuffix('agent', n, false, baseDir).catch((e) => {
+      realFileBackups.push({ kind: 'agent', name: n, prev: prevFileEnabled('agent', n, base) });
+      tasks.push(setDisabledSuffix('agent', n, false, base).catch((e) => {
         realFileErrors.push(`agent:${n}: ${e?.message || String(e)}`);
       }));
     }
@@ -245,9 +267,105 @@ export async function applyProfile(
     for (const id of profile.config.enabledHooks) {
       const parsed = parseHookIdSafe(id);
       if (!parsed) continue;
-      realFileBackups.push({ kind: 'hook', name: id, prev: prevHookPresent(parsed.event, parsed.index, settingsPath) });
+      realFileBackups.push({ kind: 'hook', name: id, prev: prevHookPresent(parsed.event, parsed.index, settings) });
       // enable 路径需要 HookEntry 信息,KV 不能恢复 → 跳过 enable
       // (用户在 UI 上手动 re-create; profile.apply 只承诺"disabled 的 hook 不再多禁用")
+    }
+    // === D13 反向 disable(current ∖ target → disable,D13 完整替代语义)===
+    // 用 6 个 scanner 拿当前 enabled 全集,然后 current ∖ target 是 toDisable
+    const [
+      curSkills,
+      curCommands,
+      curAgents,
+      curMcp,
+      curPlugins,
+      curHooks,
+    ] = await Promise.all([
+      listSkills(db, skillsDir),
+      listCommands(db, commandsDir),
+      listSubAgents(db, agentsDir),
+      listMcpServers(db, mcpConfigPath, settings),
+      listPlugins(db, installedPluginsPath, settings),
+      listHooks(db, settings),
+    ]);
+    const curEnabledSkills = new Set(curSkills.filter((s) => s.enabled).map((s) => s.name));
+    const curEnabledCommands = new Set(curCommands.filter((c) => c.enabled).map((c) => c.name));
+    const curEnabledAgents = new Set(curAgents.filter((a) => a.enabled).map((a) => a.name));
+    const curEnabledMcp = new Set(curMcp.filter((m) => m.enabled).map((m) => m.name));
+    const curEnabledPlugins = new Set(curPlugins.filter((p) => p.enabled).map((p) => p.fullName));
+    const targetSkills = new Set(profile.config.enabledSkills);
+    const targetCommands = new Set(profile.config.enabledCommands);
+    const targetAgents = new Set(profile.config.enabledAgents);
+    const targetServers = new Set(profile.config.enabledServers);
+    const targetPlugins = new Set(profile.config.enabledPlugins);
+    const targetHooks = new Set(profile.config.enabledHooks);
+
+    // 反向 disable MCP:不在 target 的当前 enabled MCP → 加进黑名单
+    for (const n of curEnabledMcp) {
+      if (targetServers.has(n)) continue;
+      const prevDisabled = prevMcpDisabled(n, settings);
+      realFileBackups.push({ kind: 'mcp', name: n, prev: prevDisabled });
+      tasks.push(setMcpDisabled(n, true, settings).catch((e) => {
+        realFileErrors.push(`mcp(→disable):${n}: ${e?.message || String(e)}`);
+      }));
+    }
+    // 反向 disable Plugin
+    for (const n of curEnabledPlugins) {
+      if (targetPlugins.has(n)) continue;
+      const prevEnabled = prevPluginEnabled(n, settings);
+      realFileBackups.push({ kind: 'plugin', name: n, prev: prevEnabled });
+      tasks.push(setPluginEnabled(n, false, settings).catch((e) => {
+        realFileErrors.push(`plugin(→disable):${n}: ${e?.message || String(e)}`);
+      }));
+    }
+    // 反向 disable Skill
+    for (const n of curEnabledSkills) {
+      if (targetSkills.has(n)) continue;
+      const prevEnabled = prevFileEnabled('skill', n, base);
+      realFileBackups.push({ kind: 'skill', name: n, prev: prevEnabled });
+      tasks.push(setDisabledSuffix('skill', n, true, base).catch((e) => {
+        realFileErrors.push(`skill(→disable):${n}: ${e?.message || String(e)}`);
+      }));
+    }
+    // 反向 disable Command
+    for (const n of curEnabledCommands) {
+      if (targetCommands.has(n)) continue;
+      const prevEnabled = prevFileEnabled('command', n, base);
+      realFileBackups.push({ kind: 'command', name: n, prev: prevEnabled });
+      tasks.push(setDisabledSuffix('command', n, true, base).catch((e) => {
+        realFileErrors.push(`command(→disable):${n}: ${e?.message || String(e)}`);
+      }));
+    }
+    // 反向 disable Agent
+    for (const n of curEnabledAgents) {
+      if (targetAgents.has(n)) continue;
+      const prevEnabled = prevFileEnabled('agent', n, base);
+      realFileBackups.push({ kind: 'agent', name: n, prev: prevEnabled });
+      tasks.push(setDisabledSuffix('agent', n, true, base).catch((e) => {
+        realFileErrors.push(`agent(→disable):${n}: ${e?.message || String(e)}`);
+      }));
+    }
+    // 反向 disable Hooks:不在 target 的当前 enabled hook → splice
+    // Hook.id 已经是 `${event}-${index}` 拼好的字符串,Hook.event 是 HookEvent
+    // 索引会因 splice 错位 → setHookEnabled 内部要安全(从末尾 splice 或按 id)
+    // 注:Hook 的 enabled=true 表示在 settings.json hooks[event] 数组里存在
+    // scanner 已返 id / event / enabled,直接调 setHookEnabled(event, index, false)
+    // 需要从 id 解析 index(用 parseHookIdSafe)
+    const curHookEntries = curHooks.filter((h) => h.enabled).map((h) => ({
+      id: h.id,
+      event: h.event,
+    }));
+    for (const h of curHookEntries) {
+      if (targetHooks.has(h.id)) continue;
+      const parsed = parseHookIdSafe(h.id);
+      if (!parsed) continue;
+      // parseHookIdSafe 已过 HOOK_EVENTS.includes 校验,这里 as HookEvent 安全
+      const event = parsed.event as HookEvent;
+      const prevPresent = prevHookPresent(event, parsed.index, settings);
+      realFileBackups.push({ kind: 'hook', name: h.id, prev: prevPresent });
+      tasks.push(setHookEnabled(event, parsed.index, false, settings).catch((e) => {
+        realFileErrors.push(`hook(→disable):${h.id}: ${e?.message || String(e)}`);
+      }));
     }
     await Promise.all(tasks);
     if (realFileErrors.length > 0) {
@@ -258,12 +376,12 @@ export async function applyProfile(
     }
     return { ok: true, appliedAt: Date.now(), realFileErrors: [] };
   } catch (e) {
-    // 4. 回滚(KV + 真实文件)
+    // 5. 回滚(KV + 真实文件)
     restoreEnabledStates(db, backup);
     // 真实文件回滚:每个 backup 反向写
     for (const b of realFileBackups) {
       try {
-        await rollbackRealFile(b, settingsPath, baseDir);
+        await rollbackRealFile(b, settings, base);
       } catch {
         /* 回滚失败不抛 — 避免掩盖原错误 */
       }

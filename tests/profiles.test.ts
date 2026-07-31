@@ -255,8 +255,21 @@ test('applyProfile rolls back KV state on failure', async () => {
 
 // Case 6 (新增): applyProfile 写真实文件 — settings.json.disabledMcpjsonServers 真删除
 test('applyProfile writes real settings.json (MCP enabled list removes from black list)', async () => {
-  // 预置:settings.json 已有 filesystem 在黑名单
-  const settingsPath = path.join(tmpRoot, 'settings.json');
+  // D13 改造后必须传 baseDir + mcpJson fixture,避免 listMcpServers 扫到生产 ~/.claude.json
+  const claudeDir = path.join(tmpRoot, 'claude-dir-case6');
+  fs.mkdirSync(claudeDir, { recursive: true });
+  const settingsPath = path.join(claudeDir, 'settings.json');
+  // writer.ts 用 join(baseDir, '..', '.claude.json') — baseDir = claudeDir,父级 = tmpRoot
+  const mcpConfigPath = path.join(tmpRoot, '.claude.json');
+
+  // 预置 .claude.json:filesystem 物理存在(只这一个 MCP,避免 reverse-disable 把别的加进来)
+  fs.writeFileSync(
+    mcpConfigPath,
+    JSON.stringify({
+      mcpServers: { filesystem: { command: 'fs', args: [] } },
+    })
+  );
+  // 预置 settings.json:filesystem 在黑名单
   fs.writeFileSync(
     settingsPath,
     JSON.stringify({ disabledMcpjsonServers: ['filesystem'] })
@@ -286,7 +299,7 @@ test('applyProfile writes real settings.json (MCP enabled list removes from blac
     })
   );
 
-  const result = await applyProfile(db, 'enable-fs', profilesPath, settingsPath);
+  const result = await applyProfile(db, 'enable-fs', profilesPath, settingsPath, claudeDir);
   assert.strictEqual(result.ok, true);
   assert.deepStrictEqual(result.realFileErrors, []);
 
@@ -296,6 +309,243 @@ test('applyProfile writes real settings.json (MCP enabled list removes from blac
     settings.disabledMcpjsonServers,
     [],
     'applyProfile 写真实文件:filesystem 应从黑名单移除'
+  );
+  closeDB(db);
+});
+
+// Case 7 (D13 新增): applyProfile 反向 disable skills — current ∖ target → 镜像目录
+// 场景:用户报告"8 skills 停 4 存 P1 → 8 全启 → apply P1 → 期望 4 启 4 停"。
+// D13 改造前,applyProfile 只保证列出的 enabled,其他不动 → 实际 8 全启。
+// D13 改造后,current ∖ target → 镜像目录,符合完整替代语义。
+test('applyProfile reverse-disables skills not in profile (D13 complete-replace semantics)', async () => {
+  const claudeDir = path.join(tmpRoot, 'claude-dir');
+  const skillsDir = path.join(claudeDir, 'skills');
+  const disabledSkillsDir = path.join(claudeDir, 'disabled_skills');
+  fs.mkdirSync(skillsDir, { recursive: true });
+  fs.mkdirSync(disabledSkillsDir, { recursive: true });
+
+  // 预置:模拟"8 个全启"状态——主目录有 8 个 skill(每个含 SKILL.md)
+  for (const name of ['foo', 'bar', 'baz', 'qux', 'a', 'b', 'c', 'd']) {
+    fs.mkdirSync(path.join(skillsDir, name), { recursive: true });
+    fs.writeFileSync(
+      path.join(skillsDir, name, 'SKILL.md'),
+      `---\ndescription: ${name} desc\n---\nbody`
+    );
+  }
+
+  // profile P1 只 capture 了 [foo, bar, baz, qux](对应"之前停了 4 个的另 4 个 enabled"快照)
+  fs.writeFileSync(
+    profilesPath,
+    JSON.stringify({
+      profiles: [
+        {
+          name: 'keep-half',
+          description: 'only foo/bar/baz/qux enabled',
+          config: {
+            enabledServers: [],
+            enabledSkills: ['foo', 'bar', 'baz', 'qux'],
+            enabledCommands: [],
+            enabledAgents: [],
+            enabledHooks: [],
+            enabledPlugins: [],
+          },
+          createdAt: '2026-07-31T00:00:00.000Z',
+          updatedAt: '2026-07-31T00:00:00.000Z',
+        },
+      ],
+    })
+  );
+
+  const result = await applyProfile(
+    db,
+    'keep-half',
+    profilesPath,
+    undefined, // settingsPath 默认(本 case 不涉及 MCP/Plugin/Hook)
+    claudeDir
+  );
+  assert.strictEqual(result.ok, true);
+  assert.deepStrictEqual(result.realFileErrors, []);
+
+  // 验证 D13 行为:target 里的 4 个仍在 skills/,current ∖ target 的 4 个挪到 disabled_skills/
+  for (const kept of ['foo', 'bar', 'baz', 'qux']) {
+    assert.ok(
+      fs.existsSync(path.join(skillsDir, kept)),
+      `${kept} 应在 skills/`
+    );
+    assert.ok(
+      !fs.existsSync(path.join(disabledSkillsDir, kept)),
+      `${kept} 不应在 disabled_skills/`
+    );
+  }
+  for (const removed of ['a', 'b', 'c', 'd']) {
+    assert.ok(
+      !fs.existsSync(path.join(skillsDir, removed)),
+      `${removed} 应从 skills/ 移走(反向 disable)`
+    );
+    assert.ok(
+      fs.existsSync(path.join(disabledSkillsDir, removed)),
+      `${removed} 应在 disabled_skills/(完整替代语义生效)`
+    );
+  }
+  closeDB(db);
+});
+
+// Case 8 (D13 新增): applyProfile 反向 disable plugins — current ∖ target → enabled=false
+// 场景:profile.config.enabledPlugins 只有 [plugin1],当前 enabledPlugins 有 plugin1+plugin2
+// → apply 后 plugin2 应在 enabledPlugins 写 false(完整替代)
+test('applyProfile reverse-disables plugins not in profile (D13 complete-replace)', async () => {
+  const claudeDir = path.join(tmpRoot, 'claude-dir2');
+  fs.mkdirSync(path.join(claudeDir, 'plugins'), { recursive: true });
+  const installedPluginsPath = path.join(claudeDir, 'plugins', 'installed_plugins.json');
+  const settingsPath = path.join(claudeDir, 'settings.json');
+
+  // 预置 installed_plugins.json:2 个插件都在(物理存在,validateVersion 必填 6 字段全)
+  fs.writeFileSync(
+    installedPluginsPath,
+    JSON.stringify({
+      version: 2,
+      plugins: {
+        'plugin1@mp': [{
+          scope: 'user',
+          installPath: '/p1',
+          version: '1.0',
+          installedAt: '2026-07-30T00:00:00.000Z',
+          lastUpdated: '2026-07-30T00:00:00.000Z',
+          gitCommitSha: 'sha1',
+        }],
+        'plugin2@mp': [{
+          scope: 'user',
+          installPath: '/p2',
+          version: '1.0',
+          installedAt: '2026-07-30T00:00:00.000Z',
+          lastUpdated: '2026-07-30T00:00:00.000Z',
+          gitCommitSha: 'sha2',
+        }],
+      },
+    })
+  );
+  // 预置 settings.json:两个都 enabled=true
+  fs.writeFileSync(
+    settingsPath,
+    JSON.stringify({
+      enabledPlugins: {
+        'plugin1@mp': true,
+        'plugin2@mp': true,
+      },
+    })
+  );
+
+  // profile P1 只有 plugin1
+  fs.writeFileSync(
+    profilesPath,
+    JSON.stringify({
+      profiles: [
+        {
+          name: 'plugins-keep1',
+          description: 'only plugin1 enabled',
+          config: {
+            enabledServers: [],
+            enabledSkills: [],
+            enabledCommands: [],
+            enabledAgents: [],
+            enabledHooks: [],
+            enabledPlugins: ['plugin1@mp'],
+          },
+          createdAt: '2026-07-31T00:00:00.000Z',
+          updatedAt: '2026-07-31T00:00:00.000Z',
+        },
+      ],
+    })
+  );
+
+  const result = await applyProfile(
+    db,
+    'plugins-keep1',
+    profilesPath,
+    settingsPath,
+    claudeDir
+  );
+  assert.strictEqual(result.ok, true);
+  assert.deepStrictEqual(result.realFileErrors, []);
+
+  // 验证 D13 行为:settings.json 里 plugin2 应 enabled=false
+  const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  assert.strictEqual(
+    settings.enabledPlugins['plugin1@mp'],
+    true,
+    'plugin1 应保持 enabled=true(profile target 里)'
+  );
+  assert.strictEqual(
+    settings.enabledPlugins['plugin2@mp'],
+    false,
+    'plugin2 应 enabled=false(反向 disable,D13 完整替代)'
+  );
+  closeDB(db);
+});
+
+// Case 9 (D13 新增): applyProfile 反向 disable MCP — current ∖ target → 加黑名单
+// 场景:profile.config.enabledServers 只有 [mcp-fs],当前有 mcp-fs + mcp-github
+// → apply 后 mcp-github 应在 disabledMcpjsonServers[]
+test('applyProfile reverse-disables MCP not in profile (D13 complete-replace)', async () => {
+  // writer.ts 用 join(baseDir, '..', '.claude.json') 拼 mcpConfigPath。
+  // baseDir = claudeDir → 父级 = tmpRoot → .claude.json 必须在 tmpRoot 下
+  const claudeDir = path.join(tmpRoot, 'claude-dir3');
+  fs.mkdirSync(claudeDir, { recursive: true });
+  const mcpConfigPath = path.join(tmpRoot, '.claude.json');
+  const settingsPath = path.join(claudeDir, 'settings.json');
+
+  // 预置 .claude.json:2 个 MCP 物理定义
+  fs.writeFileSync(
+    mcpConfigPath,
+    JSON.stringify({
+      mcpServers: {
+        'mcp-fs': { command: 'fs', args: [] },
+        'mcp-github': { command: 'gh', args: [] },
+      },
+    })
+  );
+  // 预置 settings.json:都不在黑名单(两个当前 enabled)
+  fs.writeFileSync(settingsPath, JSON.stringify({}));
+
+  // profile P1 只有 mcp-fs
+  fs.writeFileSync(
+    profilesPath,
+    JSON.stringify({
+      profiles: [
+        {
+          name: 'mcp-keep1',
+          description: 'only mcp-fs enabled',
+          config: {
+            enabledServers: ['mcp-fs'],
+            enabledSkills: [],
+            enabledCommands: [],
+            enabledAgents: [],
+            enabledHooks: [],
+            enabledPlugins: [],
+          },
+          createdAt: '2026-07-31T00:00:00.000Z',
+          updatedAt: '2026-07-31T00:00:00.000Z',
+        },
+      ],
+    })
+  );
+
+  const result = await applyProfile(
+    db,
+    'mcp-keep1',
+    profilesPath,
+    settingsPath,
+    claudeDir
+  );
+  assert.strictEqual(result.ok, true);
+  assert.deepStrictEqual(result.realFileErrors, []);
+
+  // 验证 D13 行为:disabledMcpjsonServers 应含 mcp-github,不含 mcp-fs
+  const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  assert.deepStrictEqual(
+    settings.disabledMcpjsonServers,
+    ['mcp-github'],
+    'mcp-github 应被加进黑名单(D13 反向 disable),mcp-fs 应保留 enabled'
   );
   closeDB(db);
 });
