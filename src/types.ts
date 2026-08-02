@@ -303,6 +303,10 @@ export interface ProfileModuleItem {
   /** 原文件路径 (settings.json / skills/<name>/SKILL.md / commands/<name>.md 等) */
   sourcePath: string;
   enabled: boolean;
+  /** commit 26 增: 6 模块各自的 description (skills/commands/sub-agents 走
+   *  frontmatter, mcp 走 mcp description 字段, plugin 走 plugin.json description,
+   *  hook 无 description 概念 — null)。用于 Profile 详情 / diff 显示。 */
+  description?: string;
 }
 
 export type ProfileModules = Record<string, ProfileModuleItem[]>;

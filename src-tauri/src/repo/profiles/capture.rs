@@ -47,6 +47,7 @@ pub fn capture_profile_from_state(opts: &CaptureOptions) -> ProfileSnapshot {
                 scope: "user".into(),
                 source_path: opts.settings_path.as_ref().map(|p| p.to_string_lossy().to_string()).unwrap_or_default(),
                 enabled: true,
+                description: None,
             })
             .collect(),
     );
@@ -63,6 +64,7 @@ pub fn capture_profile_from_state(opts: &CaptureOptions) -> ProfileSnapshot {
                 scope: "user".into(),
                 source_path: x.path,
                 enabled: true,
+                description: x.description,
             })
             .collect(),
     );
@@ -78,6 +80,7 @@ pub fn capture_profile_from_state(opts: &CaptureOptions) -> ProfileSnapshot {
                 scope: "user".into(),
                 source_path: x.path,
                 enabled: true,
+                description: x.description,
             })
             .collect(),
     );
@@ -94,6 +97,7 @@ pub fn capture_profile_from_state(opts: &CaptureOptions) -> ProfileSnapshot {
                 scope: "user".into(),
                 source_path: x.path,
                 enabled: true,
+                description: x.description,
             })
             .collect(),
     );
@@ -110,6 +114,7 @@ pub fn capture_profile_from_state(opts: &CaptureOptions) -> ProfileSnapshot {
                 scope: "user".into(),
                 source_path: opts.settings_path.as_ref().map(|p| p.to_string_lossy().to_string()).unwrap_or_default(),
                 enabled: true,
+                description: None,
             })
             .collect(),
     );
@@ -126,6 +131,7 @@ pub fn capture_profile_from_state(opts: &CaptureOptions) -> ProfileSnapshot {
                 scope: x.scope,
                 source_path: x.install_path,
                 enabled: true,
+                description: x.description,
             })
             .collect(),
     );

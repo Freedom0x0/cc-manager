@@ -121,6 +121,9 @@ pub struct McpServer {
     pub enabled: bool,
     #[serde(rename = "lastModified")]
     pub last_modified: Option<String>,
+    /// commit 26 增: MCP server 描述 (来自 mcp.description 或 .mcp.json 顶层)
+    #[serde(rename = "description", skip_serializing_if = "Option::is_none", default)]
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -151,6 +154,9 @@ pub struct Skill {
     pub content: String,
     pub path: String,
     pub enabled: bool,
+    /// commit 26 增: SKILL.md frontmatter description, 列表显示用
+    #[serde(rename = "description", skip_serializing_if = "Option::is_none", default)]
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -171,6 +177,9 @@ pub struct Command {
     pub content: String,
     pub path: String,
     pub enabled: bool,
+    /// commit 26 增: frontmatter description
+    #[serde(rename = "description", skip_serializing_if = "Option::is_none", default)]
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -191,6 +200,9 @@ pub struct SubAgent {
     pub content: String,
     pub path: String,
     pub enabled: bool,
+    /// commit 26 增: frontmatter description
+    #[serde(rename = "description", skip_serializing_if = "Option::is_none", default)]
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

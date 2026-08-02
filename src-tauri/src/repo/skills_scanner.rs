@@ -4,6 +4,7 @@
 //! 同名冲突主目录赢 + console.warn(D12 决策)
 
 use crate::types::Skill;
+use crate::repo::common::parse_frontmatter_description;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
@@ -32,11 +33,13 @@ pub fn list_skills(skills_dir: Option<&Path>, disabled_dir: Option<&Path>) -> Ve
                 let md = skill_md_path(&skills_dir, name);
                 if md.exists() {
                     let content = std::fs::read_to_string(&md).unwrap_or_default();
+                    let description = parse_frontmatter_description(&content);
                     result.push(Skill {
                         name: name.to_string(),
                         content,
                         path: md.to_string_lossy().to_string(),
                         enabled: true,
+                        description,
                     });
                     names.insert(name.to_string());
                 }
@@ -55,11 +58,13 @@ pub fn list_skills(skills_dir: Option<&Path>, disabled_dir: Option<&Path>) -> Ve
                 let md = skill_md_path(&disabled_dir, name);
                 if md.exists() {
                     let content = std::fs::read_to_string(&md).unwrap_or_default();
+                    let description = parse_frontmatter_description(&content);
                     result.push(Skill {
                         name: name.to_string(),
                         content,
                         path: md.to_string_lossy().to_string(),
                         enabled: false,
+                        description,
                     });
                     names.insert(name.to_string());
                 }

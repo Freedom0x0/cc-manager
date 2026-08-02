@@ -32,8 +32,21 @@ const formatTimestamp = (ms: number) => {
   return new Date(ms).toLocaleString('zh-CN');
 };
 
-const summarizeModules = (items: ProfileModuleItem[]): string =>
-  items.length === 0 ? '(空)' : items.map((i) => i.name).join(', ');
+const summarizeModules = (items: ProfileModuleItem[]): React.ReactNode =>
+  items.length === 0 ? (
+    <span style={{ color: '#9ca3af' }}>(空)</span>
+  ) : (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {items.map((i) => (
+        <div key={i.name} style={{ fontSize: 12 }}>
+          <span style={{ fontWeight: 500 }}>{i.name}</span>
+          {i.description ? (
+            <span style={{ color: '#6b7280' }}> — {i.description}</span>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
 
 export const ProfileManager: React.FC = () => {
   const [profiles, setProfiles] = useState<ProfileSummary[]>([]);
@@ -85,8 +98,7 @@ export const ProfileManager: React.FC = () => {
     Modal.confirm({
       title: `应用 Profile: ${name}?`,
       content:
-        '此操作会改变所有 6 类组件(MCP / Skills / Commands / Sub-Agents / Hooks / 插件)的启用状态。' +
-        'apply 走 D13 完整替代语义: target 列表启用 + current ∖ target 反向 disable 写真实文件, 事务失败 best-effort 回滚。',
+        '此操作会改变所有 6 类组件(MCP / Skills / Commands / Sub-Agents / Hooks / 插件)的启用状态。',
       okText: '应用',
       okButtonProps: { type: 'primary', icon: <CheckCircleOutlined /> },
       cancelText: '取消',
@@ -159,8 +171,7 @@ export const ProfileManager: React.FC = () => {
           <h2 style={{ margin: 0 }}>Profiles</h2>
           <div style={{ color: '#6b7280', fontSize: 12, marginTop: 4 }}>
             快照式启用状态集合 · 6 类组件(MCP / Skills / Commands / Sub-Agents /
-            Hooks / 插件)真实 enabled 全集 · apply 走 D13 完整替代语义(reverse-disable
-            写真实文件)
+            Hooks / 插件)真实 enabled 全集
           </div>
         </div>
         <Space>
@@ -319,7 +330,12 @@ export const ProfileManager: React.FC = () => {
               <div style={{ marginTop: 4, fontSize: 12 }}>
                 {diffResult.added.length === 0
                   ? '(无)'
-                  : diffResult.added.map((i) => i.name).join(', ')}
+                  : diffResult.added.map((i) => (
+                      <div key={i.name}>
+                        <span style={{ fontWeight: 500 }}>{i.name}</span>
+                        {i.description ? <span style={{ color: '#6b7280' }}> — {i.description}</span> : null}
+                      </div>
+                    ))}
               </div>
             </div>
             <div>
@@ -327,7 +343,12 @@ export const ProfileManager: React.FC = () => {
               <div style={{ marginTop: 4, fontSize: 12 }}>
                 {diffResult.removed.length === 0
                   ? '(无)'
-                  : diffResult.removed.map((i) => i.name).join(', ')}
+                  : diffResult.removed.map((i) => (
+                      <div key={i.name}>
+                        <span style={{ fontWeight: 500 }}>{i.name}</span>
+                        {i.description ? <span style={{ color: '#6b7280' }}> — {i.description}</span> : null}
+                      </div>
+                    ))}
               </div>
             </div>
             <div>
@@ -335,7 +356,12 @@ export const ProfileManager: React.FC = () => {
               <div style={{ marginTop: 4, fontSize: 12 }}>
                 {diffResult.modified.length === 0
                   ? '(无)'
-                  : diffResult.modified.map((i) => i.name).join(', ')}
+                  : diffResult.modified.map((i) => (
+                      <div key={i.name}>
+                        <span style={{ fontWeight: 500 }}>{i.name}</span>
+                        {i.description ? <span style={{ color: '#6b7280' }}> — {i.description}</span> : null}
+                      </div>
+                    ))}
               </div>
             </div>
           </Space>

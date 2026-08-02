@@ -26,10 +26,12 @@ pub fn list_sub_agents(agents_dir: Option<&Path>) -> Vec<SubAgent> {
     for entry in entries.flatten() {
         if let Some((name, enabled)) = parse_md_file(&entry.path()) {
             let content = std::fs::read_to_string(entry.path()).unwrap_or_default();
+            let description = crate::repo::common::parse_frontmatter_description(&content);
             result.push(SubAgent {
                 name, content,
                 path: entry.path().to_string_lossy().to_string(),
                 enabled,
+                description,
             });
         }
     }

@@ -22,6 +22,11 @@ pub struct ProfileSummary {
 }
 
 /// 单模块的单个 item(MCP server / Skill / Command / ...)
+/// ProfileModuleItem (commit 26 改: 加 description 字段)
+/// v3.1 → v4.0 平移时丢字段, 6 模块各自的 McpServer / Skill / Command /
+/// SubAgent / Hook / Plugin 类型都有 description, 但 ProfileModuleItem
+/// 只留 name/scope/sourcePath/enabled。'之前的 skills mcp 等都是有描述的'
+/// 用户反馈修复。
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ProfileModuleItem {
     pub name: String,
@@ -29,6 +34,8 @@ pub struct ProfileModuleItem {
     #[serde(rename = "sourcePath")]
     pub source_path: String,
     pub enabled: bool,
+    #[serde(rename = "description", skip_serializing_if = "Option::is_none", default)]
+    pub description: Option<String>,
 }
 
 /// ProfileSnapshot = profile_snapshot 表的完整快照

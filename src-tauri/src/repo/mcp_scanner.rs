@@ -76,6 +76,7 @@ pub fn list_mcp_servers(config_path: Option<&Path>, settings_path: Option<&Path>
             url: raw.url,
             enabled: !disabled.contains(&name),
             last_modified: None,
+            description: None, // commit 26: mcp_scanner 不从 disabledMcpjsonServers 读 description, 留 None
         })
         .collect()
 }

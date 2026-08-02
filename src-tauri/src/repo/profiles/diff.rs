@@ -70,6 +70,7 @@ pub fn diff_profile(snapshot: &ProfileSnapshot, opts: &DiffOptions) -> ProfileDi
                     scope: cur.scope.clone(),
                     source_path: cur.source_path.clone(),
                     enabled: cur.enabled,
+                    description: cur.description.clone(),
                 });
             }
         }

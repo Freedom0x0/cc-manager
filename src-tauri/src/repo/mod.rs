@@ -30,6 +30,7 @@ pub mod plugins_scanner;
 pub mod plugins_writer;
 pub mod profiles;
 pub mod usage;
+pub mod common;
 
 /// 平移自 v3.1 electron/repo/projects.ts:listWithCounts
 /// session_count 用 LEFT JOIN 计算,is_archived = 0 过滤。
