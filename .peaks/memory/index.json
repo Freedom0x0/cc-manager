@@ -1,45 +1,30 @@
 {
   "version": 1,
-  "updatedAt": "2026-07-30T17:00:00.000Z",
+  "updatedAt": "2026-08-02T07:36:56.934Z",
   "hot": {
     "feedback": [],
-    "decision": [],
+    "decision": [
+      {
+        "id": "v4-tauri-migration-start",
+        "title": "v4.0 Tauri 2 全栈迁移启动 (rid-1 / commit 0)",
+        "summary": "commit 0e3bbaa 已 commit: cargo-tauri init + git rm electron/ (61 文件) + hello_world + .cargo/config.toml (rsproxy-sparse) + package.json tauri 转发。cargo check 2m19s 0 错 / 479 crates 镜像下完 / npx tsc --noEmit 0 错 / git ls-files electron/ 0 行。剩 npm run dev:tauri 用户手验。spec = docs/superpowers/specs/2026-08-01-rust-tauri-migration-design.md",
+        "capturedAt": "2026-08-02T07:36:56.934Z",
+        "sourceRid": "2026-08-02-v4-rid1-bootstrap",
+        "sourceSession": "2026-08-02-session-c67684",
+        "relatedFiles": [
+          "src-tauri/",
+          ".cargo/config.toml",
+          "package.json"
+        ]
+      }
+    ],
     "rule": [],
     "convention": [],
     "module": [],
     "lesson": []
   },
   "warm": {
-    "project": [
-      {
-        "id": "2026-07-30-mac-adapter",
-        "title": "mac 适配 v3.1 — 配置就绪,真机验证 deferred",
-        "path": "2026-07-30-mac-adapter.md",
-        "tags": ["v3.1", "mac-adapter", "electron-builder", "gatekeeper", "deferred-verification"],
-        "summary": "mac target dmg+zip 已配, package:mac 脚本已加; mac 真机验证待 mac 贡献者跑; 未签名策略 D11"
-      },
-      {
-        "id": "2026-07-30-real-disable",
-        "title": "6 模块真停用 — 写真实文件",
-        "path": "2026-07-30-real-disable.md",
-        "tags": ["v5", "real-disable", "settings-writer", "migration", "profile-bug-fix"],
-        "summary": "推翻 V5 D6/D9 — 6 模块 toggle 写真实文件(settings.json / .disabled 后缀),KV 作 cache;抽 settings-writer 统一原子写抽象,加启动时一次性 migration;修 profiles KV prefix bug"
-      },
-      {
-        "id": "2026-07-28-cc-session-manager-v1-v2-v3",
-        "title": "cc-session-manager 项目历程（v1 → v2 → v3）",
-        "path": "2026-07-28-cc-session-manager-v1-v2-v3.md",
-        "tags": ["project-history", "electron", "antd", "fts5"],
-        "summary": "Tauri→Electron 切换、聚类算法 3 次迭代、UI 重构、坑修复；用户认知 vs 算法教训"
-      },
-      {
-        "id": "2026-07-28-cc-session-manager-v4",
-        "title": "cc-session-manager v4 修复",
-        "path": "2026-07-28-cc-session-manager-v4.md",
-        "tags": ["v4", "folder-semantics", "content-blocks", "resume-command"],
-        "summary": "folder 语义、content blocks 保留、resumer 改返回命令字符串、3 个 commit a806f43/50f0428/5901b6c"
-      }
-    ],
+    "project": [],
     "reference": []
   }
 }
