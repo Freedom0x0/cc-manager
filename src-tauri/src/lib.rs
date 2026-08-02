@@ -19,6 +19,11 @@ pub fn run() {
       cmd_list_deleted_sessions,
       cmd_list_messages,
       cmd_search_messages,
+      // commit 3 写 5 IPC
+      cmd_soft_delete_session,
+      cmd_restore_session,
+      cmd_permanent_delete_session,
+      cmd_resume_session,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
@@ -83,6 +88,44 @@ fn cmd_search_messages(
         _ => None,
     };
     crate::repo::search(&db, &query, project_ids, range).map_err(|e| e.to_string())
+}
+
+// ===== commit 3: 5 写 IPC =====
+
+#[tauri::command]
+fn cmd_soft_delete_session(
+    state: tauri::State<crate::db::DbState>,
+    session_id: String,
+) -> Result<(), String> {
+    let db = state.0.lock().map_err(|e| e.to_string())?;
+    crate::repo::soft_delete(&db, &session_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn cmd_restore_session(
+    state: tauri::State<crate::db::DbState>,
+    session_id: String,
+) -> Result<(), String> {
+    let db = state.0.lock().map_err(|e| e.to_string())?;
+    crate::repo::restore(&db, &session_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn cmd_permanent_delete_session(
+    state: tauri::State<crate::db::DbState>,
+    session_id: String,
+) -> Result<(), String> {
+    let db = state.0.lock().map_err(|e| e.to_string())?;
+    crate::repo::permanent_delete(&db, &session_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn cmd_resume_session(
+    state: tauri::State<crate::db::DbState>,
+    session_id: String,
+) -> Result<Option<crate::types::ResumeCommand>, String> {
+    let db = state.0.lock().map_err(|e| e.to_string())?;
+    crate::repo::resume_session(&db, &session_id).map_err(|e| e.to_string())
 }
 
 pub mod db;

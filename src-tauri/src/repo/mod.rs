@@ -12,8 +12,9 @@
 //! - list_project_tree (tree.rs)
 
 use crate::db::DB;
-use crate::types::{MessageRow, ProjectRow, ProjectTreeNode, SearchHit, SessionRow};
+use crate::types::{MessageRow, ProjectRow, ProjectTreeNode, ResumeCommand, SearchHit, SessionRow};
 use rusqlite::params;
+use std::path::Path;
 
 /// 平移自 v3.1 electron/repo/projects.ts:listWithCounts
 /// session_count 用 LEFT JOIN 计算,is_archived = 0 过滤。
@@ -220,6 +221,101 @@ fn build_node(
         name: self_row.name,
         session_count: self_row.session_count,
         children,
+    }
+}
+
+// ============================================================
+// commit 3: 5 写 IPC 的 repo 函数
+// ============================================================
+
+/// 平移自 v3.1 electron/repo/sessions.ts:get
+pub fn get_session(db: &DB, session_id: &str) -> rusqlite::Result<Option<SessionRow>> {
+    let sql = "
+        SELECT id, session_id, project_id, title, cwd, started_at, last_message_at,
+               message_count, source_file, is_deleted, deleted_at
+        FROM sessions
+        WHERE session_id = ?1
+    ";
+    let conn = &db.0;
+    let mut stmt = conn.prepare(sql)?;
+    let mut rows = stmt.query(params![session_id])?;
+    if let Some(row) = rows.next()? {
+        Ok(Some(session_row_mapper(row)?))
+    } else {
+        Ok(None)
+    }
+}
+
+/// 平移自 v3.1 electron/repo/sessions.ts:softDelete
+/// is_deleted = 1 + deleted_at = now, 不真删消息, FTS5 触发器自动同步(soft delete + FTS)
+pub fn soft_delete(db: &DB, session_id: &str) -> rusqlite::Result<()> {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0);
+    let conn = &db.0;
+    conn.execute(
+        "UPDATE sessions SET is_deleted = 1, deleted_at = ?1 WHERE session_id = ?2",
+        params![now, session_id],
+    )?;
+    Ok(())
+}
+
+/// 平移自 v3.1 electron/repo/sessions.ts:restore
+pub fn restore(db: &DB, session_id: &str) -> rusqlite::Result<()> {
+    let conn = &db.0;
+    conn.execute(
+        "UPDATE sessions SET is_deleted = 0, deleted_at = NULL WHERE session_id = ?1",
+        params![session_id],
+    )?;
+    Ok(())
+}
+
+/// 平移自 v3.1 electron/repo/sessions.ts:permanentDelete
+/// 事务: 先删 messages (FTS5 触发器自动同步), 再删 sessions。
+pub fn permanent_delete(db: &DB, session_id: &str) -> rusqlite::Result<()> {
+    let conn = &db.0;
+    conn.execute("DELETE FROM messages WHERE session_id = ?1", params![session_id])?;
+    conn.execute("DELETE FROM sessions WHERE session_id = ?1", params![session_id])?;
+    Ok(())
+}
+
+/// 平移自 v3.1 electron/resumer.ts:buildResumeCommand
+/// v4 spec: 只生成命令字符串返回给前端,不在主进程里 spawn claude.cmd。
+/// 保留 cwd 让用户在终端里 cd 后执行。
+pub fn build_resume_command(session_id: &str, cwd: Option<&Path>) -> ResumeCommand {
+    ResumeCommand {
+        command: format!("claude --resume {}", session_id),
+        cwd: cwd.map(|p| p.to_string_lossy().to_string()),
+    }
+}
+
+/// resume_session 的实现:
+/// 1. 查 sessions 表拿 cwd + session_id
+/// 2. 兜底: cwd 为空则取 source_file 的父目录
+/// 3. 调 build_resume_command 返回
+pub fn resume_session(db: &DB, session_id: &str) -> rusqlite::Result<Option<ResumeCommand>> {
+    let conn = &db.0;
+    let mut stmt = conn.prepare(
+        "SELECT cwd, source_file FROM sessions WHERE session_id = ?1"
+    )?;
+    let row = stmt.query_row(params![session_id], |row| {
+        Ok((
+            row.get::<_, Option<String>>(0)?,
+            row.get::<_, String>(1)?,
+        ))
+    });
+    match row {
+        Ok((cwd, source_file)) => {
+            let cwd_path = cwd
+                .as_deref()
+                .map(Path::new)
+                .filter(|p| p.exists())
+                .unwrap_or_else(|| Path::new(&source_file).parent().unwrap_or(Path::new(".")));
+            Ok(Some(build_resume_command(session_id, Some(cwd_path))))
+        }
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(e) => Err(e),
     }
 }
 
