@@ -302,6 +302,14 @@ cc-session-manager/
        - `npm run build:vite` 跑前端 production build (新加, 暴露 mock 缺口)
        3 步全过 = commit message 写的"删 / 改 / 加" 真正落地。D17 5 commit 序列只走前 2 步, D18 缺口是必然结果。
     3. 端到端验证 (e2e) vs 单元测试: e2e = vite dev server 起来 + curl http OK; 单元 = 类型 + 函数级。**e2e 不该被 "测试快" 优化掉** — 1 秒 vite dev server 启动 + 1 次 curl = 0 漏; 不做 = mock 缺口留 4 commit 才暴露。
+- **2026-08-02 v4 D20 + D21 + D22 commit 18-20 (前端 v4 集成 3 commit 收尾)**:
+  - **commit 18 (a675136) — D20 IPC channel name 不匹配**: 用户 'npm run dev:tauri 启动成功但获取不到数据' 暴露。v4 后端 60 handler 全部 `cmd_xxx` 前缀, commit 2 写 api-tauri.ts 60 wrapper 用裸 channel name (mcp_list / skill_list / subagent_list 等), invoke 找不到 `cmd_xxx` 通道, 所有 IPC 静默 fail。修: 60 wrapper channel name 加 `cmd_` 前缀 (sed 一致替换), ProfileManager 4 wrapper 签名改对齐 v4 schema (id: i64 / name: string), profileCapture / profileUpdate 删 (v4 后端无), profileDiff 增 (commit 11 加)。教训: Tauri 2 invoke channel = 函数名字符串, 保留 `cmd_` 前缀, 不简化, 不省略。
+  - **commit 19 (ebc0dff) — D21 Profile 类型 + UI 重写**: commit 18 临时 `unknown[]` 兜底, 本 commit 重写 src/types.ts Profile shape 完整对齐 v4 (ProfileSummary / ProfileSnapshot / ProfileDiff / ApplyResult / ProfileModuleItem / ProfileModules 6 类型), 删 v3.1 ProfileConfig / ProfileCreateInput / ProfileUpdatePatch。ProfileManager UI 完整: 列表 (ProfileSummary) / 详情 Modal (Descriptions 6 模块分布) / 对比 Modal (added/removed/modified) / capture / apply / delete 6 路径 + apply loading 状态 + 6 模块中文 label (MCP / Skills / Commands / Sub-Agents / Hooks / 插件)。时戳统一 number (ms, i64) 对齐后端 chrono, 不是 v3.1 string (ISO)。
+  - **commit 20 — D22 静态扫描**: 50 个 api.* 调用 vs api-tauri.ts 60 wrapper, 100% 在 wrapper 范围内。10 module Manager (sessions/RecycleBinView/SessionsPane/mcp/skills/commands/sub_agents/hooks/plugins/profiles/analytics) 全部 tsc 0 错。无剩余 v3.1 错位。D22 待办 = 用户手验跑 `npm run dev:tauri` 9 panel 列表看是否真拿到数据 (空 vs 假 fail 区分: 后端 home::home_dir() 默认路径 ~/.claude.json 不存在时 mcp_scanner 走 serde_json fail 返 `[]`, 不报错 — 静默空列表属正常行为, 不是 bug)。
+  - **教训 (D22)**:
+    1. Tauri 2 invoke channel 命名纪律: 后端 `#[tauri::command]` fn 命名 = 前端 invoke() channel 字符串, 1:1 严格匹配, 不简化, 不省略前缀。验证 `grep -c "fn cmd_"` 跟 `grep -c "invoke<...>('cmd_'"` 两数对齐, 任何 mismatch 都是 D20 类缺口。
+    2. v3.1 → v4 跨版本类型迁移应一次性重写完整 shape (ProfileSummary + ProfileSnapshot + ProfileDiff + ApplyResult 4 个), 不能用 `unknown[]` 临时兜底超过 1 个 commit — 兜底代码不写真 UI, 用户看 "unknown" 字样迷惑。commit 18 → 19 间隔 1 commit 是 OK 节奏, 18 修 channel 后立即 19 重写。
+    3. 静态扫描可发现 "调用不在 wrapper 范围" 类错位, 但 runtime fail (后端 home::home_dir() 默认路径不存在时静默空列表) 必须用户真机手验才能确认 — 自动化测试覆盖不到。**静态扫描 + 用户手验** 是 D22 类缺口的标准 2 步验证。
 
 ## 14. 用户语言
 
