@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Badge, Button, Space, message } from 'antd';
+import { api } from '../api';
 import type { WatcherStatus } from '../types';
 
 type BadgeStatus = 'default' | 'success' | 'processing' | 'warning' | 'error';
@@ -19,12 +20,11 @@ export const WatcherStatusIndicator: React.FC = () => {
     let cancelled = false;
     (async () => {
       try {
-        const s = await window.api.watcherGetStatus();
+        const s = await api.watcherGetStatus();
         if (cancelled) return;
         setStatus(s.status);
         setErrorMsg(s.lastError);
       } catch {
-        // IPC handler 尚未在 main.ts 注册(Task 9 范围) — 保持"未启动"
         if (!cancelled) {
           setStatus('starting');
           setErrorMsg(undefined);
@@ -39,11 +39,10 @@ export const WatcherStatusIndicator: React.FC = () => {
   const handleRescan = async () => {
     setRescanning(true);
     try {
-      const stats = await window.api.watcherRescanAll();
+      const stats = await api.watcherRescanAll();
       message.success(`扫描完成: +${stats.sessionsAdded} sessions, +${stats.messagesAdded} messages`);
-      // 刷新 status(后端 set watcher_state)
       try {
-        const s = await window.api.watcherGetStatus();
+        const s = await api.watcherGetStatus();
         setStatus(s.status);
         setErrorMsg(s.lastError);
       } catch { /* ignore */ }
