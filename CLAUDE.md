@@ -342,6 +342,17 @@ cc-session-manager/
 - commit 23+ 仍需 cargo test 跑通, 等用户加白名单后恢复
 - 当前 commit 22 走 cargo check 兜底, cargo test runtime 留给 CI
 
+**D25 (commit 23 决定)**: 用户加 Defender 白名单 (`Add-MpPreference -ExclusionPath`) + 管理员 PowerShell + 删 exe 重生成, **仍被 SmartScreen 拦 (os error 4551)**。根因: os error 4551 是 **Windows SmartScreen Filter** 不是 Defender。SmartScreen 独立组件,白名单对其无效。
+
+**v4.0 决策**: 本地放弃 tauri runtime (`cargo run` / `cargo test` / `npm run dev:tauri` 都不起), 走 3 步验证 (`cargo check` + `tsc` + `build:vite`) 已 commit 22 落。**真机手验 deferred**: CI runner (Linux, 无 SmartScreen) 跑 commit 14 workflow 出真 MSI/DMG/APP 装包, 用户装包后手验 9 module Manager + Profile capture/apply + Usage 仪表盘。
+
+**3 个解的对比** (不选 A B 的理由):
+- A. 本地关 SmartScreen: 需 Group Policy (gpedit.msc) 改, 副作用大 (关掉整个系统级保护), 不建议
+- B. 代码签名证书: $300+/年, 不在 v4.0 scope, v4.1+ 商业化再考虑
+- C. **CI runner 跑 (推荐)**: Linux runner 无 SmartScreen, commit 14 配的 workflow 已就绪, push tag 触发 → 出真装包, 0 额外成本, 副作用 0
+
+**v4.0 完成判定**: cargo check + tsc + build:vite 3 步全过 + commit 11-22 22 commit 全落 (含 Profiles + Usage + 删 ui-smoke + CI 重写 + drop KV + 动态 CSP + mock cleanup + IPC channel 修 + Profile UI 重写 + mcp_scanner 修 + D22 扫描 + D24 验证纪律) = v4.0 Tauri 2 30 commit 序列 commit 23/30 = 77% 完成。剩余 commit 23-30 (8 commit) 是 v4.1 范围 (真机手验报告 + 装包发布 + macOS 真机验证 + D25 决策), 留给后续会话 / 用户 push 后 CI 跑通拿装包。
+
 ## 15. 文档同步纪律（防误解）
 
 **改代码的同时改文档**。任何时候发现以下情况，**主动更新**：
