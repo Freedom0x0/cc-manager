@@ -48,6 +48,13 @@ pub fn run() {
       cmd_command_update,
       cmd_command_delete,
       cmd_command_toggle_enabled,
+      // commit 8 sub-agents 6 IPC
+      cmd_subagent_list,
+      cmd_subagent_get,
+      cmd_subagent_create,
+      cmd_subagent_update,
+      cmd_subagent_delete,
+      cmd_subagent_toggle_enabled,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
