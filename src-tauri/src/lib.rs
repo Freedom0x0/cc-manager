@@ -467,12 +467,12 @@ fn cmd_hook_toggle_enabled(_state: tauri::State<crate::db::DbState>, id: String,
 // ===== commit 10: plugins 6 IPC =====
 #[tauri::command]
 fn cmd_plugin_list(_state: tauri::State<crate::db::DbState>) -> Result<Vec<crate::types::Plugin>, String> {
-    Ok(crate::repo::plugins_scanner::list_plugins(Some(&mcp_settings_path()), None))
+    Ok(crate::repo::plugins_scanner::list_plugins(Some(&mcp_settings_path()), None, None))
 }
 
 #[tauri::command]
 fn cmd_plugin_get(_state: tauri::State<crate::db::DbState>, full_name: String) -> Result<Option<crate::types::Plugin>, String> {
-    Ok(crate::repo::plugins_scanner::get_plugin(&full_name, Some(&mcp_settings_path()), None))
+    Ok(crate::repo::plugins_scanner::get_plugin(&full_name, Some(&mcp_settings_path()), None, None))
 }
 
 #[tauri::command]

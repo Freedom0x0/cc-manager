@@ -120,7 +120,11 @@ pub fn capture_profile_from_state(opts: &CaptureOptions) -> ProfileSnapshot {
     );
 
     // plugins
-    let plugins = list_plugins(opts.settings_path.as_deref(), opts.plugins_root.as_deref());
+    let plugins = list_plugins(
+        opts.settings_path.as_deref(),
+        opts.plugins_root.as_deref(),
+        opts.installed_plugins_path.as_deref(),
+    );
     modules.insert(
         "plugins".into(),
         plugins
@@ -159,8 +163,14 @@ fn now_ms() -> i64 {
 }
 
 /// 便捷构造:全部用 default 路径(production)。
+/// commit 27 修 D29: 之前 CaptureOptions::from_base_dir 接 home::home_dir()
+/// 后, 期望路径是 base/mcp.json / base/settings.json 等(这是 test fixture
+/// 模式)。生产真实路径是 ~/.claude.json / ~/.claude/settings.json /
+/// ~/.claude/skills/ 等, 两者不匹配, 一直返 0 项启用。
+/// 改 default() 走生产路径。
 pub fn capture_with_defaults() -> ProfileSnapshot {
-    capture_profile_from_state(&CaptureOptions::default())
+    let opts = CaptureOptions::default();
+    capture_profile_from_state(&opts)
 }
 
 /// 便捷构造:全部用指定 base_dir 下的 6 个子目录(test fixture 用)。
