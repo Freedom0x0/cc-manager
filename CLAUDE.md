@@ -290,6 +290,18 @@ cc-session-manager/
   - **CLAUDE.md §1 例外** (只读视图本地过滤) **不** 适用此条: mock 删 = 改 import 链, 不是只读过滤, 触发了 §1 三层链路检查 (前端→IPC→后端→DB)。需要 v4.1 路线 A commit 完整还原。
   - **教训 (D18)**: commit 2 "删 mock" 是 "类型声明 + 包装 + 路由" 5 处改动的复合 commit, 实际只改了 4 处, 漏 main.tsx import — commit message 写的"删"与实际状态不一致。`git log -p src/main.tsx` 应作为 commit 验证必经步骤, 不只跑 `cargo test` / `npm test`。这是 v4.0 commit 5-14 一系列"未跑通"问题的统一根因: commit message 与代码状态不对齐, 用户 / 后续会话只能靠读 commit history 才知道哪些改完成 / 哪些没改。
   - **D17 commit 11 跑通 cargo test** 暴露了 3 个 commit 1-4 旧 bug (Sample Deserialize 缺、v1/v2 schema test dead code、util/mod.rs 漏注册), 全部 commit 11 顺手 sweep。**D18 才是未暴露的"删 mock 失败" 缺口** — 实际跑 `npm run build:vite` 才会发现, 当前会话只跑 `cargo test` + `npx tsc --noEmit` 不覆盖前端 build 验证。
+- **2026-08-02 v4 D19 v4.1 路线 A D18 mock cleanup 闭环 (commit 16-17)**:
+  - **commit 16 (6947c0b)**: 删 `src/main.tsx` line 6 `import "./mock"` 一行, 修 D18 commit 2 漏改的 import。验证 `npm run build:vite` 10.11s build 成功 + dist/index.html 含动态 prod CSP meta (commit 14 vite plugin 注入生效) + cargo test 22 passed + 2 ignored + 0 failed + tsc 0 错 + cargo check 0 错。CI v4.0 'npm run build:tauri' beforeBuildCommand 跑通 → release artifact 真正可出。
+  - **commit 17 (本 commit)**: 端到端前端集成验证 — vite dev server 启动 554ms + http serving OK + 9 module Manager + useSearch 全部 `import { api } from '../api'` 走真 tauri invoke (commit 2 已落) + api.ts 走 tauri invoke 完整 (commit 2 已落)。**D18 路线 A 完整收尾, 无需新增 module Manager 改造 commit** — v4.0 commit 2 时已落 src/api.ts (Tauri dispatch) + src/api-tauri.ts (60 invoke wrapper) + 9 module Manager 走 api 包装, 唯独 main.tsx mock import 漏改 (D18 缺口)。commit 16 一行修复 + commit 17 端到端验证 = 完整闭环。
+  - **真机手验 deferred** (v4.1 后续): `npm run dev:tauri` 需 Windows Defender / SmartScreen 放行 tauri build-script (CLAUDE.md §10 known issue) + 用户本机手验 6 module Manager 顶部 enabled 计数、Profile capture/apply、Usage 仪表盘。CI runner 跑通后补。
+  - **教训 (D19 闭环)**:
+    1. D18 路线 A "前端 6 module Manager 走真 tauri invoke" **不需要新写 module Manager 改造 commit** — v3.1 → v4.0 迁移时 commit 2 已落 (src/api.ts Tauri dispatch + api-tauri.ts 60 wrapper), 9 module Manager 立即改为 `import { api } from '../api'` 走 tauri invoke。**唯一漏改 = main.tsx 第 6 行 import** (commit 2 写删但漏)。任何"删 mock" 类型的 commit, 必须 `git log -p <主入口文件>` 验证所有 import 链断, 不能只 git rm 两个文件。
+    2. 验证 commit 完整性的 3 步纪律:
+       - `cargo test --lib` 跑后端测试 (Rust 模块)
+       - `npx tsc --noEmit` 跑前端类型检查
+       - `npm run build:vite` 跑前端 production build (新加, 暴露 mock 缺口)
+       3 步全过 = commit message 写的"删 / 改 / 加" 真正落地。D17 5 commit 序列只走前 2 步, D18 缺口是必然结果。
+    3. 端到端验证 (e2e) vs 单元测试: e2e = vite dev server 起来 + curl http OK; 单元 = 类型 + 函数级。**e2e 不该被 "测试快" 优化掉** — 1 秒 vite dev server 启动 + 1 次 curl = 0 漏; 不做 = mock 缺口留 4 commit 才暴露。
 
 ## 14. 用户语言
 

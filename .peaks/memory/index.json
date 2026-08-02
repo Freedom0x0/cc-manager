@@ -1,26 +1,24 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-02T11:42:00.000Z",
+  "updatedAt": "2026-08-02T11:55:00.000Z",
   "hot": {
     "feedback": [],
     "decision": [
       {
-        "id": "v4-tauri-commit-11-14-handed-off",
-        "title": "v4.0 Tauri 2 全栈迁移 commits 11-14 handed-off (Profiles + Usage + 删 ui-smoke + CI 重写)",
-        "summary": "5 commit sequence 完成 (commits 11-14 + 本 commit 15 文档)。4 commits: bf409a4 (Profiles 6 IPC + 6 case,D13 完整替代 + D15 走 6 scanner) + bed78c4 (Usage 6 IPC + 6 case,只读聚合) + a38f217 (删 8 ui-smoke 文件 -640 行) + 0939594 (CI Tauri 2 重写 + drop mcp_server_state + 动态 prod CSP vite plugin)。验收: cargo test --lib 22 passed + 2 ignored + 0 failed + npx tsc --noEmit 0 错。已知 D18 缺口: src/mock.ts 未删导致 npm run build:vite 失败, v4.0 CI 只到 typecheck 步骤,v4.1 路线 A 处理。CLAUDE.md §13 D17/D18 决策 + README v4.0.0 + macOS DMG 段 + peaks memory 2026-08-02-v4-tauri-commit-11-14.md sediment。",
-        "capturedAt": "2026-08-02T11:42:00.000Z",
+        "id": "v4-tauri-commit-16-17-handed-off",
+        "title": "v4.0 Tauri 2 D18 mock cleanup 闭环 (commits 16-17)",
+        "summary": "D18 路线 A 完整收尾 2 commits: 6947c0b (commit 16: 删 main.tsx line 6 import './mock' 1 行, 修 D18 commit 2 漏改的 import 链, 验证 npm run build:vite 10.11s 成功 + dist/index.html 含动态 prod CSP meta) + 本 commit 17 (端到端前端集成验证: vite dev server 554ms 启动 + curl OK + 9 module Manager + useSearch 全部走真 tauri invoke)。结论: D18 路线 A 实际只 1 行修复 + 1 commit 验证 = 闭环, v4.0 commit 2 已落 src/api.ts (Tauri dispatch) + src/api-tauri.ts (60 wrapper) + 9 module Manager 改 import api 走 tauri, 唯独 main.tsx mock import 漏改。教训 (3): 删/改/加类 commit 必跑 build 验证 / 主入口文件 import 链 = 删除影响范围真正定义 / vite dev server + curl 是 5 秒 e2e 应纳入 commit 验证必跑项。",
+        "capturedAt": "2026-08-02T11:55:00.000Z",
         "sourceRid": "2026-08-02-v4-rid2-profiles",
         "sourceSession": "2026-08-02-session-c67684",
         "relatedFiles": [
-          "src-tauri/src/repo/profiles/",
-          "src-tauri/src/repo/usage/",
-          "src-tauri/src/db/mod.rs",
-          "src-tauri/tauri.conf.json",
-          "vite.config.ts",
-          ".github/workflows/build-installers.yml",
+          "src/main.tsx",
+          "src/api.ts",
+          "src/api-tauri.ts",
+          "src/modules/",
+          "src/hooks/useSearch.ts",
           "CLAUDE.md",
-          "README.md",
-          ".peaks/memory/2026-08-02-v4-tauri-commit-11-14.md"
+          ".peaks/memory/2026-08-02-v4-tauri-commit-16-17.md"
         ]
       }
     ],
