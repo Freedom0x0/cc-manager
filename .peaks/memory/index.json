@@ -1,22 +1,26 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-02T09:06:30.000Z",
+  "updatedAt": "2026-08-02T11:42:00.000Z",
   "hot": {
     "feedback": [],
     "decision": [
       {
-        "id": "v4-tauri-migration-rid1-handed-off",
-        "title": "v4.0 Tauri 2 全栈迁移 rid-1 handed-off (commit 0 + hotfix + commit 1)",
-        "summary": "rid-1 / 5 rid 第一阶段完成。3 commits: 0e3bbaa (commit 0: cargo-tauri init + git rm electron/ 61 files + hello_world + .cargo/config.toml rsproxy-sparse) + 84270b3 (hotfix: beforeDevCommand/beforeBuildCommand → dev:vite/build:vite) + 4ef661c (commit 1: rusqlite 5 表 SCHEMA + 5 ALTER 兼容 + atomic_write_json push .tmp.pid.ts.rand 复合后缀防 SKILL.md → SKILL.json.tmp)。验收: cargo check 0 错 + npx tsc --noEmit 0 错 + npm run dev:tauri 用户手验 PASS。cargo test 6 case BLOCKED (Windows Defender / SmartScreen 拦 tauri build-script os error 4551, 已写代码 + 后续 commit 1.5 / CI 跑通)。PRD state: handed-off. QA: verdict-issued.",
-        "capturedAt": "2026-08-02T09:06:30.000Z",
-        "sourceRid": "2026-08-02-v4-rid1-bootstrap",
+        "id": "v4-tauri-commit-11-14-handed-off",
+        "title": "v4.0 Tauri 2 全栈迁移 commits 11-14 handed-off (Profiles + Usage + 删 ui-smoke + CI 重写)",
+        "summary": "5 commit sequence 完成 (commits 11-14 + 本 commit 15 文档)。4 commits: bf409a4 (Profiles 6 IPC + 6 case,D13 完整替代 + D15 走 6 scanner) + bed78c4 (Usage 6 IPC + 6 case,只读聚合) + a38f217 (删 8 ui-smoke 文件 -640 行) + 0939594 (CI Tauri 2 重写 + drop mcp_server_state + 动态 prod CSP vite plugin)。验收: cargo test --lib 22 passed + 2 ignored + 0 failed + npx tsc --noEmit 0 错。已知 D18 缺口: src/mock.ts 未删导致 npm run build:vite 失败, v4.0 CI 只到 typecheck 步骤,v4.1 路线 A 处理。CLAUDE.md §13 D17/D18 决策 + README v4.0.0 + macOS DMG 段 + peaks memory 2026-08-02-v4-tauri-commit-11-14.md sediment。",
+        "capturedAt": "2026-08-02T11:42:00.000Z",
+        "sourceRid": "2026-08-02-v4-rid2-profiles",
         "sourceSession": "2026-08-02-session-c67684",
         "relatedFiles": [
-          "src-tauri/",
-          ".cargo/config.toml",
-          "package.json",
-          "src-tauri/src/db/",
-          "src-tauri/src/util/"
+          "src-tauri/src/repo/profiles/",
+          "src-tauri/src/repo/usage/",
+          "src-tauri/src/db/mod.rs",
+          "src-tauri/tauri.conf.json",
+          "vite.config.ts",
+          ".github/workflows/build-installers.yml",
+          "CLAUDE.md",
+          "README.md",
+          ".peaks/memory/2026-08-02-v4-tauri-commit-11-14.md"
         ]
       }
     ],

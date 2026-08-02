@@ -4,12 +4,12 @@
 
 **Claude Code 一站式配置中心** — 把散落在 `~/.claude/` 里的 MCP / Skills / Commands / Sub-Agents / Hooks / Plugins 集中管理,再加会话搜索、Profile 切换、用量仪表盘。
 
-[![Version](https://img.shields.io/badge/version-0.3.0-1677ff?style=flat-square)](./package.json)
-[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-1677ff?style=flat-square)](./electron-builder.json)
+[![Version](https://img.shields.io/badge/version-4.0.0-1677ff?style=flat-square)](./package.json)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20%7C%20macOS%2010.15%2B-1677ff?style=flat-square)](./src-tauri/tauri.conf.json)
 [![License](https://img.shields.io/badge/license-MIT-22c55e?style=flat-square)](./LICENSE)
-[![Electron](https://img.shields.io/badge/electron-32-47848F?style=flat-square)](./package.json)
+[![Tauri](https://img.shields.io/badge/tauri-2-FFC131?style=flat-square)](./src-tauri/Cargo.toml)
 
-**所有数据存在本地 SQLite,不联网。** Windows 10/11 64-bit,免安装,双击即用。
+**所有数据存在本地 SQLite,不联网。** Windows 10/11 64-bit + macOS 10.15+(未签名),免安装,双击即用。
 
 </div>
 
@@ -37,25 +37,25 @@
 
 前往 [**Releases 页面**](https://github.com/Freedom0x0/cc-manager/releases) 下载最新版本:
 
-| 版本 | 文件 | 大小 |
-|---|---|---|
-| **v0.3.0**(最新) | `CC Manager-0.3.0-portable.exe` | ~80 MB |
-| v0.2.0 | `CC Manager-0.2.0-portable.exe` | ~80 MB |
-| v0.1.0 | `CC Manager-0.1.0-portable.exe` | ~80 MB |
+| 版本 | 文件 | 平台 | 大小 |
+|---|---|---|---|
+| **v4.0.0**(最新) | `cc-session-manager_4.0.0_x64-setup.exe` | Windows | ~25 MB |
+| **v4.0.0**(最新) | `cc-session-manager_4.0.0_aarch64.dmg` | macOS Apple Silicon | ~15 MB |
+| v0.3.0(legacy Electron) | `CC Manager-0.3.0-portable.exe` | Windows | ~80 MB |
 
-> Windows 10/11 64-bit,**免安装,双击运行**。数据文件位置: `%APPDATA%\cc-session-manager\app.db`
+> Windows 10/11 64-bit、macOS 10.15+(未签名,Gatekeeper 首次打开右键允许),**免安装,双击运行**。数据文件位置: `%APPDATA%\cc-session-manager\app.db`(Windows) / `~/Library/Application Support/com.freedom0x0.cc-session-manager/app.db`(macOS)
 
 ### macOS 用户
 
-v0.3.0 没有 macOS 装包(等 v4.0 才会出 `.dmg`)。当前可用方式:
-- **开发模式**:克隆仓库后 `npm run dev`,需要 Node 22+(详见 [Build installers workflow](https://github.com/Freedom0x0/cc-manager/blob/main/.github/workflows/build-installers.yml))
-- 装包版(`.dmg`)留到 v4.0,届时会带 Apple 签名
+v4.0.0 起 macOS 装包 (`*.dmg` + `*.app`) 已上线,但未签名(CLAUDE.md §13 D11 决策 — Developer ID + notarization 留 v4.1+)。首次打开 Gatekeeper 警告,**右键 → 打开**绕过。
+- 直接装包: 下载 `cc-session-manager_4.0.0_aarch64.dmg`,拖进 Applications
+- 开发模式: 克隆后 `npm install` + `npm run dev:tauri`(需要 Node 22+ + Rust 1.78+)
 
 ---
 
 ## 🚀 快速开始
 
-1. 下载 `CC Manager-0.3.0-portable.exe`
+1. 下载 `cc-session-manager_4.0.0_x64-setup.exe`
 2. 放到任意目录(比如 `D:\Tools\`)
 3. 双击运行
 
@@ -97,14 +97,14 @@ v0.3.0 没有 macOS 装包(等 v4.0 才会出 `.dmg`)。当前可用方式:
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) — Anthropic 的 CLI 工具
 - [antd](https://ant.design/) — UI 组件库
-- [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) — 同步 SQLite 绑定
-- [chokidar](https://github.com/paulmillr/chokidar) — 文件监听
-- [electron-builder](https://www.electron.build/) — 打包工具
+- [rusqlite](https://github.com/rusqlite/rusqlite) — 同步 SQLite 绑定(bundled,无 native build)
+- [notify](https://github.com/notify-rs/notify) — 跨平台文件监听
+- [Tauri](https://tauri.app/) — 桌面应用框架(Rust + WebView,体积小)
 
 ---
 
 <div align="center">
 
-Made with ❤️ for Claude Code users · v0.3.0 / 2026-07-31
+Made with ❤️ for Claude Code users · v4.0.0 / 2026-08-02
 
 </div>

@@ -263,6 +263,34 @@ cc-session-manager/
   - **教训**:占位组件必须带「兑现期限」。写死 `disabled` + 「波 N 启用」的空壳,若到期未接,要么接、要么删,不能一直挂着 —— 用户看到灰控件会以为是 bug,而非未实现。下次加占位 UI,宁可**不放**,也不放一个不能点的。
 - **2026-07-29 macOS 适配**：`getDataDir()` 已做跨平台：Windows 用 `%APPDATA%`，macOS 用 `~/Library/Application Support`，Linux 用 `$XDG_CONFIG_HOME` 或 `~/.config`。`logFile()` 复用同一函数，不再有独立 fallback 路径。chokidar 需单独 `npm install`（package.json `dependencies` 已有，但 mac 首次 `npm install --ignore-scripts` 后需验证）
 
+- **2026-08-02 v4 D17 Tauri 2 完整迁移 30 commit 序列 commit 11-14 落定**：
+  - **commit 11** (Profiles 6 IPC + 6 case): v3.1 D13 + D15 平移到 v4.0 Tauri。types.rs (ProfileSummary / ProfileSnapshot / ProfileModuleItem / ApplyResult / ProfileDiff / RestoreOptions / PROFILE_MODULES 6 key) + capture.rs (走 6 scanner 真实 enabled 全集, CaptureOptions 6 路径全可选) + apply.rs (完整替代语义: MCP settings.json 黑名单 / skills disabled_skills/ 镜像 / commands + agents .md.disabled 后缀 / plugins enabledPlugins[k]=false; plugins + hooks enable 路径需完整 entry 不可重建, 走 skip + real_file_errors) + diff.rs ((module, name) 复合 key 比对) + mod.rs (6 DB 接口 + from_base_dir fixture 工厂) + tests.rs (6 case)。lib.rs 6 IPC handler 注册。profiles 测试钉死 D13/D15 行为: 写真实文件 + reverse-disable + scan 当前 state.
+  - **commit 12** (Usage 6 IPC + 6 case): 用量分析只读聚合, 无 schema / state / writer, 全 sessions/messages 表 COUNT/SUM/GROUP BY。types.rs (UsageSummary / ByProject / ByDay / ByTool / SessionCost / SessionTimeline) + scanner.rs (6 聚合函数 + estimate_tokens char/4 粗估 + civil_from_days 手算 YYYY-MM-DD, no chrono dep) + mod.rs + tests.rs。lib.rs 6 IPC handler。byDay 改用 messages.created_at 切 day (v3.1 走 started_at 切分不准确, 同 session 跨天算 day1)。
+  - **commit 13** (删 8 ui-smoke 测试): v3.1 electron 时代 JSDOM + window.api 模拟 smoke, v4 Tauri invoke handler 不适, 删 tests/*-ui-smoke.test.ts 8 文件 (24 case) + package.json test script 移除引用。净增 -640 行。
+  - **commit 14** (CI Tauri 2 + drop KV 表 + 动态 prod CSP):
+    1. **CI 重写** (.github/workflows/build-installers.yml): v3.1 Electron 路径 (package:portable + better-sqlite3 rebuild) 完全不适配 v4.0 Tauri 2。改 cargo-tauri build + Swatinem/rust-cache + dtolnay/rust-toolchain + test:tauri -- --lib + 严格/双平台 artifact (Windows MSI+NSIS / macOS DMG+APP)。macOS 未签名 (D11 v4 起步不签), Gatekeeper 警告 + 右键打开绕过, Developer ID + notarization 留 v4.1+。
+    2. **drop mcp_server_state** (豁免 §4 半年原则, D10 + D15 后已无读路径): 真实 enabled = settings.json disabledMcpjsonServers 黑名单 (D10 真停用), Profiles capture 走 6 scanner (D15), 单一来源 = 真实文件 + 6 scanner。db/mod.rs SCHEMA_SQL 删 CREATE TABLE mcp_server_state, 注释重写记录决策链。
+    3. **动态 prod CSP** (vite.config.ts + tauri.conf.json): Tauri 2 `app.security.csp` 是 build-time 嵌入 binary, dev/prod 共用 conf 需 null/strict 二选一, HMR ws 会被 strict 拦。改 csp: null (Tauri conf) + vite plugin transformIndexHtml 注入 meta csp (dev 不注 / prod 注)。CSP 字符串 match Tauri 2 default 严格策略 (default-src 'self' + asset://asset.localhost + ipc:// + http://ipc.localhost + data: + 'unsafe-inline' for style)。
+  - **附记** (commit 11 顺手修): atomic_write.rs Sample struct 缺 Deserialize derive (commit 1 漏, cargo test 被 Windows Defender 拦从未暴露); db/mod.rs v1/v2 schema 升级测试 mark ignore (v4 真实路径 v4 SCHEMA_SQL 单一来源); util/mod.rs + repo/mod.rs 漏 pub mod 注册 (commit 5-10 写时漏, commit 11 一并 sweep); memory index.json 补登记 commit 11 进度。
+  - **教训(共 2 条)**:
+    1. 半年原则豁免需要明示理由 (D17: D10 + D15 决策链 + 真实路径全在 settings.json + 6 scanner)。
+    2. build-time 配置 (Tauri csp / capability) vs runtime 配置 (前端 meta csp / runtime schema) 选择 — 凡 dev/prod 行为不同者, 走 runtime 而非 build-time, 避免双 conf 文件 / dev 体验破。
+
+- **2026-08-02 v4 D18 mock.ts 残留与 src/ 前端 v3.1→v4.0 集成缺口 (待办, 不在 D17 commit 14 scope)**:
+  - **背景**: commit 2 (324a45d) 声称"删 src/mock.ts + src/mock-data.ts", 但 `src/main.tsx` 仍 `import './mock'`, 实际从未删。`npm run build:vite` 当前 fail `Could not resolve "./mock" from "src/main.tsx"`。
+  - **影响**: v4.0 build:vite 命令在 src/ 前端不可用 (仅 dev:vite + dev:electron 可), 间接影响 cargo-tauri dev 链路 (虽然 dev 走 devUrl 不需要 build)。CI 跑 `npm run build:tauri` (commit 14 配) 会因 beforeBuildCommand `npm run build:vite` 失败而 fail — 即 v4.0 CI 实际跑不通, 只到 `npm run typecheck` 步骤。
+  - **已确认 v4.0 真实状态** (commit 14 末):
+    - 后端: cargo test --lib 22 passed + 2 ignored, tauri build cargo check OK
+    - 前端 build: 失败, mock cleanup 未做
+    - 集成 build: 失败, 同上
+    - dev 模式: 未知, 用户未手验 (CLAUDE.md §1 npm run dev:tauri 跨平台可用 假定)
+  - **可选路线** (后续 commit 16+ 范围, 不在当前 D17 5 commit 序列):
+    - 路线 A (推荐): 删 src/mock.ts + src/mock-data.ts (本就该删), 把 main.tsx 改 走 src/api.ts (v3.1 已有, 调 tauri invoke) — 是 commit 2 漏做的修正。
+    - 路线 B: 保留 mock.ts 但改用真 tauri invoke (vite plugin mock-mode 切换, dev 走 mock, prod 走真 invoke) — 复杂度高, 需 vite plugin detect + window.__TAURI__ 判别。
+  - **CLAUDE.md §1 例外** (只读视图本地过滤) **不** 适用此条: mock 删 = 改 import 链, 不是只读过滤, 触发了 §1 三层链路检查 (前端→IPC→后端→DB)。需要 v4.1 路线 A commit 完整还原。
+  - **教训 (D18)**: commit 2 "删 mock" 是 "类型声明 + 包装 + 路由" 5 处改动的复合 commit, 实际只改了 4 处, 漏 main.tsx import — commit message 写的"删"与实际状态不一致。`git log -p src/main.tsx` 应作为 commit 验证必经步骤, 不只跑 `cargo test` / `npm test`。这是 v4.0 commit 5-14 一系列"未跑通"问题的统一根因: commit message 与代码状态不对齐, 用户 / 后续会话只能靠读 commit history 才知道哪些改完成 / 哪些没改。
+  - **D17 commit 11 跑通 cargo test** 暴露了 3 个 commit 1-4 旧 bug (Sample Deserialize 缺、v1/v2 schema test dead code、util/mod.rs 漏注册), 全部 commit 11 顺手 sweep。**D18 才是未暴露的"删 mock 失败" 缺口** — 实际跑 `npm run build:vite` 才会发现, 当前会话只跑 `cargo test` + `npx tsc --noEmit` 不覆盖前端 build 验证。
+
 ## 14. 用户语言
 
 - **中文交流**（用户偏好）
