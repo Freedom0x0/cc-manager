@@ -76,6 +76,13 @@ pub fn run() {
       cmd_profile_apply,
       cmd_profile_delete,
       cmd_profile_diff,
+      // commit 12 usage 6 IPC
+      cmd_usage_summary,
+      cmd_usage_get_session_cost,
+      cmd_usage_get_session_timeline,
+      cmd_usage_get_project_breakdown,
+      cmd_usage_get_daily_breakdown,
+      cmd_usage_get_top_tools,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
@@ -547,6 +554,61 @@ fn cmd_profile_diff(
     let opts = crate::repo::profiles::diff::DiffOptions::from_base_dir(&base);
     let db = state.0.lock().map_err(|e| e.to_string())?;
     crate::repo::profiles::diff(&db, id, &opts).map_err(|e| e.to_string())
+}
+
+// ===== commit 12: usage 6 IPC (只读聚合) =====
+#[tauri::command]
+fn cmd_usage_summary(
+    state: tauri::State<crate::db::DbState>,
+    range_days: Option<i64>,
+) -> Result<crate::repo::usage::UsageSummary, String> {
+    let db = state.0.lock().map_err(|e| e.to_string())?;
+    Ok(crate::repo::usage::usage_summary(&db, range_days.unwrap_or(30)))
+}
+
+#[tauri::command]
+fn cmd_usage_get_session_cost(
+    state: tauri::State<crate::db::DbState>,
+    session_id: String,
+) -> Result<Option<crate::repo::usage::SessionCost>, String> {
+    let db = state.0.lock().map_err(|e| e.to_string())?;
+    Ok(crate::repo::usage::get_session_cost(&db, &session_id))
+}
+
+#[tauri::command]
+fn cmd_usage_get_session_timeline(
+    state: tauri::State<crate::db::DbState>,
+    session_id: String,
+) -> Result<Option<crate::repo::usage::SessionTimeline>, String> {
+    let db = state.0.lock().map_err(|e| e.to_string())?;
+    Ok(crate::repo::usage::get_session_timeline(&db, &session_id))
+}
+
+#[tauri::command]
+fn cmd_usage_get_project_breakdown(
+    state: tauri::State<crate::db::DbState>,
+    project_id: i64,
+) -> Result<Option<crate::repo::usage::UsageByProjectRow>, String> {
+    let db = state.0.lock().map_err(|e| e.to_string())?;
+    Ok(crate::repo::usage::get_project_breakdown(&db, project_id))
+}
+
+#[tauri::command]
+fn cmd_usage_get_daily_breakdown(
+    state: tauri::State<crate::db::DbState>,
+    range_days: Option<i64>,
+) -> Result<Vec<crate::repo::usage::UsageByDayRow>, String> {
+    let db = state.0.lock().map_err(|e| e.to_string())?;
+    Ok(crate::repo::usage::get_daily_breakdown(&db, range_days.unwrap_or(30)))
+}
+
+#[tauri::command]
+fn cmd_usage_get_top_tools(
+    state: tauri::State<crate::db::DbState>,
+    limit: Option<i64>,
+) -> Result<Vec<crate::repo::usage::UsageByToolRow>, String> {
+    let db = state.0.lock().map_err(|e| e.to_string())?;
+    Ok(crate::repo::usage::get_top_tools(&db, limit.unwrap_or(10)))
 }
 
 pub mod db;
