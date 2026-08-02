@@ -285,41 +285,56 @@ export interface PluginUpdatePatch {
 /**
  * Profile — 跨层共享类型(CLAUDE.md §5)
  *
- * 与 electron/repo/profiles/types.ts 中的 Profile **同形**(字段名 + 类型一致)。
- * 双修:任何字段重命名都要同步改 electron 侧。
+ * v4 后端 commit 11 schema: ProfileSnapshot = { id: i64, name, modules: Map<module,
+ * Vec<item>>, createdAt, updatedAt }。ProfileSummary (list 视图) 只含
+ * id + name + 时戳 + itemCount,不含 modules Map;ProfileSnapshot (get
+ * 视图) 完整含 modules。
  *
- * v5 wave-3 Profiles 模块:Profile 是整个 ~/.claude 状态的快照 — config
- * 字段包含 6 个 enabled* 命名空间(mcp / skill / cmd / agent / hook /
- * plugin)中当前启用的列表。profile_apply 把 enabled* 列表写回
- * mcp_server_state KV 表(事务化,失败回滚)。
+ * v3.1 Profile (config: ProfileConfig enabled* 数组 + description) 已废 — 改
+ * v4 shape 后, Profile = 6 模块真实 enabled 全集(走 6 scanner 拿, D15 决策),
+ * 写真实文件而非 KV 表(apply reverse-disable 完整替代, D13 决策)。
  *
- * profiles.json 单文件存储:{ profiles: Profile[] },走原子写(同 hooks /
- * plugins 模式)。profile_capture 是实时从 KV 表读 enabled 状态(不缓存)。
+ * profile_capture / profile_apply / profile_delete / profile_diff 走 cmd_xxx
+ * channel (commit 18 加 cmd_ 前缀修复 D20)。
  */
-export interface ProfileConfig {
-  enabledServers: string[];
-  enabledSkills: string[];
-  enabledCommands: string[];
-  enabledAgents: string[];
-  enabledHooks: string[];
-  enabledPlugins: string[];
-}
-
-export interface Profile {
+export interface ProfileModuleItem {
   name: string;
-  description: string;
-  config: ProfileConfig;
-  createdAt: string;
-  updatedAt: string;
+  scope: string;
+  /** 原文件路径 (settings.json / skills/<name>/SKILL.md / commands/<name>.md 等) */
+  sourcePath: string;
+  enabled: boolean;
 }
 
-export interface ProfileCreateInput {
+export type ProfileModules = Record<string, ProfileModuleItem[]>;
+
+export interface ProfileSummary {
+  id: number;
   name: string;
-  description: string;
+  createdAt: number;
+  updatedAt: number;
+  itemCount: number;
 }
 
-export interface ProfileUpdatePatch {
-  description?: string;
+export interface ProfileSnapshot {
+  id: number;
+  name: string;
+  createdAt: number;
+  updatedAt: number;
+  modules: ProfileModules;
+}
+
+export interface ApplyResult {
+  ok: boolean;
+  restoredCount: number;
+  realFileErrors: string[];
+}
+
+export interface ProfileDiff {
+  id: number;
+  name: string;
+  added: ProfileModuleItem[];
+  removed: ProfileModuleItem[];
+  modified: ProfileModuleItem[];
 }
 
 /**

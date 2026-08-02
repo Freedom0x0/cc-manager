@@ -1,43 +1,53 @@
 import React, { useEffect, useState } from 'react';
-import { List, Button, Modal, Form, Input, message, Empty, Space, Tag } from 'antd';
+import { List, Button, Modal, Form, Input, message, Empty, Space, Tag, Descriptions } from 'antd';
 import {
   ReloadOutlined,
   CheckCircleOutlined,
   CameraOutlined,
   DeleteOutlined,
+  DiffOutlined,
 } from '@ant-design/icons';
 import { api } from '../../api';
+import type { ProfileSummary, ProfileSnapshot, ProfileDiff, ProfileModuleItem } from '../../types';
 
-// v4 后端 commit 11 Profile schema: { id: i64, name, modules: Map<module, Vec<item>>,
-// createdAt, updatedAt }。本 commit 18 临时用 unknown[] 兜底,等 commit 18b 重写
-// src/types.ts Profile shape + ProfileManager UI 完整对齐。
-interface ProfileV4 {
-  id: number;
-  name: string;
-  createdAt: number;
-  updatedAt: number;
-}
+// v4 后端 commit 11 Profile schema — ProfileSummary (list) / ProfileSnapshot
+// (get) / ProfileDiff。ProfileManager 列表显示 ProfileSummary (含 itemCount),
+// 详情 Modal 显示 ProfileSnapshot (完整 modules Map)。
 
 interface ProfileFormValues {
   name: string;
 }
 
-const formatTimestamp = (iso: string) => {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString('zh-CN');
+const PROFILE_MODULE_LABELS: Record<string, string> = {
+  mcp: 'MCP',
+  skills: 'Skills',
+  commands: 'Commands',
+  sub_agents: 'Sub-Agents',
+  hooks: 'Hooks',
+  plugins: '插件',
 };
 
+const formatTimestamp = (ms: number) => {
+  if (!ms) return '-';
+  return new Date(ms).toLocaleString('zh-CN');
+};
+
+const summarizeModules = (items: ProfileModuleItem[]): string =>
+  items.length === 0 ? '(空)' : items.map((i) => i.name).join(', ');
+
 export const ProfileManager: React.FC = () => {
-  const [profiles, setProfiles] = useState<ProfileV4[]>([]);
+  const [profiles, setProfiles] = useState<ProfileSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const [captureForm] = Form.useForm<ProfileFormValues>();
+  const [detailSnap, setDetailSnap] = useState<ProfileSnapshot | null>(null);
+  const [diffResult, setDiffResult] = useState<ProfileDiff | null>(null);
+  const [applyingId, setApplyingId] = useState<number | null>(null);
 
   const load = async () => {
     setLoading(true);
     try {
-      const list = (await api.profileList()) as unknown as ProfileV4[];
+      const list = (await api.profileList()) as unknown as ProfileSummary[];
       setProfiles(list);
     } catch (e) {
       console.error('profileList failed', e);
@@ -51,16 +61,37 @@ export const ProfileManager: React.FC = () => {
     load();
   }, []);
 
-  // v4 后端 profileApply 走 id: i64。列表渲染时存 id,apply/delete 都用 id。
+  const showDetail = async (id: number) => {
+    try {
+      const snap = (await api.profileGet(id)) as unknown as ProfileSnapshot;
+      setDetailSnap(snap);
+    } catch (e) {
+      console.error('profileGet failed', e);
+      message.error('读取 Profile 详情失败');
+    }
+  };
+
+  const showDiff = async (id: number) => {
+    try {
+      const diff = (await api.profileDiff(id)) as unknown as ProfileDiff;
+      setDiffResult(diff);
+    } catch (e) {
+      console.error('profileDiff failed', e);
+      message.error('对比当前状态失败');
+    }
+  };
+
   const handleApply = (id: number, name: string) => {
     Modal.confirm({
       title: `应用 Profile: ${name}?`,
       content:
-        '此操作会改变所有 6 类组件(MCP / Skills / Commands / Sub-Agents / Hooks / 插件)的启用状态,事务化执行,失败自动回滚。',
+        '此操作会改变所有 6 类组件(MCP / Skills / Commands / Sub-Agents / Hooks / 插件)的启用状态。' +
+        'apply 走 D13 完整替代语义: target 列表启用 + current ∖ target 反向 disable 写真实文件, 事务失败 best-effort 回滚。',
       okText: '应用',
       okButtonProps: { type: 'primary', icon: <CheckCircleOutlined /> },
       cancelText: '取消',
       onOk: async () => {
+        setApplyingId(id);
         try {
           await api.profileApply(id);
           message.success(`已应用 ${name}`);
@@ -68,12 +99,13 @@ export const ProfileManager: React.FC = () => {
         } catch (e) {
           if (e instanceof Error) console.error('profileApply failed', e);
           message.error('应用失败');
+        } finally {
+          setApplyingId(null);
         }
       },
     });
   };
 
-  // v4 后端 profileCreate 单参数 name,description 走 patch 模式不带。
   const openCapture = () => {
     captureForm.resetFields();
     setCapturing(true);
@@ -96,7 +128,7 @@ export const ProfileManager: React.FC = () => {
   const handleDelete = (id: number, name: string) => {
     Modal.confirm({
       title: `删除 Profile: ${name}?`,
-      content: '此操作从 profile_snapshot 表移除该 row,不可恢复。',
+      content: '此操作从 profile_snapshot 表移除该 row,不可恢复(不影响当前真实文件 enabled 状态)。',
       okText: '删除',
       okButtonProps: { danger: true },
       cancelText: '取消',
@@ -127,7 +159,8 @@ export const ProfileManager: React.FC = () => {
           <h2 style={{ margin: 0 }}>Profiles</h2>
           <div style={{ color: '#6b7280', fontSize: 12, marginTop: 4 }}>
             快照式启用状态集合 · 6 类组件(MCP / Skills / Commands / Sub-Agents /
-            Hooks / 插件)当前启用列表 · apply 事务化写回 KV 表,失败自动回滚
+            Hooks / 插件)真实 enabled 全集 · apply 走 D13 完整替代语义(reverse-disable
+            写真实文件)
           </div>
         </div>
         <Space>
@@ -143,57 +176,70 @@ export const ProfileManager: React.FC = () => {
       {profiles.length === 0 && !loading ? (
         <Empty description="暂无 Profile,点右上角'捕获当前状态'从 6 scanner 真实 enabled 全集快照" />
       ) : (
-        <List<ProfileV4>
+        <List<ProfileSummary>
           loading={loading}
           bordered
           dataSource={profiles}
-          renderItem={(p) => {
-            // v4 后端 modules 字段未在 list 视图返 (ProfileSummary 只含 id/name/时戳/itemCount),
-            // itemCount 不在 ProfileV4 shape (v3.1 shape) — 暂不显示项数 tag。后续 commit 18b
-            // 重写 src/types.ts Profile 完整 shape 后这里再补。
-            return (
-              <List.Item
-                key={p.id}
-                actions={[
-                  <Button
-                    key="apply"
-                    type="text"
-                    icon={<CheckCircleOutlined />}
-                    onClick={() => handleApply(p.id, p.name)}
-                  >
-                    应用
-                  </Button>,
-                  <Button
-                    key="delete"
-                    type="text"
-                    danger
-                    icon={<DeleteOutlined />}
-                    onClick={() => handleDelete(p.id, p.name)}
-                  >
-                    删除
-                  </Button>,
-                ]}
-              >
-                <List.Item.Meta
-                  title={
-                    <Space wrap>
-                      <span style={{ fontWeight: 600 }}>{p.name}</span>
-                      <Tag color="blue">id={p.id}</Tag>
-                    </Space>
-                  }
-                  description={
-                    <div style={{ fontSize: 12, color: '#6b7280' }}>
-                      <div>更新于 {formatTimestamp(new Date(p.updatedAt).toISOString())}</div>
-                    </div>
-                  }
-                />
-              </List.Item>
-            );
-          }}
+          renderItem={(p) => (
+            <List.Item
+              key={p.id}
+              actions={[
+                <Button
+                  key="detail"
+                  type="text"
+                  onClick={() => showDetail(p.id)}
+                >
+                  详情
+                </Button>,
+                <Button
+                  key="diff"
+                  type="text"
+                  icon={<DiffOutlined />}
+                  onClick={() => showDiff(p.id)}
+                >
+                  对比
+                </Button>,
+                <Button
+                  key="apply"
+                  type="text"
+                  icon={<CheckCircleOutlined />}
+                  loading={applyingId === p.id}
+                  onClick={() => handleApply(p.id, p.name)}
+                >
+                  应用
+                </Button>,
+                <Button
+                  key="delete"
+                  type="text"
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={() => handleDelete(p.id, p.name)}
+                >
+                  删除
+                </Button>,
+              ]}
+            >
+              <List.Item.Meta
+                title={
+                  <Space wrap>
+                    <span style={{ fontWeight: 600 }}>{p.name}</span>
+                    <Tag color="blue">id={p.id}</Tag>
+                    <Tag color="green">{p.itemCount} 项启用</Tag>
+                  </Space>
+                }
+                description={
+                  <div style={{ fontSize: 12, color: '#6b7280' }}>
+                    <div>创建于 {formatTimestamp(p.createdAt)}</div>
+                    <div>更新于 {formatTimestamp(p.updatedAt)}</div>
+                  </div>
+                }
+              />
+            </List.Item>
+          )}
         />
       )}
 
-      {/* Capture Dialog — v4 后端 profileCreate 单参数 name (无 description,description 走 patch 模式不带) */}
+      {/* Capture Dialog */}
       <Modal
         title="捕获当前状态为新 Profile"
         open={capturing}
@@ -220,7 +266,80 @@ export const ProfileManager: React.FC = () => {
           >
             <Input placeholder="例如:dev-default / prod / experiment-1" />
           </Form.Item>
+          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 8 }}>
+            将从 6 scanner (mcp / skills / commands / sub_agents / hooks /
+            plugins) 抓取真实 enabled 全集,写入 profile_snapshot 表。
+          </div>
         </Form>
+      </Modal>
+
+      {/* Detail Modal — 显示完整 modules Map */}
+      <Modal
+        title={detailSnap ? `Profile 详情: ${detailSnap.name}` : ''}
+        open={!!detailSnap}
+        onCancel={() => setDetailSnap(null)}
+        footer={<Button onClick={() => setDetailSnap(null)}>关闭</Button>}
+        width={720}
+      >
+        {detailSnap && (
+          <Descriptions column={1} bordered size="small">
+            <Descriptions.Item label="ID">{detailSnap.id}</Descriptions.Item>
+            <Descriptions.Item label="名称">{detailSnap.name}</Descriptions.Item>
+            <Descriptions.Item label="创建时间">{formatTimestamp(detailSnap.createdAt)}</Descriptions.Item>
+            <Descriptions.Item label="更新时间">{formatTimestamp(detailSnap.updatedAt)}</Descriptions.Item>
+            {Object.entries(detailSnap.modules).map(([mod, items]) => (
+              <Descriptions.Item
+                key={mod}
+                label={
+                  <Space>
+                    <Tag color="blue">{PROFILE_MODULE_LABELS[mod] ?? mod}</Tag>
+                    <span style={{ color: '#6b7280' }}>{items.length} 项</span>
+                  </Space>
+                }
+              >
+                <div style={{ fontSize: 12 }}>{summarizeModules(items)}</div>
+              </Descriptions.Item>
+            ))}
+          </Descriptions>
+        )}
+      </Modal>
+
+      {/* Diff Modal — 显示 vs 当前状态差异 */}
+      <Modal
+        title={diffResult ? `对比: ${diffResult.name} vs 当前状态` : ''}
+        open={!!diffResult}
+        onCancel={() => setDiffResult(null)}
+        footer={<Button onClick={() => setDiffResult(null)}>关闭</Button>}
+        width={720}
+      >
+        {diffResult && (
+          <Space direction="vertical" style={{ width: '100%' }} size="middle">
+            <div>
+              <Tag color="green">新增 ({diffResult.added.length})</Tag>
+              <div style={{ marginTop: 4, fontSize: 12 }}>
+                {diffResult.added.length === 0
+                  ? '(无)'
+                  : diffResult.added.map((i) => i.name).join(', ')}
+              </div>
+            </div>
+            <div>
+              <Tag color="red">删除 ({diffResult.removed.length})</Tag>
+              <div style={{ marginTop: 4, fontSize: 12 }}>
+                {diffResult.removed.length === 0
+                  ? '(无)'
+                  : diffResult.removed.map((i) => i.name).join(', ')}
+              </div>
+            </div>
+            <div>
+              <Tag color="orange">修改 ({diffResult.modified.length})</Tag>
+              <div style={{ marginTop: 4, fontSize: 12 }}>
+                {diffResult.modified.length === 0
+                  ? '(无)'
+                  : diffResult.modified.map((i) => i.name).join(', ')}
+              </div>
+            </div>
+          </Space>
+        )}
       </Modal>
     </div>
   );
