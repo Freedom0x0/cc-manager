@@ -16,6 +16,20 @@ use crate::types::{MessageRow, ProjectRow, ProjectTreeNode, ResumeCommand, Searc
 use rusqlite::params;
 use std::path::Path;
 
+pub mod mcp_scanner;
+pub mod mcp_writer;
+pub mod skills_scanner;
+pub mod skills_writer;
+pub mod commands_scanner;
+pub mod commands_writer;
+pub mod agents_scanner;
+pub mod agents_writer;
+pub mod hooks_scanner;
+pub mod hooks_writer;
+pub mod plugins_scanner;
+pub mod plugins_writer;
+pub mod profiles;
+
 /// 平移自 v3.1 electron/repo/projects.ts:listWithCounts
 /// session_count 用 LEFT JOIN 计算,is_archived = 0 过滤。
 pub fn list_with_counts(db: &DB) -> rusqlite::Result<Vec<ProjectRow>> {

@@ -142,10 +142,10 @@ fn rand_u64() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde::Serialize;
+    use serde::{Deserialize, Serialize};
     use tempfile::TempDir;
 
-    #[derive(Serialize, PartialEq, Debug)]
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
     struct Sample {
         name: String,
         value: i32,

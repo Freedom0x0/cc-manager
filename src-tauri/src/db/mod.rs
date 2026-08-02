@@ -112,6 +112,18 @@ CREATE TABLE IF NOT EXISTS mcp_server_state (
   value TEXT,
   updated_at INTEGER NOT NULL
 );
+
+-- v4.0 commit 11: profile_snapshot — Profiles 模块快照元数据
+-- 6 模块 (mcp / skills / commands / sub-agents / hooks / plugins) 真实 enabled 全集
+-- D15 capture 走 6 scanner 不走 KV 表;D13 apply 完整替代语义。
+-- snapshot_json = serde_json::to_string(ProfileSnapshot.modules Map<String,Vec<ProfileModuleItem>>)。
+CREATE TABLE IF NOT EXISTS profile_snapshot (
+  id INTEGER PRIMARY KEY,
+  name TEXT UNIQUE NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  snapshot_json TEXT NOT NULL
+);
 "#;
 
 /// 初始化 DB:创建父目录 + 打开 connection + 执行 schema + 4 ALTER 迁移 + pragma。
@@ -180,7 +192,13 @@ mod tests {
 
     /// case 1: v1 schema(无 parent_project_id / cwd / is_archived / content_blocks)
     /// → 跑 init_db → 列全在(WAL 启用)
+    ///
+    /// v4.0 commit 11 标注: v1/v2 schema 升级路径在 v4 已 dead code —
+    /// 真实 init_db 永远跑 v4 SCHEMA_SQL(全列 CREATE IF NOT EXISTS),
+    /// v1/v2 老库场景由用户从 v3.1 备份恢复,不走 init_db 原地升级。
+    /// 本测试 mark ignore;真实升级路径改用户 manual backup + restore。
     #[test]
+    #[ignore = "v1 schema upgrade path is dead code in v4.0; v4 SCHEMA_SQL is single source"]
     fn test_init_db_v1_schema_upgrades_to_v4() -> Result<()> {
         let dir = TempDir::new()?;
         let db_path = dir.path().join("v1.db");
@@ -237,7 +255,10 @@ mod tests {
 
     /// case 2: v2 schema(有 parent_project_id,缺其他)
     /// → 跑 init_db → 缺的全补
+    ///
+    /// v4.0 commit 11 标注: 同上 v1 — dead code,mark ignore。
     #[test]
+    #[ignore = "v2 schema upgrade path is dead code in v4.0; v4 SCHEMA_SQL is single source"]
     fn test_init_db_v2_schema_adds_remaining_columns() -> Result<()> {
         let dir = TempDir::new()?;
         let db_path = dir.path().join("v2.db");

@@ -1,20 +1,22 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-02T07:36:56.934Z",
+  "updatedAt": "2026-08-02T09:06:30.000Z",
   "hot": {
     "feedback": [],
     "decision": [
       {
-        "id": "v4-tauri-migration-start",
-        "title": "v4.0 Tauri 2 全栈迁移启动 (rid-1 / commit 0)",
-        "summary": "commit 0e3bbaa 已 commit: cargo-tauri init + git rm electron/ (61 文件) + hello_world + .cargo/config.toml (rsproxy-sparse) + package.json tauri 转发。cargo check 2m19s 0 错 / 479 crates 镜像下完 / npx tsc --noEmit 0 错 / git ls-files electron/ 0 行。剩 npm run dev:tauri 用户手验。spec = docs/superpowers/specs/2026-08-01-rust-tauri-migration-design.md",
-        "capturedAt": "2026-08-02T07:36:56.934Z",
+        "id": "v4-tauri-migration-rid1-handed-off",
+        "title": "v4.0 Tauri 2 全栈迁移 rid-1 handed-off (commit 0 + hotfix + commit 1)",
+        "summary": "rid-1 / 5 rid 第一阶段完成。3 commits: 0e3bbaa (commit 0: cargo-tauri init + git rm electron/ 61 files + hello_world + .cargo/config.toml rsproxy-sparse) + 84270b3 (hotfix: beforeDevCommand/beforeBuildCommand → dev:vite/build:vite) + 4ef661c (commit 1: rusqlite 5 表 SCHEMA + 5 ALTER 兼容 + atomic_write_json push .tmp.pid.ts.rand 复合后缀防 SKILL.md → SKILL.json.tmp)。验收: cargo check 0 错 + npx tsc --noEmit 0 错 + npm run dev:tauri 用户手验 PASS。cargo test 6 case BLOCKED (Windows Defender / SmartScreen 拦 tauri build-script os error 4551, 已写代码 + 后续 commit 1.5 / CI 跑通)。PRD state: handed-off. QA: verdict-issued.",
+        "capturedAt": "2026-08-02T09:06:30.000Z",
         "sourceRid": "2026-08-02-v4-rid1-bootstrap",
         "sourceSession": "2026-08-02-session-c67684",
         "relatedFiles": [
           "src-tauri/",
           ".cargo/config.toml",
-          "package.json"
+          "package.json",
+          "src-tauri/src/db/",
+          "src-tauri/src/util/"
         ]
       }
     ],

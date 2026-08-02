@@ -69,6 +69,13 @@ pub fn run() {
       cmd_plugin_update,
       cmd_plugin_delete,
       cmd_plugin_toggle_enabled,
+      // commit 11 profiles 6 IPC
+      cmd_profile_list,
+      cmd_profile_get,
+      cmd_profile_create,
+      cmd_profile_apply,
+      cmd_profile_delete,
+      cmd_profile_diff,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
@@ -487,6 +494,59 @@ fn cmd_plugin_toggle_enabled(_state: tauri::State<crate::db::DbState>, full_name
     atomic_write_json(&path, &full).map_err(|e| format!("atomic_write: {}", e))?;
     let _ = read_claude_settings; // suppress unused
     Ok(())
+}
+
+// ===== commit 11: profiles 6 IPC =====
+#[tauri::command]
+fn cmd_profile_list(state: tauri::State<crate::db::DbState>) -> Result<Vec<crate::repo::profiles::types::ProfileSummary>, String> {
+    let db = state.0.lock().map_err(|e| e.to_string())?;
+    crate::repo::profiles::list(&db).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn cmd_profile_get(state: tauri::State<crate::db::DbState>, id: i64) -> Result<Option<crate::repo::profiles::types::ProfileSnapshot>, String> {
+    let db = state.0.lock().map_err(|e| e.to_string())?;
+    crate::repo::profiles::get(&db, id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn cmd_profile_create(
+    state: tauri::State<crate::db::DbState>,
+    name: String,
+) -> Result<crate::repo::profiles::types::ProfileSnapshot, String> {
+    let db = state.0.lock().map_err(|e| e.to_string())?;
+    let opts = crate::repo::profiles::capture::CaptureOptions::from_base_dir(
+        &home::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."))
+    );
+    crate::repo::profiles::create(&db, &name, &opts).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn cmd_profile_apply(
+    state: tauri::State<crate::db::DbState>,
+    id: i64,
+) -> Result<crate::repo::profiles::types::ApplyResult, String> {
+    let base = home::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
+    let opts = crate::repo::profiles::apply::ApplyOptions::from_base_dir(&base);
+    let db = state.0.lock().map_err(|e| e.to_string())?;
+    crate::repo::profiles::apply(&db, id, &opts).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn cmd_profile_delete(state: tauri::State<crate::db::DbState>, id: i64) -> Result<(), String> {
+    let db = state.0.lock().map_err(|e| e.to_string())?;
+    crate::repo::profiles::delete(&db, id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn cmd_profile_diff(
+    state: tauri::State<crate::db::DbState>,
+    id: i64,
+) -> Result<crate::repo::profiles::types::ProfileDiff, String> {
+    let base = home::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
+    let opts = crate::repo::profiles::diff::DiffOptions::from_base_dir(&base);
+    let db = state.0.lock().map_err(|e| e.to_string())?;
+    crate::repo::profiles::diff(&db, id, &opts).map_err(|e| e.to_string())
 }
 
 pub mod db;
