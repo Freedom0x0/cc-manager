@@ -525,9 +525,11 @@ fn cmd_profile_create(
     name: String,
 ) -> Result<crate::repo::profiles::types::ProfileSnapshot, String> {
     let db = state.0.lock().map_err(|e| e.to_string())?;
-    let opts = crate::repo::profiles::capture::CaptureOptions::from_base_dir(
-        &home::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."))
-    );
+    // commit 27 修 D29: CaptureOptions::default() = 7 字段全 None, scanner
+    // 内部 default*Dir() 自动走 ~/.claude/skills 等生产路径。from_base_dir
+    // 是 test fixture 工厂(接 TempDir 根), 之前被误用为生产路径, 导致
+    // capture 期望 ~/mcp.json (实际 ~/.claude.json), 0 项启用。
+    let opts = crate::repo::profiles::capture::CaptureOptions::default();
     crate::repo::profiles::create(&db, &name, &opts).map_err(|e| e.to_string())
 }
 
@@ -536,8 +538,8 @@ fn cmd_profile_apply(
     state: tauri::State<crate::db::DbState>,
     id: i64,
 ) -> Result<crate::repo::profiles::types::ApplyResult, String> {
-    let base = home::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
-    let opts = crate::repo::profiles::apply::ApplyOptions::from_base_dir(&base);
+    // commit 27 修 D29: 改 ApplyOptions::default() 走生产路径(同 cmd_profile_create)
+    let opts = crate::repo::profiles::apply::ApplyOptions::default();
     let db = state.0.lock().map_err(|e| e.to_string())?;
     crate::repo::profiles::apply(&db, id, &opts).map_err(|e| e.to_string())
 }
@@ -553,8 +555,8 @@ fn cmd_profile_diff(
     state: tauri::State<crate::db::DbState>,
     id: i64,
 ) -> Result<crate::repo::profiles::types::ProfileDiff, String> {
-    let base = home::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
-    let opts = crate::repo::profiles::diff::DiffOptions::from_base_dir(&base);
+    // commit 27 修 D29: 改 DiffOptions::default() 走生产路径(同 cmd_profile_create)
+    let opts = crate::repo::profiles::diff::DiffOptions::default();
     let db = state.0.lock().map_err(|e| e.to_string())?;
     crate::repo::profiles::diff(&db, id, &opts).map_err(|e| e.to_string())
 }
