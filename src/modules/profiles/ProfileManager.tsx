@@ -7,13 +7,19 @@ import {
   DeleteOutlined,
 } from '@ant-design/icons';
 import { api } from '../../api';
-import type { Profile, ProfileCreateInput } from '../../types';
 
-// Capture 表单字段(name + description) — profile.config 由 capture 自动从 KV
-// 表读 enabled 状态生成,不该用户手编,故无 Edit dialog。
+// v4 后端 commit 11 Profile schema: { id: i64, name, modules: Map<module, Vec<item>>,
+// createdAt, updatedAt }。本 commit 18 临时用 unknown[] 兜底,等 commit 18b 重写
+// src/types.ts Profile shape + ProfileManager UI 完整对齐。
+interface ProfileV4 {
+  id: number;
+  name: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 interface ProfileFormValues {
   name: string;
-  description: string;
 }
 
 const formatTimestamp = (iso: string) => {
@@ -23,7 +29,7 @@ const formatTimestamp = (iso: string) => {
 };
 
 export const ProfileManager: React.FC = () => {
-  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [profiles, setProfiles] = useState<ProfileV4[]>([]);
   const [loading, setLoading] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const [captureForm] = Form.useForm<ProfileFormValues>();
@@ -31,7 +37,7 @@ export const ProfileManager: React.FC = () => {
   const load = async () => {
     setLoading(true);
     try {
-      const list = await api.profileList();
+      const list = (await api.profileList()) as unknown as ProfileV4[];
       setProfiles(list);
     } catch (e) {
       console.error('profileList failed', e);
@@ -45,8 +51,8 @@ export const ProfileManager: React.FC = () => {
     load();
   }, []);
 
-  // 应用:把该 profile 的 enabled* 列表写回 KV 表(事务化,失败自动回滚)
-  const handleApply = (name: string) => {
+  // v4 后端 profileApply 走 id: i64。列表渲染时存 id,apply/delete 都用 id。
+  const handleApply = (id: number, name: string) => {
     Modal.confirm({
       title: `应用 Profile: ${name}?`,
       content:
@@ -56,8 +62,8 @@ export const ProfileManager: React.FC = () => {
       cancelText: '取消',
       onOk: async () => {
         try {
-          const result = await api.profileApply(name);
-          message.success(`已应用 ${name}(@ ${formatTimestamp(new Date(result.appliedAt).toISOString())})`);
+          await api.profileApply(id);
+          message.success(`已应用 ${name}`);
           load();
         } catch (e) {
           if (e instanceof Error) console.error('profileApply failed', e);
@@ -67,7 +73,7 @@ export const ProfileManager: React.FC = () => {
     });
   };
 
-  // 捕获:从当前 KV 表 enabled 状态生成新 profile
+  // v4 后端 profileCreate 单参数 name,description 走 patch 模式不带。
   const openCapture = () => {
     captureForm.resetFields();
     setCapturing(true);
@@ -76,31 +82,27 @@ export const ProfileManager: React.FC = () => {
   const submitCapture = async () => {
     try {
       const values = await captureForm.validateFields();
-      const input: ProfileCreateInput = {
-        name: values.name,
-        description: values.description,
-      };
-      await api.profileCapture(input.name, input.description);
+      await api.profileCreate(values.name);
       message.success(`已捕获 ${values.name}`);
       setCapturing(false);
       captureForm.resetFields();
       load();
     } catch (e) {
-      if (e instanceof Error) console.error('profileCapture failed', e);
+      if (e instanceof Error) console.error('profileCreate failed', e);
       message.error('捕获失败');
     }
   };
 
-  const handleDelete = (name: string) => {
+  const handleDelete = (id: number, name: string) => {
     Modal.confirm({
       title: `删除 Profile: ${name}?`,
-      content: '此操作会从 profiles.json 移除该 profile,不可恢复(不影响当前 KV 表 enabled 状态)。',
+      content: '此操作从 profile_snapshot 表移除该 row,不可恢复。',
       okText: '删除',
       okButtonProps: { danger: true },
       cancelText: '取消',
       onOk: async () => {
         try {
-          await api.profileDelete(name);
+          await api.profileDelete(id);
           message.success(`已删除 ${name}`);
           load();
         } catch (e) {
@@ -139,29 +141,25 @@ export const ProfileManager: React.FC = () => {
       </div>
 
       {profiles.length === 0 && !loading ? (
-        <Empty description="暂无 Profile,点右上角'捕获当前状态'从当前 KV 表快照" />
+        <Empty description="暂无 Profile,点右上角'捕获当前状态'从 6 scanner 真实 enabled 全集快照" />
       ) : (
-        <List<Profile>
+        <List<ProfileV4>
           loading={loading}
           bordered
           dataSource={profiles}
           renderItem={(p) => {
-            const total =
-              p.config.enabledServers.length +
-              p.config.enabledSkills.length +
-              p.config.enabledCommands.length +
-              p.config.enabledAgents.length +
-              p.config.enabledHooks.length +
-              p.config.enabledPlugins.length;
+            // v4 后端 modules 字段未在 list 视图返 (ProfileSummary 只含 id/name/时戳/itemCount),
+            // itemCount 不在 ProfileV4 shape (v3.1 shape) — 暂不显示项数 tag。后续 commit 18b
+            // 重写 src/types.ts Profile 完整 shape 后这里再补。
             return (
               <List.Item
-                key={p.name}
+                key={p.id}
                 actions={[
                   <Button
                     key="apply"
                     type="text"
                     icon={<CheckCircleOutlined />}
-                    onClick={() => handleApply(p.name)}
+                    onClick={() => handleApply(p.id, p.name)}
                   >
                     应用
                   </Button>,
@@ -170,7 +168,7 @@ export const ProfileManager: React.FC = () => {
                     type="text"
                     danger
                     icon={<DeleteOutlined />}
-                    onClick={() => handleDelete(p.name)}
+                    onClick={() => handleDelete(p.id, p.name)}
                   >
                     删除
                   </Button>,
@@ -180,20 +178,12 @@ export const ProfileManager: React.FC = () => {
                   title={
                     <Space wrap>
                       <span style={{ fontWeight: 600 }}>{p.name}</span>
-                      <Tag color="blue">{total} 项启用</Tag>
+                      <Tag color="blue">id={p.id}</Tag>
                     </Space>
                   }
                   description={
                     <div style={{ fontSize: 12, color: '#6b7280' }}>
-                      <div>{p.description || '(无描述)'}</div>
-                      <div style={{ marginTop: 4 }}>
-                        更新于 {formatTimestamp(p.updatedAt)}
-                      </div>
-                      {total === 0 && (
-                        <div style={{ marginTop: 4, color: '#dc2626' }}>
-                          当前所有类别都未启用任何项
-                        </div>
-                      )}
+                      <div>更新于 {formatTimestamp(new Date(p.updatedAt).toISOString())}</div>
                     </div>
                   }
                 />
@@ -203,8 +193,7 @@ export const ProfileManager: React.FC = () => {
         />
       )}
 
-      {/* Capture Dialog — 唯一 dialog。profile.config 由 capture 自动从 KV 表
-          读 enabled 状态生成,不允许用户手编,故无 Edit/Create 区分。 */}
+      {/* Capture Dialog — v4 后端 profileCreate 单参数 name (无 description,description 走 patch 模式不带) */}
       <Modal
         title="捕获当前状态为新 Profile"
         open={capturing}
@@ -230,16 +219,6 @@ export const ProfileManager: React.FC = () => {
             ]}
           >
             <Input placeholder="例如:dev-default / prod / experiment-1" />
-          </Form.Item>
-          <Form.Item
-            label="描述"
-            name="description"
-            rules={[{ required: true, message: '请输入描述' }]}
-          >
-            <Input.TextArea
-              rows={3}
-              placeholder="说明这个 Profile 的用途(例如:开发环境的默认启用集合)"
-            />
           </Form.Item>
         </Form>
       </Modal>
