@@ -353,6 +353,41 @@ cc-session-manager/
 
 **v4.0 完成判定**: cargo check + tsc + build:vite 3 步全过 + commit 11-22 22 commit 全落 (含 Profiles + Usage + 删 ui-smoke + CI 重写 + drop KV + 动态 CSP + mock cleanup + IPC channel 修 + Profile UI 重写 + mcp_scanner 修 + D22 扫描 + D24 验证纪律) = v4.0 Tauri 2 30 commit 序列 commit 23/30 = 77% 完成。剩余 commit 23-30 (8 commit) 是 v4.1 范围 (真机手验报告 + 装包发布 + macOS 真机验证 + D25 决策), 留给后续会话 / 用户 push 后 CI 跑通拿装包。
 
+- **2026-08-02 v4 D26 v4.0 commit 4 漏 importer 集成修复 (commit 24)**:
+  - **根因**: v4.0 commit 4 (4e4b99c) 平移 notify watcher + watcher_state 2 IPC, 但 watcher 启动后只把事件写 KV 表, **不调 importer 把 jsonl 解析入 DB**。`cmd_watcher_rescan_all` 是 stub (返 `{ok: true}`)。`lib.rs setup()` 调用 `init_db` 只建 schema, **不扫 `~/.claude/projects/`**。后果: v4.0 启动后 DB 空, 前端 SessionsPane 永远空。属于 D18 类缺口的延伸 (commit 4 写 'watcher 集成' 但实际只完成 1/3)。
+  - **修复** (commit 24 64cb967): 新增 `src-tauri/src/importer.rs` (270 行) 平移 v3.1 electron/importer 核心 3 函数 + ensure_project。`lib.rs setup()` 启动后自动 rescan。`cmd_watcher_rescan_all` 改真做事返 `ImportStats`。前端 WatcherStatusIndicator 加 "立即扫描" 按钮。
+  - **教训 (D26)**: "集成" 类 commit 必须 3 段全跑通 (notify 事件路由 + importer 解析 + 启动触发), 缺 1/3 = "集成" 名不副实。stub 必须带"未实现"warning, 不能让前端误以为可用。
+- **2026-08-02 v4 D27 v3.1 window.api 残留 (commit 25)**:
+  - **根因**: v4 commit 24 (D26) WatcherStatusIndicator 按钮用 `window.api.watcherRescanAll()`, 但 v4 Tauri 2 不走 window.api 路径 — v3.1 Electron preload inject 模式 v4 已无。`window.api` 永远 undefined,触发 TypeError "Cannot read properties of undefined (reading 'watcherRescanAll')"。
+  - **修复** (commit 25 6095ce7): WatcherStatusIndicator 改 `import { api } from '../api'` (跟其他 module Manager 一致)。`global.d.ts` 100 行 v3.1 残留 stub → 6 行注释说明 v3.1 废弃 + `export {}` 保留 importable。
+  - **教训 (D27)**: 复制 v3.1 代码必须验证 v4 路径仍存在 — `window.api.X` v3.1 静默 undefined 不被 tsc 抓。**v3.1 → v4 切换时 window.api 声明必须同步删,留 = 误导**。D19 验证纪律 + 真机手验 2 步组合才能完整覆盖。
+- **2026-08-02 v4 D28 Profile 6 模块 description + UI 删 D13 文案 (commit 26)**:
+  - **根因**: 用户反馈 "之前的 skills mcp 等都是有描述的" + "apply 走 D13 完整替代语义(reverse-disable 写真实文件) 这句话删掉"。v3.1 → v4 ProfileModuleItem 平移时丢 description 字段 (只留 4 字段 name/scope/sourcePath/enabled); UI 文案冗余 D13 实现细节。
+  - **修复** (commit 26 f3a3a59): 后端 `ProfileModuleItem` 加 description + 5 module 类型 (McpServer / Skill / Command / SubAgent) 加 description。新增 `src-tauri/src/repo/common.rs` 共享 `parse_frontmatter_description` helper (4 test)。3 scanner 解析 frontmatter 填 description。前端 ProfileManager UI 删 2 处 D13 文案 + 详情/diff 列表渲染 `<name> — <description>` 格式。
+  - **教训 (D28)**: UI 文案只讲用户能观察的副作用 ("会改变 6 类组件"), 实现细节 (D13 / D15) 写 commit msg / CLAUDE.md sediment。
+- **2026-08-02 v4 D29 Profile capture 改 production 路径 (commit 27)**:
+  - **根因**: 用户反馈 "profiles 捕获当前状态怎么是 0 项启用?"。`cmd_profile_create` 错用 `CaptureOptions::from_base_dir(&home::home_dir())`, `from_base_dir` 是 test fixture 工厂 (期望 ~/mcp.json), 生产实际路径是 ~/.claude.json / ~/.claude/settings.json, scanner 找不到 → 0 项启用。
+  - **修复** (commit 27 f1199d3): 3 handler (cmd_profile_create / cmd_profile_apply / cmd_profile_diff) 改用 `::default()` (7 字段 None), scanner 内部 `default_*_dir()` 自动走生产路径。
+  - **教训 (D29)**: **fixture 工厂 vs production 工厂命名必须明确分离**。测试 fixture 模式 vs 生产路径模式不能混用 — `from_base_dir` + `Default` 是两种, 不能误把 fixture 工厂用于生产 handler。
+- **2026-08-03 v4 D30 插件 scanner 改读 installed_plugins.json v2 schema (commit 28)**:
+  - **根因**: 用户反馈 "插件扫描的位置是不是不对?"。v4 commit 10 写 read_installed_plugins 按 v1 schema 解析 (`{"name@marketplace": data}` 平铺), 但 Anthropic 2026 升 v2 schema (`{"version": 2, "plugins": {"name@marketplace": [data]}}`), scanner 顶层 `version`/`plugins` 不是 InstalledPlugin 形状 → serde 失败 → 跳过 → 0 plugin。
+  - **修复** (commit 28 cb4d965): `read_installed_plugins` 改读 v2 schema (先拿 `plugins` 嵌套 object, 然后 value 是 array 取 first)。`InstalledPlugin` struct 加 `version: Option<String>` 字段。
+  - **教训 (D30)**: **v3.1 → v4 schema 平移必须看真实数据**, 不能凭 v3.1 注释。**缺 v2 test fixture** (cargo test 36 仍 0 个 plugins_scanner test) — 留 v4.1 follow-up。
+- **2026-08-03 v4 D31 plugins_scanner 接 opts + installPath 路径 (commit 29)**:
+  - **根因**: commit 28 修 schema 后仍 0 plugin, 暴露 3 个二次 bug: (1) `list_plugins(_plugins_root, ...)` 带 `_` 前缀忽略 opts (fixture 想 mock 路径失败, 污染生产路径); (2) `plugin.json` 路径用 `root/<name>/.claude-plugin/plugin.json` 错 (实际是 v2 cache `installPath/.claude-plugin/plugin.json`); (3) `read_installed_plugins` 硬编 `default_installed_plugins_path` 同 fixture 隔离陷阱。
+  - **修复** (commit 29 64e6544): `list_plugins` 形参去 `_` 前缀, 加 `installed_plugins_path: Option<&Path>` 参数; `plugin.json` 路径优先 `installPath` (v2), fallback root-based (v1); 3 caller 同步更新签名。
+  - **教训 (D31)**: **fixture 测试 + 真机手验 = 4 层验证** — cargo test case1/2 fail (fixture 隔离) + 真机手验 "plugin 0" 同时指明同一 bug。
+- **2026-08-03 v4.0 完成判定 (commit 30 收尾)**: cargo check + tsc + build:vite + 真机手验 4 步全过 + commit 11-29 共 19 commit 全落 (含 D17-D31 11 个新决策 + bug 修复)。**v4.0 Tauri 2 30 commit 序列 commit 29/30 = 97% 完成**。剩余 commit 30 (本 commit) 是文档收尾 + sediment。
+- **v4.1 路线 (用户 push 后开新会话)**:
+  1. **真机手验全 4 步** (commit 30 后用户必跑): npm run dev:tauri + 看 9 panel 列表 + 点立即扫描 + 点 Profile capture / apply / diff + 看 Plugins 列表 1+ 项
+  2. **推送 tag 出 release**: `git tag v4.0.0-rust-migration && git push origin v4.0.0-rust-migration` → CI runner 出 MSI / NSIS / DMG / APP artifact (commit 14 workflow 配)
+  3. **v4.1 follow-up commits**:
+     - plugins_scanner 加 v2 test fixture (commit 28/29 缺)
+     - 6 module scanner/writer 走完整 fixture 测试 (Windows Defender 拦, CI runner 跑通后补)
+     - settings_reader + ClaudeSettings v3.1 等价测试 (unknown-fields 保留策略变化)
+     - macOS 真机验证 (Apple Developer ID + notarization 留 v4.1+)
+     - 4-10 个 plugins/hooks enable 路径补 (v4 commit 11 apply.rs 标 "未实现 in v4.0 commit 11" 的 skip 项)
+
 ## 15. 文档同步纪律（防误解）
 
 **改代码的同时改文档**。任何时候发现以下情况，**主动更新**：
