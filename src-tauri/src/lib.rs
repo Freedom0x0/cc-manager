@@ -34,6 +34,13 @@ pub fn run() {
       cmd_mcp_update,
       cmd_mcp_delete,
       cmd_mcp_toggle_enabled,
+      // commit 6 skills 6 IPC
+      cmd_skill_list,
+      cmd_skill_get,
+      cmd_skill_create,
+      cmd_skill_update,
+      cmd_skill_delete,
+      cmd_skill_toggle_enabled,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
