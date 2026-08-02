@@ -62,6 +62,13 @@ pub fn run() {
       cmd_hook_update,
       cmd_hook_delete,
       cmd_hook_toggle_enabled,
+      // commit 10 plugins 6 IPC
+      cmd_plugin_list,
+      cmd_plugin_get,
+      cmd_plugin_create,
+      cmd_plugin_update,
+      cmd_plugin_delete,
+      cmd_plugin_toggle_enabled,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
