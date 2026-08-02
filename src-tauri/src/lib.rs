@@ -21,3 +21,6 @@ pub fn run() {
 fn hello_world() -> &'static str {
   "cc-session-manager v4.0 (Tauri 2)"
 }
+
+pub mod db;
+pub mod util;
