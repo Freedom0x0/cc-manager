@@ -1,0 +1,12 @@
+# appended by cc-session-manager v4.0 migration (2026-08-01)
+# Source: spec §14 Q11 — rsproxy-sparse 镜像 (节省首次 cargo build 30-60min → 5-10min)
+# 详细: https://rsproxy.cn/
+
+[source.crates-io]
+replace-with = "rsproxy-sparse"
+
+[source.rsproxy-sparse]
+registry = "sparse+https://rsproxy.cn/index/"
+
+[registries.rsproxy-sparse]
+index = "sparse+https://rsproxy.cn/index/"
