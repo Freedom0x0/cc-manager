@@ -24,6 +24,9 @@ pub fn run() {
       cmd_restore_session,
       cmd_permanent_delete_session,
       cmd_resume_session,
+      // commit 4 watcher 2 IPC
+      cmd_watcher_rescan_all,
+      cmd_watcher_get_status,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
@@ -128,7 +131,25 @@ fn cmd_resume_session(
     crate::repo::resume_session(&db, &session_id).map_err(|e| e.to_string())
 }
 
+// ===== commit 4: watcher 2 IPC =====
+
+#[tauri::command]
+fn cmd_watcher_rescan_all() -> Result<std::collections::HashMap<String, bool>, String> {
+    // v3.1 等价实现: 返回 { ok: true }
+    // v4.0 后续 commit 走 importer 重扫 + watcher 触发同步, 当前 stub
+    let mut m = std::collections::HashMap::new();
+    m.insert("ok".to_string(), true);
+    Ok(m)
+}
+
+#[tauri::command]
+fn cmd_watcher_get_status(state: tauri::State<crate::db::DbState>) -> Result<crate::types::WatcherStatus, String> {
+    let db = state.0.lock().map_err(|e| e.to_string())?;
+    Ok(crate::watcher::get_status(&db))
+}
+
 pub mod db;
 pub mod repo;
 pub mod util;
 pub mod types;
+pub mod watcher;
