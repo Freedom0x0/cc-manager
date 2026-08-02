@@ -16,6 +16,8 @@ struct InstalledPlugin {
     #[serde(default)]
     install_path: Option<String>,
     #[serde(default)]
+    version: Option<String>,
+    #[serde(default)]
     installed_at: Option<String>,
     #[serde(default)]
     last_updated: Option<String>,
@@ -37,14 +39,23 @@ fn read_installed_plugins() -> std::collections::HashMap<String, InstalledPlugin
         Ok(s) => s,
         Err(_) => return std::collections::HashMap::new(),
     };
-    // installed_plugins.json 是 { "name@marketplace": {...}, ... }
+    // commit 28 修 D30: installed_plugins.json 实际 schema 是 v2:
+    //   { "version": 2, "plugins": { "name@marketplace": [{ scope, installPath, version, ... }] } }
+    // plugins map 的 value 是**数组**(可重复装不同 scope / version), 我们
+    // 取第一个 = 首选版本。
+    // 之前 v4 scanner 误按 v1 schema 解析(顶层 { name@marketplace: data } 平铺),
+    // 'version' / 'plugins' 等顶层 key 不是 InstalledPlugin 形状 → serde
+    // 失败 → 跳过 → map 空 → 0 个 plugin。
     match serde_json::from_str::<serde_json::Value>(&raw) {
         Ok(v) => {
             let mut map = std::collections::HashMap::new();
-            if let Some(obj) = v.as_object() {
-                for (k, val) in obj {
-                    if let Ok(parsed) = serde_json::from_value::<InstalledPlugin>(val.clone()) {
-                        map.insert(k.clone(), parsed);
+            if let Some(plugins_obj) = v.get("plugins").and_then(|p| p.as_object()) {
+                for (k, val) in plugins_obj {
+                    // val 是 array, 取第一个
+                    if let Some(first) = val.as_array().and_then(|a| a.first()) {
+                        if let Ok(parsed) = serde_json::from_value::<InstalledPlugin>(first.clone()) {
+                            map.insert(k.clone(), parsed);
+                        }
                     }
                 }
             }
