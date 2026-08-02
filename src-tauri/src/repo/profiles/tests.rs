@@ -76,8 +76,9 @@ fn case3_apply_real_file_mcp_disabled() {
     let settings = base.join("settings.json");
     fs::write(&settings, r#"{"disabledMcpjsonServers":[]}"#).unwrap();
     let mcp_json = base.join("mcp.json");
-    // ClaudeJson.mcp_servers 字段无 rename_all,JSON 键保持 snake_case
-    fs::write(&mcp_json, r#"{"mcp_servers":{"github":{"command":"gh"}}}"#).unwrap();
+    // ClaudeJson.mcp_servers 字段已加 #[serde(rename = "mcpServers")] (D22 fix),
+    // 实际 ~/.claude.json schema 走 camelCase (Anthropic 官方)
+    fs::write(&mcp_json, r#"{"mcpServers":{"github":{"command":"gh"}}}"#).unwrap();
 
     // capture current — github 启用
     let cur = capture_profile_from_state(&opts);

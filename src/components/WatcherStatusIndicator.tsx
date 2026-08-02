@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Badge } from 'antd';
+import { Badge, Button, Space, message } from 'antd';
 import type { WatcherStatus } from '../types';
 
 type BadgeStatus = 'default' | 'success' | 'processing' | 'warning' | 'error';
@@ -13,6 +13,7 @@ const statusToBadge: Record<WatcherStatus['status'], BadgeStatus> = {
 export const WatcherStatusIndicator: React.FC = () => {
   const [status, setStatus] = useState<WatcherStatus['status']>('starting');
   const [errorMsg, setErrorMsg] = useState<string | undefined>(undefined);
+  const [rescanning, setRescanning] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,6 +36,24 @@ export const WatcherStatusIndicator: React.FC = () => {
     };
   }, []);
 
+  const handleRescan = async () => {
+    setRescanning(true);
+    try {
+      const stats = await window.api.watcherRescanAll();
+      message.success(`扫描完成: +${stats.sessionsAdded} sessions, +${stats.messagesAdded} messages`);
+      // 刷新 status(后端 set watcher_state)
+      try {
+        const s = await window.api.watcherGetStatus();
+        setStatus(s.status);
+        setErrorMsg(s.lastError);
+      } catch { /* ignore */ }
+    } catch (e) {
+      message.error(`扫描失败: ${String(e)}`);
+    } finally {
+      setRescanning(false);
+    }
+  };
+
   const label =
     status === 'starting'
       ? 'watcher: 未启动'
@@ -43,9 +62,14 @@ export const WatcherStatusIndicator: React.FC = () => {
         : `watcher: 错误${errorMsg ? ` (${errorMsg})` : ''}`;
 
   return (
-    <span aria-label="watcher-status-indicator" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-      <Badge status={statusToBadge[status]} />
-      <span style={{ fontSize: 12 }}>{label}</span>
-    </span>
+    <Space size="small">
+      <span aria-label="watcher-status-indicator" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        <Badge status={statusToBadge[status]} />
+        <span style={{ fontSize: 12 }}>{label}</span>
+      </span>
+      <Button size="small" loading={rescanning} onClick={handleRescan}>
+        立即扫描
+      </Button>
+    </Space>
   );
 };

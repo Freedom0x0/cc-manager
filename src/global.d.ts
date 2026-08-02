@@ -37,6 +37,7 @@ import type {
   UsageByProjectRow,
   UsageByDayRow,
   UsageByToolRow,
+  ImportStats,
 } from './types';
 
 export type Api = {
@@ -51,7 +52,7 @@ export type Api = {
     fromMs: number | null,
     toMs: number | null
   ): Promise<SearchHit[]>;
-  watcherRescanAll(): Promise<{ ok: true }>;
+  watcherRescanAll(): Promise<ImportStats>;
   watcherGetStatus(): Promise<WatcherStatus>;
   softDeleteSession(sessionId: string): Promise<void>;
   restoreSession(sessionId: string): Promise<void>;

@@ -413,3 +413,9 @@ export interface SessionTimeline {
   title: string | null;
   entries: SessionTimelineEntry[];
 }
+
+// commit 24: watcher_rescan_all 返回值 (平移 Rust ImportStats)
+export interface ImportStats {
+  sessionsAdded: number;
+  messagesAdded: number;
+}

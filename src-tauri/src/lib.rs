@@ -6,6 +6,12 @@ pub fn run() {
       use tauri::Manager;
       let app_data_dir = app.path().app_data_dir()?;
       let db = crate::db::init_db(&app_data_dir)?;
+      // commit 24 修 D26: 启动后立即 rescan 一次,把 ~/.claude/projects/ 下
+      // 现有 jsonl 导入 DB。否则前端 SessionsPane 空 — D20 类缺口的延伸(commit 4
+      // 写 'watcher 集成' 但实际只完成 notify 事件路由, importer 解析 + 启动触发漏)。
+      if let Err(e) = crate::importer::rescan_all(&db) {
+        eprintln!("[startup] rescan_all failed: {}", e);
+      }
       app.manage(crate::db::DbState::new(db));
       Ok(())
     })
@@ -190,12 +196,9 @@ fn cmd_resume_session(
 // ===== commit 4: watcher 2 IPC =====
 
 #[tauri::command]
-fn cmd_watcher_rescan_all() -> Result<std::collections::HashMap<String, bool>, String> {
-    // v3.1 等价实现: 返回 { ok: true }
-    // v4.0 后续 commit 走 importer 重扫 + watcher 触发同步, 当前 stub
-    let mut m = std::collections::HashMap::new();
-    m.insert("ok".to_string(), true);
-    Ok(m)
+fn cmd_watcher_rescan_all(state: tauri::State<crate::db::DbState>) -> Result<crate::importer::ImportStats, String> {
+    let db = state.0.lock().map_err(|e| e.to_string())?;
+    crate::importer::rescan_all(&db).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -612,7 +615,11 @@ fn cmd_usage_get_top_tools(
 }
 
 pub mod db;
+pub mod importer;
 pub mod repo;
 pub mod util;
 pub mod types;
 pub mod watcher;
+
+#[cfg(test)]
+mod importer_tests;

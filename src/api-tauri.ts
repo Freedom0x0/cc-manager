@@ -31,6 +31,7 @@ import type {
   UsageByProjectRow,
   UsageByDayRow,
   UsageByToolRow,
+  ImportStats,
 } from './types';
 
 // v4.0 Tauri 2 全栈迁移 — api-tauri.ts
@@ -64,7 +65,7 @@ export const api = {
     toMs: number | null
   ): Promise<SearchHit[]> =>
     invoke<SearchHit[]>('cmd_search_messages', { query, projectIds, fromMs, toMs }),
-  watcherRescanAll: (): Promise<{ ok: true }> => invoke<{ ok: true }>('cmd_watcher_rescan_all'),
+  watcherRescanAll: (): Promise<ImportStats> => invoke<ImportStats>('cmd_watcher_rescan_all'),
   watcherGetStatus: (): Promise<WatcherStatus> => invoke<WatcherStatus>('cmd_watcher_get_status'),
   softDeleteSession: (sessionId: string): Promise<void> =>
     invoke<void>('cmd_soft_delete_session', { sessionId }),
