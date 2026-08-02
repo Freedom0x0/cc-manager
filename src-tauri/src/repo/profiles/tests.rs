@@ -12,7 +12,7 @@
 use crate::repo::profiles::apply::{apply_profile, ApplyOptions};
 use crate::repo::profiles::capture::{capture_profile_from_state, CaptureOptions};
 use crate::repo::profiles::diff::{diff_profile, DiffOptions};
-use crate::repo::profiles::types::{ProfileSnapshot, PROFILE_MODULES};
+use crate::repo::profiles::types::PROFILE_MODULES;
 use crate::repo::profiles::{create, delete, diff, get, list, apply};
 use std::fs;
 use tempfile::TempDir;
