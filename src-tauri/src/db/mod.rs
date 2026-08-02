@@ -37,8 +37,12 @@ pub struct DB(pub Connection);
 /// 与 v3.1 `electron/db/connection.ts:10-93` 字节级等价。
 ///
 /// v5 wave-0: watcher 单值 KV 表 (key PRIMARY KEY / value / updated_at) — Simplicity First。
-/// v5 wave-1: mcp_server_state KV 表存 enabled: / last_modified: 前缀。
-/// commit 14 drop_mcp_server_state(豁免 §4 半年原则,D15 后已无读路径)。
+/// v4.0 commit 14: drop mcp_server_state 表(豁免 §4 半年原则, D10 + D15 决策)。
+/// 真实 enabled 状态走 settings.json 的 disabledMcpjsonServers 黑名单(D10 真停用),
+/// Profiles 模块 capture 走 6 scanner 拿真实 enabled 全集(D15),不再需要 KV 表 cache。
+/// v3.1 wave-1 mcp_server_state 是 KV cache 记录用户 toggle 状态,profiles.captured
+/// 用它;v4.0 commit 14 起完全废弃 — 用户 toggle 写真实 settings.json,scanner
+/// 读 scanner 拿真实 enabled(单一来源)。
 const SCHEMA_SQL: &str = r#"
 CREATE TABLE IF NOT EXISTS projects (
   id INTEGER PRIMARY KEY,
@@ -102,12 +106,6 @@ CREATE TRIGGER IF NOT EXISTS messages_au AFTER UPDATE ON messages BEGIN
 END;
 
 CREATE TABLE IF NOT EXISTS watcher_state (
-  key TEXT PRIMARY KEY,
-  value TEXT,
-  updated_at INTEGER NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS mcp_server_state (
   key TEXT PRIMARY KEY,
   value TEXT,
   updated_at INTEGER NOT NULL

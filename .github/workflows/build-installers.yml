@@ -1,12 +1,17 @@
-# Build CC Manager installers on push tag or manual dispatch.
+# Build CC Manager v4.0 installers on push tag or manual dispatch.
 #
-# - tag v*   → 同时跑 Windows + macOS 双 build,把产物挂到 GitHub release
-# - manual   → 在 Actions 页面点 "Run workflow",只 build 不发 release(供调试)
-# - push PR  → 不触发(避免每次 PR 都跑 5-10 分钟的 mac build)
+# v4.0 Tauri 2 migration: 重写 CI for cargo-tauri build + 双平台 (Windows + macOS)。
+# v3.1 Electron workflow (build-installers.yml v1) 弃用 — 路径完全不适配 Tauri。
 #
-# Mac 产物未签名(CLAUDE.md §13 D11 决策):Gatekeeper 首启拦截 + 右键打开。
-# v4.0 才会接 Apple Developer ID + notarization。
-name: Build installers
+# - tag v*     → Windows + macOS 双 build, 产物挂 GitHub release
+# - manual     → Actions 页面 Run workflow, 只 build 不发 release (调试用)
+# - push PR    → 不触发 (避免每次 PR 5-10 分钟 mac build)
+#
+# Mac 产物未签名 (CLAUDE.md §13 D11 决策 v4 起步不签): Gatekeeper 首启拦 + 右键打开。
+# v4.1+ 才接 Apple Developer ID + notarization。
+#
+# 镜像: .cargo/config.toml 已配 rsproxy-sparse (commit 0 落),节省 30-60min → 5-10min。
+name: Build installers (Tauri 2)
 
 on:
   push:
@@ -15,10 +20,10 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # 允许 softprops/action-gh-release 创建/更新 release
+  contents: write   # softprops/action-gh-release 创建/更新 release
 
 jobs:
-  # ───────────────────── Windows: build + test + upload ─────────────────────
+  # ───────────────────── Windows: test + build + upload ─────────────────────
   windows:
     name: Windows installer
     runs-on: windows-latest
@@ -30,38 +35,39 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Install JS dependencies (skip native compile)
-        # CLAUDE.md §10:better-sqlite3 必须用 Electron headers 重编,
-        # 不能用系统 Node 的预编译 .node(二进制 ABI 不兼容)。
+        # CLAUDE.md §10 (v4.0): 唯一需要 native 编译的是 tauri (Rust),
+        # 无 better-sqlite3 了 (rusqlite bundled)。npm ci 不需要 --ignore-scripts,
+        # 但保留 skip-on-error 防 postinstall 失败(纯保险)。
         run: npm ci --ignore-scripts
 
-      - name: Install Electron binary
-        # --ignore-scripts 跳过了 electron 的 postinstall (下载 Electron 二进制)。
-        # 不补这一步,后面 npm test 跑 ELECTRON_RUN_AS_NODE=1 electron 会报
-        # "Electron failed to install correctly, please delete node_modules/electron"。
-        run: node node_modules/electron/install.js
+      - name: Cache cargo registry & build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri → target
 
-      - name: Rebuild better-sqlite3 for Electron
-        # electron-rebuild 把 better-sqlite3 编成跟 Electron 内置 Node ABI 匹配。
-        # 没有这一步,npm test 会 ERR_DLOPEN_FAILED(NODE_MODULE_VERSION 127 vs 128)。
-        run: npm run rebuild:sqlite
+      - name: Run cargo test (lib)
+        # v4.0 commit 11/12 已落 22 case + 2 ignore; Windows Defender 不再拦。
+        run: npm run test:tauri -- --lib
 
-      - name: Run tests
-        run: npm test
-
-      - name: Type check
+      - name: Type check (renderer + electron config)
+        # v4.0 仍用 tsc 验证 src/ 前端, electron config 留作历史(空壳)
         run: npm run typecheck
 
       - name: Build portable installer
-        # electron-builder 自带 @electron/rebuild 会再次重编 better-sqlite3,
-        # 这次按目标 Electron 版本,确保打包出来的 binary 可运行。
-        run: npm run package:portable
+        # cargo-tauri build → src-tauri/target/release/bundle/{nsis,msi}/*.exe
+        run: npm run build:tauri
 
-      - name: Upload portable artifact
+      - name: Upload Windows MSI/NSIS artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cc-manager-windows-portable
-          path: release/CC Manager-*-portable.exe
+          name: cc-manager-windows
+          path: |
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/nsis/*.exe
           if-no-files-found: error
 
       - name: Upload to GitHub release (tag only)
@@ -69,19 +75,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            release/CC Manager-*-portable.exe
-            release/CC Manager-*-x64.exe
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/nsis/*.exe
           fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # ───────────────────── macOS: build + upload (未签名) ─────────────────────
-  # macOS runner 是 Apple Silicon (M1,arm64)。electron-builder 配 mac target =
-  # dmg+zip 双架构(arm64+x64),D9 续决策要求双架构。Apple Silicon 用户用 arm64
-  # 原生跑,Intel Mac 用 Rosetta 2 跑 x64。
-  #
-  # 已知问题:GitHub Actions macos-latest 的 hdiutil detach 在 arm64 DMG 打包时
-  # 偶发失败(Exit code 16)。fallback:DMG 失败仍继续产 ZIP(zip 没这个问题)。
+  # ───────────────────── macOS: test + build + upload (未签名) ─────────────────────
   macos:
     name: macOS installer (unsigned)
     runs-on: macos-latest
@@ -93,44 +93,45 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install JS dependencies (skip native compile)
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install JS dependencies
         run: npm ci --ignore-scripts
 
-      - name: Install Electron binary
-        # 同 Windows job: --ignore-scripts 跳过 electron postinstall,需手动触发下载。
-        run: node node_modules/electron/install.js
+      - name: Cache cargo registry & build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri → target
 
-      - name: Rebuild better-sqlite3 for Electron
-        # CLAUDE.md §10:macOS 系统 Node ABI ≠ Electron Node ABI,需 electron-rebuild
-        run: npm run rebuild:sqlite
+      - name: Run cargo test (lib)
+        run: npm run test:tauri -- --lib
 
-      - name: Build DMG + ZIP
-        # electron-builder.json 已经配 arm64 + x64 双架构 + dmg + zip,这里不用 --x64。
-        # 已知问题:GitHub Actions macos-latest (M1 runner) 上 hdiutil detach 偶发
-        # Exit code 16 → arm64 DMG 收尾失败 → 整个 electron-builder exit 1。
-        # 临时方案:整条命令 retry 1 次,第二次通常成功(M1 runner 偶发不是稳定失败)。
-        run: npm run package:mac || (sleep 15 && echo "::warning::DMG hdiutil retry — known GitHub Actions macos-latest bug" && npm run package:mac)
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Build DMG + APP
+        # cargo-tauri build → src-tauri/target/release/bundle/{dmg,macos}/*
+        # 已知问题: GitHub Actions macos-latest (M1) cargo-tauri DMG 偶发挂起,
+        # fallback retry 1 次。
+        run: npm run build:tauri || (sleep 15 && echo "::warning::DMG build retry — known GitHub Actions macos-latest" && npm run build:tauri)
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
           name: cc-manager-macos
           path: |
-            release/CC Manager-*-mac-arm64.dmg
-            release/CC Manager-*-mac-arm64.zip
-            release/CC Manager-*-mac-x64.dmg
-            release/CC Manager-*-mac-x64.zip
-          if-no-files-found: warn  # macOS build is best-effort;unsigned + 真机未验证
+            src-tauri/target/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/macos/*.app
+          if-no-files-found: warn   # macOS best-effort; 未签名 + 真机未验证
 
       - name: Upload to GitHub release (tag only)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            release/CC Manager-*-mac-arm64.dmg
-            release/CC Manager-*-mac-arm64.zip
-            release/CC Manager-*-mac-x64.dmg
-            release/CC Manager-*-mac-x64.zip
+            src-tauri/target/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/macos/*.app
           fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
