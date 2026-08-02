@@ -387,6 +387,27 @@ cc-session-manager/
      - settings_reader + ClaudeSettings v3.1 等价测试 (unknown-fields 保留策略变化)
      - macOS 真机验证 (Apple Developer ID + notarization 留 v4.1+)
      - 4-10 个 plugins/hooks enable 路径补 (v4 commit 11 apply.rs 标 "未实现 in v4.0 commit 11" 的 skip 项)
+- **2026-08-03 v4 D33 v4.0 release deferred (用户决策)**:
+  - **背景**: tag `v4.0.0-rust-migration` 推后, CI run #30756586212 跑 Windows + macOS 双 build — Windows job 在 typecheck 步骤 fail (`error TS18003: No inputs were found in config file 'tsconfig.electron.json'`)。commit 31 (D32) 修了 `package.json typecheck` script, 但 tsconfig.electron.json 文件本身没删 + electron-* scripts 没清。
+  - **用户决策**: 2026-08-03 '不build了, 成功不了, 总结一下工作, 将知识沉淀下' — v4.0 release 暂不发布, 改做总结归档。
+  - **理由**:
+    - v4.0 30 commit + 31 fix commit 已落, 代码完整 (commit 30/30 + commit 31 D32)
+    - 但 release chain 还没修完: tsconfig.electron.json 文件本身可能还要删, electron-* scripts 清理未做
+    - 真机手验 4 步用户没完整跑过 (sessions / plugins / profile capture / apply)
+    - v4.1 follow-up 7 项等下个会话
+  - **结果**: branch `rust/full-tauri-migration` 已推 (含 commits 0-31 共 32 commit), tag `v4.0.0-rust-migration` 已推但 release build fail, 待 v4.0.1 修复。peaks memory sediment + CLAUDE.md D33 沉淀完成。
+  - **教训 (D33)**:
+    1. **"code 完整" ≠ "release ready"** — 31 commit 全绿 + cargo test 36 passed + tsc 0 错 + build:vite 成功, 但 release chain (CI workflow + tsconfig + electron scripts) + 真机手验 还没做 → release 失败
+    2. **真机手验是 release 前必经** — D26/D27/D28/D29/D30/D31 都是手验暴露的 bug, 提前跑能减少 commit 数 (v4.0 commit 5-14 期间未做手验 = 后期 commit 16-31 大量手验 fix commit)
+    3. **release 前 checklist** (v4.1 必跑):
+       - 真机手验 4 步全过 (sessions / plugins / profile / apply)
+       - CI 双平台 typecheck 绿 (D32 已修 package.json)
+       - tsconfig.electron.json 文件本身删
+       - electron-* scripts (dev:electron / build / test / rebuild:sqlite / package*) 删
+       - macOS DMG + Windows MSI 实际 artifact 验 (CI runner 跑)
+       - 重新 push tag 触发 CI release build (tag 推送不会因新 commit 自动重跑, 需手动 re-run workflow 或新 tag)
+    4. 用户决策 "不发布, 总结下" 是稳的 — 31 commit 内部归档 + v4.0.1 修复 release 比 v4.0 半成品发布更负责。**用户审慎 > 用户急躁**。
+  - **关联**: `.peaks/memory/2026-08-03-v4-tauri-migration-overview.md` (完整 31 commit 总览 + 12 决策表 D17-D32 + bug 修复链 + v4.1 follow-up 7 项)
 
 ## 15. 文档同步纪律（防误解）
 
