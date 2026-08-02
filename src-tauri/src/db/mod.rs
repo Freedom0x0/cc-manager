@@ -150,6 +150,16 @@ impl DB {
     }
 }
 
+/// Tauri 共享 DB 状态(spec §3.4):
+/// Connection 是 Send + !Sync, 装 Mutex 后变 Send + Sync, 才能装进 tauri::State。
+pub struct DbState(pub std::sync::Mutex<DB>);
+
+impl DbState {
+    pub fn new(db: DB) -> Self {
+        Self(std::sync::Mutex::new(db))
+    }
+}
+
 // ============================================================================
 // tests
 // ============================================================================

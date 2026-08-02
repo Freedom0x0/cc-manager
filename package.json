@@ -47,6 +47,7 @@
     "wait-on": "^8.0.1"
   },
   "dependencies": {
+    "@tauri-apps/api": "^2.11.1",
     "antd": "^6.5.2",
     "better-sqlite3": "^11.10.0",
     "chokidar": "^5.0.0",
