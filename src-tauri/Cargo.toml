@@ -32,6 +32,17 @@ home = "0.5"
 dirs = "5"
 parking_lot = "0.12"
 tokio = { version = "1", features = ["sync", "time"] }
+hmac = "0.12"      # v1.2 c3: cc-status-emit HMAC signing
+sha2 = "0.10"      # v1.2 c3: SHA-256
+hex = "0.4"        # v1.2 c3: signature hex encoding
 
 [dev-dependencies]
 tempfile = "3"
+
+[[bin]]
+name = "cc-status-emit"
+path = "src/bin/cc-status-emit.rs"
+
+[[test]]
+name = "cc_status_emit_test"
+path = "src/bin/cc_status_emit_test.rs"
