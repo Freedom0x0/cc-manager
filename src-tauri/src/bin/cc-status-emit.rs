@@ -14,26 +14,15 @@ use std::process::ExitCode;
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
 
+// Single source of truth for the hook→state mapping (spec §5.2): the lib
+// crate's pet::state module. The lib target is named `app_lib` in Cargo.toml,
+// hence the import path below rather than the package name.
+use app_lib::pet::state::event_name_to_state_str;
+
 type HmacSha256 = Hmac<Sha256>;
 
-const TARGET_URL: &str = "http://127.0.0.1:19847/agent-event";
-
-// Duplicated from src-tauri/src/pet/state.rs — keep binary self-contained.
-// Option A per task brief: bin is its own crate root, cannot import from
-// the lib crate's pet module without extra plumbing. The mapping table is
-// small (6 entries) and stable (spec §5.2 single source of truth); sync
-// with src-tauri/src/pet/state.rs::HOOK_TO_STATE on any change.
-fn state_for_hook(event: &str) -> Option<&'static str> {
-    match event {
-        "UserPromptSubmit" => Some("responding"),
-        "PreToolUse" => Some("tool-use"),
-        "PostToolUse" => Some("tool-use"),
-        "Stop" => Some("completed"),
-        "SubagentStop" => Some("completed"),
-        "Notification" => Some("ask-user"),
-        _ => None,
-    }
-}
+const TARGET_HOST: &str = "127.0.0.1:19847";
+const TARGET_PATH: &str = "/agent-event";
 
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().collect();
@@ -58,11 +47,9 @@ fn main() -> ExitCode {
         Err(_) => return ExitCode::SUCCESS,  // bad JSON → silent drop
     };
 
-    // Map event to PetState via shared module
-    let state_str = match state_for_hook(&event_name) {
-        Some(s) => serde_json::to_value(s).unwrap_or(serde_json::json!("idle")),
-        None => serde_json::json!("idle"),  // unknown event (e.g. PermissionRequest) → idle
-    };
+    // Map event to PetState via shared module; unknown events (e.g. the
+    // non-existent PermissionRequest) fall back to "idle".
+    let state_str = serde_json::json!(event_name_to_state_str(&event_name));
     if let Some(obj) = event.as_object_mut() {
         obj.insert("state".to_string(), state_str);
         if !obj.contains_key("timestamp_ms") {
@@ -96,7 +83,7 @@ fn main() -> ExitCode {
     }
 
     // POST to cc-manager HTTP receiver
-    let _ = post_to_target(TARGET_URL, &body, &sig);
+    let _ = post_to_target(&body, &sig);
     // Silent on all errors (E1: cc-manager not running → drop silently)
     ExitCode::SUCCESS
 }
@@ -106,24 +93,26 @@ fn parse_arg(args: &[String], flag: &str) -> Option<String> {
     args.get(i + 1).cloned()
 }
 
-fn post_to_target(_url: &str, body: &str, sig: &str) -> std::io::Result<()> {
+fn post_to_target(body: &str, sig: &str) -> std::io::Result<()> {
     // Minimal HTTP POST without external deps. Uses TcpStream to localhost:19847.
     use std::io::{Read, Write};
     use std::net::TcpStream;
 
-    let mut stream = TcpStream::connect("127.0.0.1:19847")?;
+    let mut stream = TcpStream::connect(TARGET_HOST)?;
     let req = format!(
-        "POST /agent-event HTTP/1.1\r\n\
-         Host: 127.0.0.1:19847\r\n\
+        "POST {path} HTTP/1.1\r\n\
+         Host: {host}\r\n\
          Content-Type: application/json\r\n\
-         X-Signature: hmac-sha256={}\r\n\
-         Content-Length: {}\r\n\
+         X-Signature: hmac-sha256={sig}\r\n\
+         Content-Length: {len}\r\n\
          Connection: close\r\n\
          \r\n\
-         {}",
-        sig,
-        body.len(),
-        body
+         {body}",
+        path = TARGET_PATH,
+        host = TARGET_HOST,
+        sig = sig,
+        len = body.len(),
+        body = body
     );
     stream.write_all(req.as_bytes())?;
     let mut response = String::new();

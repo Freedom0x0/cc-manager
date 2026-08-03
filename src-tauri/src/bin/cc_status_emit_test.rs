@@ -96,11 +96,14 @@ mod tests_inner {
 
     #[test]
     fn test_cc_status_emit_missing_secret_exits_zero() {
-        // No CC_PET_SECRET env, no --secret arg → exit 0 silently (E1)
+        // No CC_PET_SECRET env, no --secret arg → exit 0 silently (E1).
+        // Strip CC_PET_SECRET from the spawned env so a leaked value in the
+        // parent shell can't make the test pass for the wrong reason.
         let bin = env!("CARGO_BIN_EXE_cc-status-emit");
-        let child = Command::new(bin)
+        let mut child = Command::new(bin)
             .arg("--event")
             .arg("Stop")
+            .env_remove("CC_PET_SECRET")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .spawn()

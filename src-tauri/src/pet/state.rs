@@ -24,6 +24,20 @@ pub enum PetState {
 }
 
 impl PetState {
+    /// Wire-format string, identical to the `#[serde(rename)]` above.
+    /// Exhaustive match: adding a variant without a string here fails to compile.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Idle => "idle",
+            Self::Responding => "responding",
+            Self::Thinking => "thinking",
+            Self::ToolUse => "tool-use",
+            Self::AskUser => "ask-user",
+            Self::Completed => "completed",
+            Self::ErrorInterrupted => "error-interrupted",
+        }
+    }
+
     pub fn priority(&self) -> u8 {
         match self {
             Self::AskUser => 100,
@@ -64,6 +78,17 @@ pub fn state_for_hook(event: &str) -> Option<PetState> {
     HOOK_TO_STATE.iter()
         .find(|(e, _)| *e == event)
         .map(|(_, s)| *s)
+}
+
+/// Hook event name → wire-format state string, unknown events → `"idle"`.
+///
+/// Single source of truth for callers that need the string form directly —
+/// notably the `cc-status-emit` binary, which injects it into the event JSON.
+/// Keeps HOOK_TO_STATE the one mapping table (D34.14).
+pub fn event_name_to_state_str(event: &str) -> &'static str {
+    state_for_hook(event)
+        .unwrap_or(PetState::Idle)
+        .as_str()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -131,8 +156,24 @@ mod tests {
     }
 
     #[test]
-    fn test_agent_state_event_default_payload() {
-        // payload should default to Null when missing from JSON (D34 spec)
+    fn test_event_name_to_state_str_matches_serde_rename() {
+        // The string form must stay byte-identical to the serde wire format,
+        // because cc-status-emit injects it straight into the event JSON.
+        for (event, state) in HOOK_TO_STATE {
+            let via_serde = serde_json::to_string(state).unwrap();
+            assert_eq!(
+                format!("\"{}\"", event_name_to_state_str(event)),
+                via_serde,
+                "mismatch for hook event {}", event
+            );
+        }
+        // Unknown events fall back to idle (E1 silent drop, never panics).
+        assert_eq!(event_name_to_state_str("PermissionRequest"), "idle");
+        assert_eq!(event_name_to_state_str(""), "idle");
+    }
+
+    #[test]
+    fn test_agent_state_event_default_payload() {        // payload should default to Null when missing from JSON (D34 spec)
         let json = r#"{"session_id":"abc","state":"idle","timestamp_ms":1234}"#;
         let event: AgentStateEvent = serde_json::from_str(json).unwrap();
         assert_eq!(event.session_id, "abc");
