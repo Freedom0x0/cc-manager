@@ -1,9 +1,26 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-03T12:30:00.000Z",
+  "updatedAt": "2026-08-03T13:45:00.000Z",
   "hot": {
     "feedback": [],
     "decision": [
+      {
+        "id": "v4-cc-pet-v1.2",
+        "title": "cc-pet v1.2 review fixes — 5 事实硬错 + 3 设计澄清",
+        "summary": "v1.0/v1.1 修了 4 项, v1.2 修了第二轮 review 命中 5 事实硬错: F1 编造的 Cargo.toml [[bin]] 段 (实为 [lib] rlib + 默认 src/main.rs bin) / F2 捏造的 atomic_write binary 函数 (实只有 atomic_write_json) / F3 编造的 5 依赖 (实需 4 + getrandom) / F4 漏 capabilities/pet.json 完整 ACL (Tauri 2 白名单模式) / F5 二手信息 PermissionRequest (Claude Code 真实 hook event 不存在, 砍 PetState 8→7). 3 澄清: D34.10 PetStateDaemon + mpsc + parking_lot 锁 / D34.11 synthetic idle 后端 spawn timer / D34.12 secret.json JSON 替代 binary / D34.13 capabilities 显式白名单 / D34.14 HOOK_TO_STATE 集中常量. 教训: 网络沙箱拒 docs 不能编造答案 / 凭印象写代码 = 错 / 真机手验是最后闸门 / 用户 review 是 spec 质量门控.",
+        "capturedAt": "2026-08-03T13:45:00.000Z",
+        "sourceRid": "2026-08-03-rid-cc-pet-v1.2",
+        "sourceSession": "2026-08-03-session-mentor",
+        "relatedFiles": [
+          "docs/superpowers/specs/2026-08-03-cc-pet-integration-design.md",
+          ".peaks/memory/2026-08-03-cc-pet-design.md",
+          "src-tauri/Cargo.toml",
+          "src-tauri/src/util/atomic_write.rs",
+          "src-tauri/src/repo/hooks_scanner.rs",
+          "src-tauri/capabilities/default.json",
+          "CLAUDE.md"
+        ]
+      },
       {
         "id": "v4-cc-pet-design",
         "title": "cc-pet (Hopet-like 嵌入式桌面宠物) 整体设计 7 项决策",

@@ -139,3 +139,93 @@ manager = 状态丢. 这符合"嵌入式宠物"语义, 也避开 D10 禁令.
 3. **跨平台陷阱**: secret 文件权限 (chmod 600 vs icacls) / Windows Firewall
    端口 (loopback 不拦) 这类"看似要处理其实不用"的项目, spec 应该**明确
    说明**为什么不处理, 不留"看起来应该有"的歧义.
+
+---
+
+# v1.1 review fixes (commit 5fffb94)
+
+## 用户第二轮 review 命中
+
+5 个事实硬错 (F1-F5) + 3 个设计澄清 (D34.x 后续), 全部修.
+
+### F1: 编造的 `[[bin]]` 段
+
+**v1.0/v1.1 spec §8.1 写**: "Cargo.toml 加 `[[bin]] name = "cc-status-emit" path = "src/bin/cc-status-emit.rs"`"
+
+**真实**: Cargo.toml:13-15 只有 `[lib]`, **没有任何 `[[bin]]` 段**; `src-tauri/src/bin/`
+目录**不存在**; cargo metadata 只识别默认 `src/main.rs` bin.
+
+**根因**: 凭 v3.1 Electron 时代印象 (v3.1 是 Electron 进程, 没 Cargo.toml), 没读 v4.
+
+**修复**: v1.2 spec §8.1 改成正确格式 - 加 `[[bin]] name = "cc-status-emit" path = "src/bin/cc-status-emit.rs"`,
+ 单独 `[[bin]]` 段, 现有 main.rs 仍然靠 cargo 默认推断.
+
+### F2: 捏造的 `atomic_write` binary 函数
+
+**v1.0/v1.1 spec §4.1 写**: "util/atomic_write::atomic_write secret.key (binary 写)"
+
+**真实**: atomic_write.rs:88 只有 `atomic_write_json<T: Serialize>`. **没有** binary 写函数.
+
+**修复**: v1.2 spec §4.1 表格改: secret 走 `atomic_write_json` 写 `{"secret": "..."}` JSON 格式,
+ 不需要 binary 写. §5.5 secret.json 替代 secret.key.
+
+### F3: 编造的依赖列表
+
+**v1.0/v1.1 spec §8.1 写**: "加 axum/hmac/sha2/hex/rand 5 依赖"
+
+**真实**: Cargo.toml 9 个 dep 无这 5 个. 而 `rand` 不需要 - `getrandom` 是 Rust 实践,
+ v4 Cargo.lock 已有 transitive.
+
+**修复**: v1.2 spec §4.3 改成 4 依赖 (axum/hmac/sha2/hex) + getrandom + tokio + parking_lot.
+
+### F4: 漏 capabilities/pet.json ACL
+
+**v1.0/v1.1 spec §4.1 写**: "capabilities/pet.json 允许 pet 窗口权限"
+
+**真实**: capabilities/default.json 是白名单模式 `windows: ["main"]`. Tauri 2 不允许
+ default 隐式覆盖 — 加新 window **必须** 显式列出, 而且需要 permissions 数组.
+
+**修复**: v1.2 spec §8.4 完整写 capabilities/pet.json 模板 + 3 个 permissions.
+
+### F5: 二手信息 PermissionRequest
+
+**v1.0/v1.1 spec §3.1 Layer 1 写**: "PermissionRequest → PermissionPrompt"
+
+**真实**: Claude Code **没有** PermissionRequest hook event (Hopet 文档里写的 PermissionRequest
+ 是 Hopet 自己的概念, 不是 Claude Code 的 hook event 名). 同时 spec 还漏了 `SubagentStop`
+ (Claude Code 真实有).
+
+**根因**: 我网络沙箱拒了 docs.anthropic.com, 但凭 Hopet 文档 + 中文博客抄了二手信息.
+
+**修复**: v1.2 spec §3.2.2 用 v4 `repo/hooks_scanner::HOOK_EVENTS` 真实名单 (hooks_scanner.rs:9-11),
+ 砍 PermissionPrompt (PetState 8→7), 加 SubagentStop, D34.8 决策记录.
+
+### F5 副作用: PermissionPrompt 状态砍掉
+
+webSearch 摘要 + v4 HOOK_EVENTS 交叉验证 6 个真实 event:
+PreToolUse/PostToolUse/Stop/SubagentStop/Notification/UserPromptSubmit.
+
+Notification 重新映射到 AskUser (Claude Code "通知" 是最接近"需用户介入"的概念).
+
+### 3 个设计澄清 (D34.10-D34.14)
+
+| 决策 | v1.2 加在哪 |
+|---|---|
+| D34.10 PetStateDaemon 独立 daemon + mpsc + parking_lot 锁 | §11.1 / §11.2 |
+| D34.11 synthetic idle 后端 spawn timer, 不走前端 setTimeout | §11.3 |
+| D34.12 secret.json (JSON) 替代 binary 写 | §5.5 |
+| D34.13 capabilities/pet.json 显式白名单 | §8.4 |
+| D34.14 HOOK_TO_STATE 集中常量 | §5.2 |
+
+## 教训 (二手信息)
+
+1. **网络沙箱拒 docs.anthropic.com 不能编造答案**. 上轮我 spec 抄 Hopet 文档 + 博客,
+   写出 F5. 本轮由 WebSearch 摘要 + v4 HOOK_EVENTS 实测数据交叉验证, 仍带"⚠️ 待真机手验"
+   风险标签 (§5.3 §9.3 第 9 步).
+2. **凭印象写代码 = 写错误代码**. F1-F3 全是凭 v3.1 印象. v4 commit 11 教训 (D17) 同样
+   写过 "v3.1 → v4 schema 平移必须看真实数据", 这次踩坑是没把这教训同步到 pet spec 写作.
+3. **真机手验是 spec 写完后的最后一道闸**. §9.3 第 9 步专门查字段名, 因为 AgentStateEvent
+   字段是 WebSearch 摘要推断, 真实 hook payload 字段名可能完全不一样.
+4. **用户 review 是 spec 质量的实际门控**. v1.0 → v1.1 (4 fix) → v1.2 (5 fix + 3 澄清) = 
+   3 轮 review 才把硬错挖出来. brainstorming 自查 + 自我检查覆盖不到二手信息 / v4 路径,
+   只有用户实战 review 才能命中.
