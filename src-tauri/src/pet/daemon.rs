@@ -38,9 +38,13 @@ impl PetStateDaemon {
             event_tx: tx,
         });
 
-        // Spawn the mpsc → daemon loop task
+        // Spawn the mpsc → daemon loop task. Use Tauri's async_runtime
+        // (Tauri 2 wraps tokio + guarantees a runtime is running) instead of
+        // `tokio::spawn`, which panics with "there is no reactor running"
+        // when called from a sync setup-hook context. — D34 fix after
+        // dev:tauri panic at daemon.rs:43 in commit 0e7f5c1..0048807 follow-up.
         let daemon_clone = daemon.clone();
-        tokio::spawn(async move {
+        tauri::async_runtime::spawn(async move {
             Self::run_loop(daemon_clone, rx).await;
         });
 
@@ -60,7 +64,7 @@ impl PetStateDaemon {
         });
 
         let daemon_clone = daemon.clone();
-        tokio::spawn(async move {
+        tauri::async_runtime::spawn(async move {
             Self::run_loop(daemon_clone, rx).await;
         });
 
@@ -102,7 +106,7 @@ impl PetStateDaemon {
             //   (which has no production subscribers) — PetWindow listen()
             //   never sees the synthetic Idle.
             let app = self.app.clone();
-            tokio::spawn(async move {
+            tauri::async_runtime::spawn(async move {
                 tokio::time::sleep(Duration::from_secs(5)).await;
                 let idle = AgentStateEvent {
                     session_id: session_id.clone(),

@@ -7,6 +7,7 @@ license = ""
 repository = ""
 edition = "2021"
 rust-version = "1.77.2"
+default-run = "cc-session-manager"  # v1.2 c3+ follow-up: pick default when `cargo run` has 2+ bin targets
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -48,4 +49,4 @@ path = "src/bin/cc-status-emit.rs"
 
 [[test]]
 name = "cc_status_emit_test"
-path = "src/bin/cc_status_emit_test.rs"
+path = "tests/cc_status_emit.rs"

@@ -82,7 +82,11 @@ pub async fn start_http_server(daemon: Arc<PetStateDaemon>, secret: String) -> R
         .await
         .map_err(|e| format!("bind 127.0.0.1:19847: {}", e))?;
 
-    tokio::spawn(async move {
+    // tauri::async_runtime::spawn (not tokio::spawn) — same rationale as
+    // daemon.rs:43. Even though start_http_server is `async` and called from
+    // a tokio-runtime context, using Tauri's wrapper is the documented pattern
+    // and matches lib.rs:30.
+    tauri::async_runtime::spawn(async move {
         if let Err(e) = axum::serve(listener, app).await {
             eprintln!("[pet http] server error: {}", e);
         }
