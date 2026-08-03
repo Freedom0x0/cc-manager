@@ -13,8 +13,27 @@ pub fn run() {
         eprintln!("[startup] rescan_all failed: {}", e);
       }
       app.manage(crate::db::DbState::new(db));
-      // v1.2 c2: PetStateDaemon stub (real wiring in c4)
-      app.manage(crate::pet::daemon::PetStateDaemon::new());
+      // v1.2 c4: PetStateDaemon (real wiring with AppHandle so Task 5 can
+      // emit "agent-state-event" to the frontend without changing the
+      // signature again) + HTTP receiver on 127.0.0.1:19847.
+      let app_handle = app.handle().clone();
+      let daemon = crate::pet::daemon::PetStateDaemon::new(app_handle);
+      let secret = match crate::pet::install::secret_load_or_create(&app_data_dir) {
+        Ok(s) => s,
+        Err(e) => {
+          eprintln!("[startup] pet secret load_or_create failed: {}", e);
+          return Err(e.into());
+        }
+      };
+      let daemon_for_http = daemon.clone();
+      let secret_for_http = secret.clone();
+      tauri::async_runtime::spawn(async move {
+        if let Err(e) = crate::pet::http::start_http_server(daemon_for_http, secret_for_http).await {
+          eprintln!("[startup] pet http server failed: {}", e);
+        }
+      });
+      app.manage(daemon);
+      let _ = secret; // kept for future direct IPC use
       Ok(())
     })
     .invoke_handler(tauri::generate_handler![
@@ -627,13 +646,35 @@ fn cmd_usage_get_top_tools(
 // ===== v1.2 c2: cc-pet IPC handlers =====
 
 #[tauri::command]
-async fn cmd_pet_install_status_hook(_app: tauri::AppHandle) -> Result<crate::pet::state::InstallResult, String> {
-    Err("not implemented in c2, will be wired in c4".into())
+async fn cmd_pet_install_status_hook(app: tauri::AppHandle) -> Result<crate::pet::state::InstallResult, String> {
+    use tauri::Manager;
+    let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let secret = crate::pet::install::secret_load_or_create(&app_data_dir)?;
+
+    let settings_path = home::home_dir()
+        .map(|h| h.join(".claude").join("settings.json"))
+        .ok_or_else(|| "home_dir not found".to_string())?;
+
+    let emit_path = std::env::current_exe()
+        .map_err(|e| e.to_string())?
+        .parent()
+        .map(|p| p.join(if cfg!(windows) { "cc-status-emit.exe" } else { "cc-status-emit" }))
+        .ok_or_else(|| "exe parent dir not found".to_string())?;
+
+    crate::pet::install::install_status_hooks(
+        &settings_path,
+        &secret,
+        &emit_path,
+        crate::repo::hooks_scanner::HOOK_EVENTS,
+    )
 }
 
 #[tauri::command]
 async fn cmd_pet_uninstall_status_hook(_app: tauri::AppHandle) -> Result<crate::pet::state::UninstallResult, String> {
-    Err("not implemented in c2, will be wired in c4".into())
+    let settings_path = home::home_dir()
+        .map(|h| h.join(".claude").join("settings.json"))
+        .ok_or_else(|| "home_dir not found".to_string())?;
+    crate::pet::install::uninstall_status_hooks(&settings_path)
 }
 
 #[tauri::command]
@@ -675,9 +716,9 @@ async fn cmd_pet_window_close(app: tauri::AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 fn cmd_pet_get_status(
-    _state: tauri::State<std::sync::Arc<crate::pet::daemon::PetStateDaemon>>,
+    state: tauri::State<std::sync::Arc<crate::pet::daemon::PetStateDaemon>>,
 ) -> Result<Vec<crate::pet::state::AgentStateEvent>, String> {
-    Ok(Vec::new())
+    Ok(state.snapshot())
 }
 
 pub mod db;

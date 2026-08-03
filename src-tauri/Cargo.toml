@@ -35,9 +35,12 @@ tokio = { version = "1", features = ["sync", "time"] }
 hmac = "0.12"      # v1.2 c3: cc-status-emit HMAC signing
 sha2 = "0.10"      # v1.2 c3: SHA-256
 hex = "0.4"        # v1.2 c3: signature hex encoding
+axum = "0.7"       # v1.2 c4: HTTP receiver
+getrandom = "0.3"  # v1.2 c4: 32-byte secret generation
 
 [dev-dependencies]
 tempfile = "3"
+tower = { version = "0.5", features = ["util"] }  # v1.2 c4: pet::http tests use ServiceExt::oneshot
 
 [[bin]]
 name = "cc-status-emit"
