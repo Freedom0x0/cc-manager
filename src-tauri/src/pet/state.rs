@@ -66,6 +66,17 @@ pub fn state_for_hook(event: &str) -> Option<PetState> {
         .map(|(_, s)| *s)
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InstallResult {
+    pub installed: usize,
+    pub skipped: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UninstallResult {
+    pub removed: usize,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

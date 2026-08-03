@@ -365,6 +365,7 @@ dependencies = [
  "home",
  "log",
  "notify",
+ "parking_lot",
  "rusqlite",
  "serde",
  "serde_json",
@@ -373,6 +374,7 @@ dependencies = [
  "tauri-plugin-log",
  "tempfile",
  "thiserror 1.0.69",
+ "tokio",
 ]
 
 [[package]]

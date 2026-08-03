@@ -7,3 +7,4 @@
 //! - c4: daemon, install, http
 
 pub mod state;
+pub mod daemon;

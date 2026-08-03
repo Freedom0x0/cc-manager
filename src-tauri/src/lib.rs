@@ -13,6 +13,8 @@ pub fn run() {
         eprintln!("[startup] rescan_all failed: {}", e);
       }
       app.manage(crate::db::DbState::new(db));
+      // v1.2 c2: PetStateDaemon stub (real wiring in c4)
+      app.manage(crate::pet::daemon::PetStateDaemon::new());
       Ok(())
     })
     .invoke_handler(tauri::generate_handler![
@@ -89,6 +91,12 @@ pub fn run() {
       cmd_usage_get_project_breakdown,
       cmd_usage_get_daily_breakdown,
       cmd_usage_get_top_tools,
+      // v1.2 c2: cc-pet 5 IPC handlers
+      cmd_pet_install_status_hook,
+      cmd_pet_uninstall_status_hook,
+      cmd_pet_window_open,
+      cmd_pet_window_close,
+      cmd_pet_get_status,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
@@ -614,6 +622,62 @@ fn cmd_usage_get_top_tools(
 ) -> Result<Vec<crate::repo::usage::UsageByToolRow>, String> {
     let db = state.0.lock().map_err(|e| e.to_string())?;
     Ok(crate::repo::usage::get_top_tools(&db, limit.unwrap_or(10)))
+}
+
+// ===== v1.2 c2: cc-pet IPC handlers =====
+
+#[tauri::command]
+async fn cmd_pet_install_status_hook(_app: tauri::AppHandle) -> Result<crate::pet::state::InstallResult, String> {
+    Err("not implemented in c2, will be wired in c4".into())
+}
+
+#[tauri::command]
+async fn cmd_pet_uninstall_status_hook(_app: tauri::AppHandle) -> Result<crate::pet::state::UninstallResult, String> {
+    Err("not implemented in c2, will be wired in c4".into())
+}
+
+#[tauri::command]
+async fn cmd_pet_window_open(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+
+    if let Some(existing) = app.get_webview_window("pet") {
+        existing.show().map_err(|e| e.to_string())?;
+        existing.set_focus().map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+
+    tauri::WebviewWindowBuilder::new(
+        &app,
+        "pet",
+        tauri::WebviewUrl::App("pet.html".into()),
+    )
+    .title("cc-pet")
+    .inner_size(280.0, 320.0)
+    .decorations(false)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .resizable(false)
+    .transparent(true)
+    .build()
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn cmd_pet_window_close(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+
+    if let Some(window) = app.get_webview_window("pet") {
+        window.close().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn cmd_pet_get_status(
+    _state: tauri::State<std::sync::Arc<crate::pet::daemon::PetStateDaemon>>,
+) -> Result<Vec<crate::pet::state::AgentStateEvent>, String> {
+    Ok(Vec::new())
 }
 
 pub mod db;
