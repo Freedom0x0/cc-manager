@@ -98,6 +98,11 @@ impl PetStateDaemon {
         // 3. Spawn synthetic idle if Completed (per §11.3)
         if state == PetState::Completed {
             let bcast = self.broadcast.clone();
+            // D34 fix (c5 review C2): clone AppHandle so spawned closure can
+            //   also emit to frontend. Without this, only broadcast fires
+            //   (which has no production subscribers) — PetWindow listen()
+            //   never sees the synthetic Idle.
+            let app = self.app.clone();
             tokio::spawn(async move {
                 tokio::time::sleep(Duration::from_secs(5)).await;
                 let idle = AgentStateEvent {
@@ -114,7 +119,10 @@ impl PetStateDaemon {
                         .unwrap_or(0),
                     payload: serde_json::json!(null),
                 };
-                let _ = bcast.send(idle);
+                let _ = bcast.send(idle.clone());
+                if let Some(app) = app.as_ref() {
+                    let _ = app.emit("agent-state-event", &idle);
+                }
             });
         }
     }

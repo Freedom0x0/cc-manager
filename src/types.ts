@@ -462,5 +462,6 @@ export interface AgentStateEvent {
   mcp_server: string | null;
   elapsed_ms: number | null;
   timestamp_ms: number;
-  payload: any;
+  // D34 fix (c5 review M2): unknown 配 Rust serde_json::Value (CLAUDE.md §12)
+  payload: unknown;
 }

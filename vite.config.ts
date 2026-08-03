@@ -39,10 +39,13 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     // v1.2 D34 c5: 多入口 (主窗口 + 宠物窗口), spec §8.3
+    // D34 fix (c5 review): pet.html 放项目根 (跟 index.html 平级),
+    //   build 输出 dist/pet.html (匹配 WebviewUrl::App("pet.html"))
+    //   而非 dist/src/pet.html (会 404)
     rollupOptions: {
       input: {
         main: 'index.html',
-        pet: 'src/pet.html',
+        pet: 'pet.html',
       },
     },
   },

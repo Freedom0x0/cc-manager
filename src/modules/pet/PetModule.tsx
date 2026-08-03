@@ -55,8 +55,8 @@ export function PetModule() {
         message: 'Agent Status Hook 已安装',
         description: `已装 ${result.installed} 条 hook, 跳过 ${result.skipped} 条已存在的`,
       });
-    } catch (e: any) {
-      notification.error({ message: '安装失败', description: e.toString() });
+    } catch (e) {
+      notification.error({ message: '安装失败', description: String(e) });
     } finally {
       setLoading(false);
     }
@@ -65,8 +65,8 @@ export function PetModule() {
   const handleOpenWindow = async () => {
     try {
       await api.petWindowOpen();
-    } catch (e: any) {
-      notification.error({ message: '打开宠物窗口失败', description: e.toString() });
+    } catch (e) {
+      notification.error({ message: '打开宠物窗口失败', description: String(e) });
     }
   };
 
@@ -78,7 +78,11 @@ export function PetModule() {
           <Button type="primary" onClick={handleInstall} loading={loading}>
             {installed === null ? '安装 Agent Status Hook' : installed ? '重新安装 Hook' : '安装 Hook'}
           </Button>
-          <Button onClick={handleOpenWindow} disabled={installed !== true}>
+          // D34 fix (c5 review C3): 去掉 disabled gate。
+//   之前 installed 初始 null, 只有 handleInstall 成功后才 true; app 重启后
+//   按钮永远 disabled, 没法开窗。打开空窗口无害 (显示空闲宠物), reinstall
+//   走原 skipped 计数幂等。按钮 label 动态反映 installed 状态。
+          <Button onClick={handleOpenWindow}>
             打开宠物窗口
           </Button>
         </Space>
