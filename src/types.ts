@@ -423,3 +423,44 @@ export interface ImportStats {
   sessionsAdded: number;
   messagesAdded: number;
 }
+
+// ===== v1.2 D34 (Task 5): Pet types =====
+//
+// Mirrors src-tauri/src/pet/state.rs AgentStateEvent / InstallResult /
+// UninstallResult, and PetState's serde rename wire format (idle / responding /
+// thinking / tool-use / ask-user / completed / error-interrupted). Field names
+// match Rust struct field names verbatim — serde lowers them as-is for these
+// flat structs, so JSON keys are session_id, cwd, tool_name, etc.
+//
+// 2026-08-03 commit c5: ⚠️ field names flagged for真机手验 — the WebSearch
+// summary inferred session_id/cwd/tool_name/skill_name/mcp_server; end-to-end
+// test must run a real Claude Code and verify cc-status-emit stdin matches.
+export interface InstallResult {
+  installed: number;
+  skipped: number;
+}
+
+export interface UninstallResult {
+  removed: number;
+}
+
+export type PetState =
+  | 'idle'
+  | 'responding'
+  | 'thinking'
+  | 'tool-use'
+  | 'ask-user'
+  | 'completed'
+  | 'error-interrupted';
+
+export interface AgentStateEvent {
+  session_id: string;
+  cwd: string | null;
+  state: PetState;
+  tool_name: string | null;
+  skill_name: string | null;
+  mcp_server: string | null;
+  elapsed_ms: number | null;
+  timestamp_ms: number;
+  payload: any;
+}

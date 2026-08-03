@@ -38,6 +38,13 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    // v1.2 D34 c5: 多入口 (主窗口 + 宠物窗口), spec §8.3
+    rollupOptions: {
+      input: {
+        main: 'index.html',
+        pet: 'src/pet.html',
+      },
+    },
   },
   server: {
     port: 5173,

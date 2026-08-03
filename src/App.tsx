@@ -12,6 +12,7 @@ import { HooksManager } from './modules/hooks/HooksManager';
 import { PluginsManager } from './modules/plugins/PluginsManager';
 import { ProfileManager } from './modules/profiles/ProfileManager';
 import { AnalyticsModule } from './modules/analytics/AnalyticsModule';
+import { PetModule } from './modules/pet/PetModule';
 
 const { Header, Sider, Content } = Layout;
 
@@ -25,6 +26,7 @@ const TAB_KEYS = [
   'plugins',
   'profiles',
   'usage',
+  'pet',
 ] as const;
 
 type TabKey = (typeof TAB_KEYS)[number];
@@ -39,6 +41,7 @@ const TAB_LABELS: Record<TabKey, string> = {
   plugins: '插件',
   profiles: 'Profiles',
   usage: '用量分析',
+  pet: '宠物',
 };
 
 export default function AppRoot() {
@@ -61,6 +64,7 @@ const TAB_WAVES: Record<TabKey, number> = {
   plugins: 2,
   profiles: 3,
   usage: 3,
+  pet: 4,
 };
 
 function App() {
@@ -114,6 +118,8 @@ function App() {
             <ProfileManager />
           ) : activeTab === 'usage' ? (
             <AnalyticsModule />
+          ) : activeTab === 'pet' ? (
+            <PetModule />
           ) : (
             <ComingSoon label={TAB_LABELS[activeTab]} wave={TAB_WAVES[activeTab]} />
           )}

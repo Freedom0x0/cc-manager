@@ -15,6 +15,7 @@ use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 
 use crate::pet::state::{AgentStateEvent, PetState};
+use tauri::Emitter;
 
 pub struct PetStateDaemon {
     /// Stored for Task 5 frontend event emission. Unused in Task 4.
@@ -85,6 +86,14 @@ impl PetStateDaemon {
 
         // 2. Broadcast to subscribers (HTTP receiver, frontend listener, etc.)
         let _ = self.broadcast.send(event.clone());
+
+        // 2.5 Emit to Tauri webview (PetWindow listen('agent-state-event'))
+        // Optional<AppHandle> may be None in tests; production wiring (lib.rs setup)
+        // passes Some(app). Errors are intentionally swallowed — frontend may not
+        // be listening yet, that's not a daemon fault.
+        if let Some(app) = self.app.as_ref() {
+            let _ = app.emit("agent-state-event", &event);
+        }
 
         // 3. Spawn synthetic idle if Completed (per §11.3)
         if state == PetState::Completed {

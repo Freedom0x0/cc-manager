@@ -32,6 +32,9 @@ import type {
   UsageByDayRow,
   UsageByToolRow,
   ImportStats,
+  InstallResult,
+  UninstallResult,
+  AgentStateEvent,
 } from './types';
 
 // v4.0 Tauri 2 全栈迁移 — api-tauri.ts
@@ -174,4 +177,17 @@ export const api = {
     invoke<UsageByDayRow[]>('cmd_usage_get_daily_breakdown', { rangeDays }),
   usageGetTopTools: (limit: number): Promise<UsageByToolRow[]> =>
     invoke<UsageByToolRow[]>('cmd_usage_get_top_tools', { limit }),
+
+  // ===== Pet (v1.2 D34 / commit 5) =====
+  // cc-pet 集成: Agent Status Hook 安装/卸载 + 宠物窗口开关 + 状态快照。
+  // 后端 daemon.rs 用 broadcast + emit('agent-state-event') 通知前端
+  // PetWindow (listen 在 PetWindow.tsx 注册,不走 invoke)。
+  petInstallStatusHook: (): Promise<InstallResult> =>
+    invoke<InstallResult>('cmd_pet_install_status_hook'),
+  petUninstallStatusHook: (): Promise<UninstallResult> =>
+    invoke<UninstallResult>('cmd_pet_uninstall_status_hook'),
+  petWindowOpen: (): Promise<void> => invoke<void>('cmd_pet_window_open'),
+  petWindowClose: (): Promise<void> => invoke<void>('cmd_pet_window_close'),
+  petGetStatus: (): Promise<AgentStateEvent[]> =>
+    invoke<AgentStateEvent[]>('cmd_pet_get_status'),
 };
