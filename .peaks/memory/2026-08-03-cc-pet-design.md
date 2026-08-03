@@ -229,3 +229,73 @@ Notification 重新映射到 AskUser (Claude Code "通知" 是最接近"需用�
 4. **用户 review 是 spec 质量的实际门控**. v1.0 → v1.1 (4 fix) → v1.2 (5 fix + 3 澄清) = 
    3 轮 review 才把硬错挖出来. brainstorming 自查 + 自我检查覆盖不到二手信息 / v4 路径,
    只有用户实战 review 才能命中.
+
+---
+
+# v1.2 → implementation 落地 sediment (commit 0e7f5c1..0048807, 10 commits)
+
+## 执行流程
+
+走 `superpowers:subagent-driven-development` skill (5 task = 5 implementer subagent + 5 task reviewer + 4 fix subagent + 1 final reviewer + 1 final cleanup).
+
+每个 task 严格 TDD: test → fail → impl → pass → commit.
+每个 commit 后跑 v4 三步验证 (cargo check + tsc + build:vite), 全 exit 0.
+
+## 10 commit 链
+
+| commit | type | 内容 |
+|---|---|---|
+| 0e7f5c1 | feat (c1) | PetState 7 状态 + HOOK_TO_STATE 集中映射表 |
+| 5d7f4cf | feat (c2) | 5 IPC handlers + window open/close stub |
+| b36311c | feat (c3) | cc-status-emit binary + [[bin]] 段 |
+| 2f8236e | fix  (c3 review) | 3 required issues: 删 duplicated state_for_hook (改用 app_lib::pet::state::event_name_to_state_str) / 修 test env leak / 删 _url dead param |
+| 3a2774d | feat (c4) | HTTP receiver + PetStateDaemon + install/uninstall |
+| 109473c | fix  (c4 review) | install_test C1 (断言逻辑错) + I1 (HOOK_EVENTS_REAL 改用真 HOOK_EVENTS) |
+| 00266b0 | feat (c5) | 前端 PetModule/PetWindow + capabilities |
+| ff5c682 | fix  (c5 review) | 3 Critical + 2 Minor: vite path (git mv src/pet.html → pet.html) / synthetic idle emit / install gate / catch any / payload any |
+| fed6272 | fix  (c5 review2) | JSX comment 包装 (// 行注释被 JSX 当 children 渲染) |
+| 0048807 | chore | Final cleanup: use position + dead_code + plan doc drift |
+
+## 关键 bug 修复 (per-task review 抓到)
+
+1. **c3 review**: duplicated `state_for_hook` 在 binary 里 (破坏 single source of truth)
+   → 加 `event_name_to_state_str` helper 到 state.rs, binary 调 `app_lib::pet::state::event_name_to_state_str`
+2. **c4 review**: `test_install_skips_already_installed_hooks` 断言 `installed=5, skipped=1` 但 pre-seed 用 `other-tool` (没 cc-status-emit), 实际应是 `installed=6, skipped=0`
+   → 改 pre-seed 为 `cc-status-emit --event tool-use` + 加单独 test 测 `other-tool` 保留场景
+3. **c5 review Critical**: vite 输出 `dist/src/pet.html` 而 `WebviewUrl::App("pet.html")` 要 `dist/pet.html` —— 404
+   → `git mv src/pet.html pet.html` + vite config `pet: 'pet.html'`
+4. **c5 review Critical**: synthetic idle spawn 闭包没 clone AppHandle, broadcast 没 prod 订阅者 → 宠物卡 ✅ 不切回 😐
+   → spawn 闭包加 `let app = self.app.clone();` + emit 同步调用
+5. **c5 review Critical**: "打开宠物窗口" 按钮 `disabled={installed !== true}` 但 `installed` 不持久化 → 重启后无法打开
+   → 删 disabled (PetWindow 无 hook 也无害, 显示 idle)
+6. **c5 review2**: JSX 里 `// D34 fix` 行注释不是 JSX 注释, 被当 children 渲染成中文文本泄露到 UI
+   → 改 `{/* */}` JSX 注释语法
+
+## Final review verdict
+
+Spec compliance ✅ / Code quality Approved / Integration ✅ / Ready to merge: **No** (real-device test gate)
+
+**唯一阻塞风险 (N3)**: AgentStateEvent 字段名 (`session_id` / `cwd` / `tool_name` / `skill_name` / `mcp_server`) 是 WebSearch 摘要推断, 没查 Claude Code 官方文档. **真机手验必跑** (spec §9.3 第 9 步). 字段名不符就 fix `state.rs` + `cc-status-emit.rs` mapping. 这是发布前最后闸门.
+
+## 教训 (这次执行)
+
+1. **reviewer 抓到的 bug 全是真 bug, 不能 performative agree**.
+   c3 duplicated state_for_hook / c5 vite path / c5 synthetic idle emit / c5 JSX comment — 每条都是破坏性 bug, 不是 nit. per-task review 不能省.
+
+2. **fix subagent 也可能出 bug, 必须 re-review**.
+   c5 fix subagent 把 `//` 行注释写进 JSX, 又被抓. **fix 完直接进 final review 不行**, 必须 fix-review loop.
+
+3. **vite multi-entry 的 input key 不决定 output 路径**.
+   `pet: 'src/pet.html'` → 输出 `dist/src/pet.html` (不是 `dist/pet.html`). Vite/rollup 从 input 路径推 output. 文件必须在 root + `pet: 'pet.html'` 才能输出 `dist/pet.html`.
+
+4. **broadcast::Sender 没 prod 订阅者就是死代码**.
+   c5 第一次实现 spawn synthetic idle 只广播, 没 emit. broadcast channel 是 daemon 内部组件, 没 Tauri emit 桥接 = 前端收不到. **daemon emit 必须跟 broadcast 同步**.
+
+5. **CLAUDE.md §14.5 三步 `cargo check` 不编译 `#[cfg(test)]` 模块**.
+   Test-only edit (改断言) 不会触发 cargo check 验证. 必须加 `cargo check --all-targets` 或 `cargo check --profile test` 覆盖. 4-task reviewer N1 抓到. v4 验证纪律需要扩.
+
+6. **JSX `//` 不是注释, 是字符串 children**.
+   Rust 写代码习惯 `//` 行注释, JSX 不识别. 必须 `{/* */}`. 这条 v3.1 Electron 时代不存在, 但 Tauri 2 + React 项目必须注意.
+
+7. **subagent 不应假设 push, dispatch prompt 必须明确说 "local commits only, no push"**.
+   第一次 Task 5 dispatch 被 auto-mode classifier 误判 push 拒绝. 第二次明确写 "DO NOT push, local commits only" 通过. 跟 CLAUDE.md §11 保持一致, 也让 subagent 知道约束.

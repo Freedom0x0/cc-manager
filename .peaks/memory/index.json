@@ -5,6 +5,33 @@
     "feedback": [],
     "decision": [
       {
+        "id": "v4-cc-pet-implementation-10-commits",
+        "title": "cc-pet v1.2 spec 落地 — 10 commits (5 feat + 5 fix)",
+        "summary": "D34 cc-pet 完整落地: 5 task (c1-c5) + 5 fix commits. c1 state+HOOK_TO_STATE / c2 IPC handlers stub / c3 cc-status-emit binary (review 修了 duplicated state_for_hook + test env leak + dead _url) / c4 HTTP+Daemon+install (review 修了 install_test C1+I1) / c5 前端+capabilities (review 修了 3 Critical: vite path / synthetic idle emit / install gate + 2 Minor catch any/payload any + 1 JSX comment 包装). Final review Spec compliance ✅ / Code quality Approved / Integration ✅ / Ready to merge: No (N3 risk AgentStateEvent 字段真机手验). v4 验证三步全绿. 教训 7 条: reviewer 抓的 bug 都是真 bug / fix subagent 也可能出 bug 必须 re-review / vite multi-entry input key 不决定 output 路径 / broadcast 没 prod 订阅者 = 死代码 / cargo check 不编译 #[cfg(test)] / JSX // 不是注释 / subagent dispatch 必须明说 'local commits only'.",
+        "capturedAt": "2026-08-03T15:30:00.000Z",
+        "sourceRid": "2026-08-03-rid-cc-pet-implementation",
+        "sourceSession": "2026-08-03-session-mentor",
+        "relatedFiles": [
+          "docs/superpowers/specs/2026-08-03-cc-pet-integration-design.md",
+          "docs/superpowers/plans/2026-08-03-cc-pet-implementation.md",
+          ".peaks/memory/2026-08-03-cc-pet-design.md",
+          ".superpowers/sdd/progress.md",
+          "src-tauri/src/pet/",
+          "src-tauri/src/bin/cc-status-emit.rs",
+          "src-tauri/capabilities/pet.json",
+          "src-tauri/Cargo.toml",
+          "src-tauri/src/lib.rs",
+          "src/modules/pet/",
+          "src/pet-main.tsx",
+          "src/pet.html",
+          "src/types.ts",
+          "src/api-tauri.ts",
+          "src/App.tsx",
+          "vite.config.ts",
+          "CLAUDE.md"
+        ]
+      },
+      {
         "id": "v4-cc-pet-v1.2",
         "title": "cc-pet v1.2 review fixes — 5 事实硬错 + 3 设计澄清",
         "summary": "v1.0/v1.1 修了 4 项, v1.2 修了第二轮 review 命中 5 事实硬错: F1 编造的 Cargo.toml [[bin]] 段 (实为 [lib] rlib + 默认 src/main.rs bin) / F2 捏造的 atomic_write binary 函数 (实只有 atomic_write_json) / F3 编造的 5 依赖 (实需 4 + getrandom) / F4 漏 capabilities/pet.json 完整 ACL (Tauri 2 白名单模式) / F5 二手信息 PermissionRequest (Claude Code 真实 hook event 不存在, 砍 PetState 8→7). 3 澄清: D34.10 PetStateDaemon + mpsc + parking_lot 锁 / D34.11 synthetic idle 后端 spawn timer / D34.12 secret.json JSON 替代 binary / D34.13 capabilities 显式白名单 / D34.14 HOOK_TO_STATE 集中常量. 教训: 网络沙箱拒 docs 不能编造答案 / 凭印象写代码 = 错 / 真机手验是最后闸门 / 用户 review 是 spec 质量门控.",
