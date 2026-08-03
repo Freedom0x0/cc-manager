@@ -618,6 +618,7 @@ fn cmd_usage_get_top_tools(
 
 pub mod db;
 pub mod importer;
+pub mod pet;       // v1.2 c1 — cc-pet state + types
 pub mod repo;
 pub mod util;
 pub mod types;
