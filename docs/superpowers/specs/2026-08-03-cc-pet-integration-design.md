@@ -1,8 +1,8 @@
 # CC Pet 集成设计 (Hopet-like Desktop Pet)
 
-> 版本: v1.0
+> 版本: v1.1
 > 日期: 2026-08-03
-> 状态: Draft — 待评审后进入 plan 阶段
+> 状态: Review fixes applied — 待用户二审通过后进 writing-plans
 > 关联: v4 spec (`2026-07-28-cc-session-manager-v4-design.md`) · Hopet README & DevDocs
 
 ---
@@ -16,7 +16,7 @@
 - 会话完成时提醒用户
 - 像素动物 + 动画 + 气泡状态显示
 
-**不引入新依赖**：不引入 Swift（Hopet 是 Swift），不引入新 Tauri 构建目标，纯 Rust + React。
+**不引入新依赖**:不引入 Swift (Hopet 是 Swift), 不引入新 Tauri 构建目标, 纯 Rust + React。
 
 ### 1.2 跟 Hopet 的差异
 
@@ -24,29 +24,29 @@
 |---|---|---|
 | 语言 | Swift 5.10 | Rust + TypeScript |
 | 平台 | macOS 14+ only | Windows 10/11 + macOS 10.15+ |
-| 进程模型 | 独立 `.app` | 嵌入 cc-manager 主进程（多 WebviewWindow） |
-| 生命周期 | 独立运行，主 App 关掉宠物仍在 | 主 App 关 = 宠物消失（嵌入式语义） |
+| 进程模型 | 独立 `.app` | 嵌入 cc-manager 主进程 (多 WebviewWindow) |
+| 生命周期 | 独立运行, 主 App 关掉宠物仍在 | 主 App 关 = 宠物消失 (嵌入式语义) |
 | IPC | Unix Domain Socket | HTTP localhost:19847 (跨平台兼容) |
-| 主题 | 内置 Hopi 像素海豹 + 用户自定义 | v1 只内置 Hopi 风格的 8 状态 GIF（无主题导入） |
+| 主题 | 内置 Hopi 像素海豹 + 用户自定义 | v1 只内置 Hopi 风格的 8 状态 GIF (无主题导入) |
 
 ### 1.3 非目标 (v1)
 
-- ❌ 跨 session 优先级聚合（v1 只反映当前焦点 session）
-- ❌ 用户自定义主题导入（v1 只有内置 8 GIF）
-- ❌ 灵动岛 / 顶部状态条（macOS 专属能力，v1 不做）
-- ❌ Permission 气泡 Allow/Deny（v1 只观察不介入）
-- ❌ 多 session 同时显示多个气泡（v1 单气泡）
-- ❌ Codex CLI 集成（v1 只支持 Claude Code）
+- ❌ 跨 session 优先级聚合 (v1 只反映当前焦点 session)
+- ❌ 用户自定义主题导入 (v1 只有内置 8 GIF)
+- ❌ 灵动岛 / 顶部状态条 (macOS 专属能力, v1 不做)
+- ❌ Permission 气泡 Allow/Deny (v1 只观察不介入)
+- ❌ 多 session 同时显示多个气泡 (v1 单气泡)
+- ❌ Codex CLI 集成 (v1 只支持 Claude Code)
 
 ### 1.4 v2+ 接口预留
 
 | 能力 | 预留接口 |
 |---|---|
-| 多 session 聚合 | `AgentStateEvent.session_id` 已有，`PetState::priority()` 已实现 |
+| 多 session 聚合 | `AgentStateEvent.session_id` 已有, `PetState::priority()` 已实现 |
 | 自定义主题 | `PetWindow.tsx` 接 `theme_id` 参数 + `~/.claude/themes/<id>/` 目录约定 |
 | 灵动岛 | Tauri 2 `WebviewWindow` 配置项加 macOS-specific 段 |
-| Permission 气泡 | `PermissionRequest` hook 已在 hook 列表，v2 加 `response_url` 字段 |
-| Codex CLI | `~/.codex/hooks.json` 同款模式，cc-status-emit 支持 `--target codex` |
+| Permission 气泡 | `PermissionRequest` hook 已在 hook 列表, v2 加 `response_url` 字段 |
+| Codex CLI | `~/.codex/hooks.json` 同款模式, cc-status-emit 支持 `--target codex` |
 
 ---
 
@@ -54,13 +54,13 @@
 
 | 术语 | 含义 |
 |---|---|
-| **PetWindow** | Tauri 2 独立 WebviewWindow，无边框/置顶/不可聚焦，显示像素动物 + 气泡 |
+| **PetWindow** | Tauri 2 独立 WebviewWindow, 无边框/置顶/不可聚焦, 显示像素动物 + 气泡 |
 | **PetState** | 8 状态枚举 (`Idle/Responding/Thinking/ToolUse/PermissionPrompt/AskUser/Completed/ErrorInterrupted`) |
-| **AgentStateEvent** | hook 上报的单个事件，含 session_id / state / tool_name 等 |
-| **EventBus** | Rust `tokio::sync::broadcast<AgentStateEvent>`，主窗口和宠物窗口都订阅 |
-| **cc-status-emit** | 新增 Rust 二进制，从 stdin 读 hook payload → HTTP POST 到 cc-manager |
-| **HTTP Receiver** | axum server (127.0.0.1:19847)，验证 HMAC + 推到 EventBus |
-| **Secret** | 32 字节随机密钥，存 `app_data_dir/secret.key`，嵌入 hook 环境变量 `CC_PET_SECRET` |
+| **AgentStateEvent** | hook 上报的单个事件, 含 session_id / state / tool_name 等 |
+| **EventBus** | Rust `tokio::sync::broadcast<AgentStateEvent>`, 主窗口和宠物窗口都订阅 |
+| **cc-status-emit** | 新增 Rust 二进制, 从 stdin 读 hook payload → HTTP POST 到 cc-manager |
+| **HTTP Receiver** | axum server (127.0.0.1:19847), 验证 HMAC + 推到 EventBus |
+| **Secret** | 32 字节随机密钥, 存 `app_data_dir/secret.key`, 嵌入 hook 环境变量 `CC_PET_SECRET` |
 
 ---
 
@@ -115,16 +115,36 @@
 
 **前端 → IPC → 后端 → DB**:
 
-1. **前端**: PetModule.tsx 调 `api.installStatusHook()` (Tauri invoke)
+1. **前端**: PetModule.tsx 调 `api.petInstallStatusHook()` (Tauri invoke)
 2. **IPC**: `cmd_pet_install_status_hook` (lib.rs 新增)
-3. **后端**: 调用 `repo/hooks_writer.rs` 的 `create_hook` 模式写 `~/.claude/settings.json` (复用 commit 9)
-4. **DB**: 不写 DB，secret 写 `app_data_dir/secret.key`
+3. **后端**: 调用**新**函数 `repo/pet/install.rs::install_status_hooks(settings_path, secret)`
+   - **不**直接复用 `repo/hooks_writer::create_hook` — 见 §3.2.1
+   - 调用 `repo/hooks_scanner::list_hooks` 做"是否已存在"检查 (避免重复装)
+   - 调用 `util/settings_reader::read_claude_settings` + 手动 serde_json merge env 段
+   - 调用 `util/atomic_write::atomic_write_json` 原子写
+   - 生成 32 字节随机 secret, 写 `app_data_dir/secret.key`
+4. **DB**: 不写 DB; secret 写 `app_data_dir/secret.key` 文件
+   - **不**走 KV 表 (CLAUDE.md §13 D10 决策: KV 表是 cache + profile_capture 专用, 不作 UI 真实状态源)
 
 **事件上报链路**:
 
 1. **前端**: 宠物窗口 `listen('agent-state-event', cb)` (Tauri event)
-2. **IPC**: 不走 invoke，事件走 Rust 内部 broadcast → emit → JS 端 event listener
+2. **IPC**: 不走 invoke, 事件走 Rust 内部 broadcast → emit → JS 端 event listener
 3. **后端**: HTTP receiver 接收 → 解析 → broadcast
+
+### 3.2.1 为什么不直接复用 create_hook
+
+`repo/hooks_writer::create_hook` (hooks_writer.rs:23-33) 限制:
+
+| 项 | create_hook | install_status_hooks (新) |
+|---|---|---|
+| 一次写几条 | 1 条 | 6 条 |
+| 写 `env` 段 | ❌ 不动 env | ✅ 写 CC_PET_SECRET |
+| 已存在检查 | ❌ 无脑 push | ✅ scanner skip |
+| matcher 格式 | 透传 | 固定 "" (匹配所有) |
+| 错误回滚 | 写一半坏 | 全部 atomic (单文件) |
+
+所以 install_status_hooks 是**新函数**, 但**内部**继续用 `atomic_write_json` + `read_claude_settings` 这两个底层原语 (跟 create_hook 同样依赖)。
 
 ---
 
@@ -136,6 +156,8 @@
 |---|---|---|---|
 | `src-tauri/src/pet/mod.rs` | EventBus + HTTP 接收器 + 5 IPC handler 注册 | 220 | c1 + c2 + c4 |
 | `src-tauri/src/pet/state.rs` | `PetState` 枚举 + `AgentStateEvent` schema + priority + 测试 | 80 | c1 |
+| `src-tauri/src/pet/install.rs` | `install_status_hooks` (写 env + 6 hooks atomic) + 测试 | 120 | c4 |
+| `src-tauri/src/pet/http.rs` | axum server + HMAC + EventBus broadcast + 测试 | 180 | c4 |
 | `src-tauri/src/bin/cc-status-emit.rs` | stdin → HTTP POST helper | 80 | c3 |
 | `src/modules/pet/PetModule.tsx` | 主 Tab: 装 hook 按钮 + 打开宠物窗口按钮 + 状态总览 | 220 | c5 |
 | `src/modules/pet/PetWindow.tsx` | 宠物窗口内容 (像素 + 气泡) | 280 | c5 |
@@ -144,19 +166,19 @@
 | `src-tauri/capabilities/pet.json` | Tauri capability: pet 窗口权限 | 30 | c5 |
 | `src-tauri/src/pet/state_test.rs` (cfg test) | 8 状态 priority + 转换测试 | 60 | c1 |
 | `src-tauri/src/bin/cc-status-emit_test.rs` (cfg test) | stdin → HTTP POST mock 测试 | 60 | c3 |
+| `src-tauri/src/pet/install_test.rs` (cfg test) | install_status_hooks atomic + 重复装 skip | 80 | c4 |
 | `src-tauri/src/pet/http_test.rs` (cfg test) | HTTP receiver 验签 + 解析 | 80 | c4 |
 | `docs/superpowers/specs/2026-08-03-cc-pet-integration-design.md` | 本文档 | — | c0 |
 
-### 4.2 复用现有模块
+### 4.2 复用现有模块 (v4 真实路径, 已 `git grep` 验证)
 
-| 现有 | 用途 |
-|---|---|
-| `repo/hooks_scanner.rs` | 安装 hook 前扫描, 检查是否已存在 (避免覆盖) |
-| `repo/hooks_writer.rs` | `create_hook` 模式 — 走 atomic_write_json (commit 9 已验) |
-| `util/settings_reader.rs` | 读 `~/.claude/settings.json` |
-| `util/atomic_write.rs` | 原子写 (commit 7 模式, 已验 150+ case) |
-| `types::HookCreateInput` | 创建 hook 的输入类型 (commit 9) |
-| `tauri::WebviewWindowBuilder` | 第二窗口创建 (Tauri 2 原生) |
+| 现有 (v4) | 用途 | 行 |
+|---|---|---|
+| `repo/hooks_scanner::list_hooks` | 安装 hook 前扫描, 检查是否已存在 | repo/hooks_scanner.rs |
+| `util/settings_reader::read_claude_settings` | 读 `~/.claude/settings.json` | util/settings_reader.rs |
+| `util/atomic_write::atomic_write_json` | 原子写 (commit 9 已验 150+ case) | util/atomic_write.rs:88 |
+| `util/atomic_write::atomic_write` | 写 secret.key 文件 (binary 写) | util/atomic_write.rs |
+| `repo/hooks_writer::create_hook` (单条) | **不直接复用**, 仅作"单条添加"参考模式 | repo/hooks_writer.rs:23 |
 
 ---
 
@@ -242,11 +264,14 @@ GET /agent-state
 ### 5.4 Secret 管理
 
 - **生成时机**: 第一次启动 cc-manager 时 (`cmd_pet_install_status_hook` 首次调用时若不存在)
-- **存储**: `app_data_dir/secret.key`, 仅本机用户可读 (chmod 600 / icacls)
+- **存储**: `app_data_dir/secret.key`
+  - Windows: `C:\Users\<user>\AppData\Roaming\com.freedom0x0.cc-session-manager\secret.key`
+  - macOS: `~/Library/Application Support/com.freedom0x0.cc-session-manager/secret.key`
+  - **权限**: 依赖 Tauri 2 `app.path().app_data_dir()` 默认权限 (Windows = 当前用户 ACL, macOS = 0700). 不需要额外 chmod/icacls.
 - **长度**: 32 字节随机, hex 编码 = 64 字符
-- **嵌入方式**: hook 命令模板 `<cc-status-emit> --secret "$CC_PET_SECRET"`, 通过 settings.json 的 env 段注入
+- **嵌入方式**: hook 命令模板 `<cc-status-emit> --event <state>`, 通过 settings.json 的 env 段注入 `$CC_PET_SECRET`
 
-**settings.json env 段** (Claude Code 支持):
+**settings.json 写入片段** (install_status_hooks 函数):
 ```json
 {
   "env": {
@@ -256,39 +281,50 @@ GET /agent-state
     "PreToolUse": [
       {
         "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "<path-to-cc-status-emit> --event tool-use"
-          }
-        ]
+        "hooks": [{"type": "command", "command": "<cc-status-emit-path> --event tool-use"}]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [{"type": "command", "command": "<cc-status-emit-path> --event completed"}]
       }
     ]
+    // ... UserPromptSubmit / PostToolUse / Notification / PermissionRequest 共 6 个
   }
 }
 ```
 
+注意 `env` 段是 settings.json 顶层字段 (`ClaudeSettings.env: Option<HashMap<String, String>>`), 跟 `hooks` 平级. install_status_hooks 必须用 `serde_json::Value` 整体读 + 改 env 段 + 改 hooks 段 + atomic_write, 不能直接用 `ClaudeSettings` struct (会丢未识别字段).
+
 ---
 
-## 6. 6 个 IPC (5 写 + 1 读)
+## 6. 5 个 IPC (4 写 + 1 读)
 
 ```rust
-// c1: 不挂线 (空壳 mod 注册)
-// c2: 注册 4 个 IPC
+// c2: 注册 4 写 + 1 读, 但 install/uninstall 在 c2 是占位 (返 Err "未实现"), c4 才接真路径
 #[tauri::command]
 async fn cmd_pet_install_status_hook(app: tauri::AppHandle) -> Result<InstallResult, String>;
+//   c2: 返 Err("not implemented in c2, will be wired in c4")
+//   c4: 真装 hook + 生成 secret + 起 HTTP server
 
 #[tauri::command]
 async fn cmd_pet_uninstall_status_hook(app: tauri::AppHandle) -> Result<UninstallResult, String>;
+//   c2: 返 Err("not implemented in c2")
+//   c4: 真卸载 hook + 删 env 段 + 关 HTTP server (可选, 留连接也行)
 
 #[tauri::command]
 async fn cmd_pet_window_open(app: tauri::AppHandle) -> Result<(), String>;
+//   c2: 真做事, 创建 PetWindow (无 IPC handler 也能从前端 API 走, 但要注册)
 
 #[tauri::command]
 async fn cmd_pet_window_close(app: tauri::AppHandle) -> Result<(), String>;
+//   c2: 真做事, 销毁 PetWindow
 
 #[tauri::command]
 fn cmd_pet_get_status(state: tauri::State<PetStateManager>) -> Result<PetStatusResponse, String>;
+//   c1/c2: 真做事, 返当前 EventBus 所有 session 最新事件
+//   c1 阶段: PetStateManager 是空 stub, 返空数组
 ```
 
 ```typescript
@@ -315,6 +351,8 @@ export const api = {
 | E4 | 端口 19847 被占 | 启动 bind 失败 → cmd_pet_window_open 返错, 主 App 其他功能正常 |
 | E5 | Tauri 窗口创建失败 (权限/DWM) | 返错给前端, antd notification.error 提示 |
 
+**Windows Firewall 注**: 端口 19847 绑 `127.0.0.1` (loopback), **不会**被 Windows Defender Firewall 拦截 (只拦 inbound 公网/局域网). 同样 macOS 应用防火墙默认放行 loopback. 不需要额外防火墙规则.
+
 ---
 
 ## 8. 部署: 5 commit 节奏
@@ -322,10 +360,10 @@ export const api = {
 | commit | 内容 | 行数 | 风险 | 验证 |
 |---|---|---|---|---|
 | **c1** | `pet/state.rs` + 测试 + `pet/mod.rs` 空壳 + lib.rs 注册 | +120 | 0 | cargo check + tsc + build:vite |
-| **c2** | `cmd_pet_get_status` + `cmd_pet_window_open/close` + `cmd_pet_install/uninstall_status_hook` 占位 | +80 | 0 | 同上 |
+| **c2** | `cmd_pet_get_status` 真做事 + `cmd_pet_window_open/close` 真做事 + `cmd_pet_install/uninstall_status_hook` 占位 (返 Err) | +80 | 0 | 同上 |
 | **c3** | `bin/cc-status-emit.rs` + Cargo.toml `[[bin]]` + tests | +100 | 中 (首次第二 bin) | cargo test --lib pet cc-status-emit |
-| **c4** | HTTP 接收器 (axum) + HMAC + EventBus + 真装 hook (用 hooks_writer 模式) + axum 依赖 | +220 | 中 (首次 HTTP) | cargo test --lib pet::http |
-| **c5** | 前端 PetModule/PetWindow/pet-main/pet.html + 5 wrapper + capabilities/pet.json | +500 | 高 (前端最大改动) | 端到端手验 4 步 |
+| **c4** | `pet/install.rs` + `pet/http.rs` + axum/hmac/sha2/hex/rand 依赖 + 装 hook 真写 settings.json | +400 | 中 (首次 HTTP) | cargo test --lib pet::http pet::install |
+| **c5** | 前端 PetModule/PetWindow/pet-main/pet.html + 5 wrapper + capabilities/pet.json + vite 多入口 | +500 | 高 (前端最大改动) | 端到端手验 4 步 |
 
 ### 8.1 Cargo.toml 改动
 
@@ -352,7 +390,20 @@ rand = "0.8"
 
 ### 8.2 tauri.conf.json 改动 (c2)
 
-不修改 `app.windows` 数组（宠物窗口运行时创建，不在 conf 预声明）。
+不修改 `app.windows` 数组 (宠物窗口运行时创建, 不在 conf 预声明).
+
+### 8.2.1 vite.config.ts 改动 (c5)
+
+加 `build.rollupOptions.input` 第二个入口:
+
+```ts
+input: {
+  main: 'index.html',
+  pet: 'src/pet.html',
+}
+```
+
+build 后 `dist/index.html` + `dist/pet.html` 都生成, tauri.conf.json 的 frontendDist 引用 `../dist` 不变.
 
 ### 8.3 反向兼容 / 回滚
 
@@ -379,24 +430,25 @@ rand = "0.8"
 |---|---|
 | `state_test.rs` | 8 状态 priority 排序 + 转换合法性 (≥5 case) |
 | `cc-status-emit_test.rs` | stdin JSON → HTTP POST mock (≥3 case) |
+| `install_test.rs` | atomic 写 + 重复装 skip + env 段 merge (≥4 case) |
 | `http_test.rs` | HMAC 验签 + schema 校验 + EventBus 广播 (≥5 case) |
 
-合计 ≥13 case, 全过。
+合计 ≥17 case, 全过.
 
 ### 9.3 端到端手验 (release 前必跑, v4 D24/D25 节奏)
 
 1. `npm run dev:tauri` → 主窗口起
 2. 点 Pet Tab → 看 "Install Agent Status Hook" 按钮
 3. 点按钮 → 装 6 个 hook 到 `~/.claude/settings.json`
-4. 验: `cat ~/.claude/settings.json | jq '.hooks | keys'`
+4. 验: `cat ~/.claude/settings.json | jq '.hooks | keys'` 应包含 6 个事件
 5. 点 "Open Pet Window" → 看像素动物 + 气泡
 6. 跑真 Claude Code (用 dev:tauri 的同 shell 起 `claude`)
-7. 观察: 气泡切换到 "Tool Use: xxx" / "Thinking" / "Completed"
+7. 观察: 气泡切换到 "Tool Use: Skill: commit" / "Thinking" / "Completed"
 8. 验 4 步全过 → commit c5 → tag v4.1.0-pet-alpha
 
 ### 9.4 v4.1 验证纪律延伸
 
-CLAUDE.md D24/D25 已写明: SmartScreen 拦 cargo test runtime, 本次也走 `cargo check` 兜底。runtime 验证留给 CI runner (Linux, 无 SmartScreen)。
+CLAUDE.md D24/D25 已写明: SmartScreen 拦 cargo test runtime, 本次也走 `cargo check` 兜底. runtime 验证留给 CI runner (Linux, 无 SmartScreen).
 
 ---
 
@@ -408,12 +460,14 @@ CLAUDE.md D24/D25 已写明: SmartScreen 拦 cargo test runtime, 本次也走 `c
 User: Pet Tab → 点 "Install Agent Status Hook"
   → api.petInstallStatusHook() → invoke('cmd_pet_install_status_hook')
   → 后端:
-     1. 读 ~/.claude/settings.json (settings_reader)
-     2. 若 secret 不存在 → 生成 32 字节随机, 写 app_data_dir/secret.key
-     3. atomic_write: env.CC_PET_SECRET = secret (非破坏性 merge)
-     4. atomic_write: hooks.PreToolUse/PostToolUse/Stop/Notification/PermissionRequest/UserPromptSubmit
-        各加一条 → "<cc-status-emit> --event <state> --secret \"$CC_PET_SECRET\""
-     5. 启动 axum HTTP server (若未起) — spawn tokio task
+     1. 若 secret 不存在 → 生成 32 字节随机, 写 app_data_dir/secret.key
+     2. 读 ~/.claude/settings.json (settings_reader, serde_json::Value 整体读)
+     3. 已存在检查 (hooks_scanner.list_hooks) — 跳过已装的事件
+     4. merge env.CC_PET_SECRET = secret
+     5. merge hooks.PreToolUse/PostToolUse/Stop/Notification/PermissionRequest/UserPromptSubmit
+        各加一条 → "<cc-status-emit> --event <state>"
+     6. atomic_write_json 写回整个 settings.json
+     7. 启动 axum HTTP server (若未起) — spawn tokio task
   → 返回 InstallResult { installed: 6, skipped: 0 }
 ```
 
@@ -425,8 +479,9 @@ Claude Code: PreToolUse hook 触发
      stdin = {session_id, cwd, tool_name: "Skill", tool_input: {skill: "commit"}, ...}
   → cc-status-emit:
      1. 读 stdin JSON
-     2. 加 HMAC-SHA256(secret, body) → X-Signature header
-     3. POST 127.0.0.1:19847/agent-event
+     2. 解析 → AgentStateEvent { state: ToolUse, tool_name: "Skill", skill_name: "commit" }
+     3. 加 HMAC-SHA256(secret, body) → X-Signature header
+     4. POST 127.0.0.1:19847/agent-event
   → HTTP receiver:
      1. 验签 (HMAC 比对)
      2. 解析 AgentStateEvent
@@ -446,20 +501,26 @@ Claude Code: Stop hook 触发
   → PetWindow: 切到 completed GIF + 气泡 "完成: <last assistant text 前 80 字>"
   → 同时: 主窗口 listen → antd notification.success 弹窗
   → PetWindow 5 秒后自动切回 Idle (delay 5s, then send synthetic idle event)
+     注: 由后端 EventBus 内部 tokio timer 触发, 不走 cc-status-emit 上报
+     (避免假事件签名复杂度, 也避免污染 audit log)
 ```
 
 ---
 
 ## 11. 关联决策
 
-| 决策 | 内容 |
-|---|---|
-| D34 | cc-pet 模块整体设计 (本 spec) |
-| D34.1 | 嵌入式宠物窗口, 跟随主 App 生命周期 |
-| D34.2 | HTTP localhost:19847 替代 UDS, 跨平台 |
-| D34.3 | HMAC-SHA256 防假事件, secret 存 app_data_dir |
-| D34.4 | 5 commit 节奏 (c1-c5), 每个独立可回滚 |
-| D34.5 | v1 不做多 session 聚合 / 自定义主题 / 灵动岛 / Permission 介入 / Codex CLI |
+| ID | 决策 | 落地位置 |
+|---|---|---|
+| **D34** | cc-pet 模块整体设计 | 本 spec |
+| D34.1 | 嵌入式宠物窗口, 跟随主 App 生命周期 | §1.2 / §3.1 |
+| D34.2 | HTTP localhost:19847 替代 UDS, 跨平台 | §5.3 / §7 (E4 Firewall 注) |
+| D34.3 | HMAC-SHA256 防假事件, secret 存 app_data_dir | §5.4 / §7 (E2) |
+| D34.4 | 5 commit 节奏 (c1-c5), 每个独立可回滚 | §8 |
+| D34.5 | v1 不做多 session 聚合 / 自定义主题 / 灵动岛 / Permission 介入 / Codex CLI | §1.3 / §1.4 |
+| D34.6 | 宠物状态不写 KV 表, 遵循 D10 禁令 | §3.2 |
+| D34.7 | install_status_hooks 是新函数不直接复用 create_hook | §3.2.1 |
+
+**完整决策记录**: `.peaks/memory/2026-08-03-cc-pet-design.md` (按 CLAUDE.md §13 模板).
 
 ---
 

@@ -1,9 +1,28 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-02T11:55:00.000Z",
+  "updatedAt": "2026-08-03T12:30:00.000Z",
   "hot": {
     "feedback": [],
     "decision": [
+      {
+        "id": "v4-cc-pet-design",
+        "title": "cc-pet (Hopet-like 嵌入式桌面宠物) 整体设计 7 项决策",
+        "summary": "在 cc-manager (Tauri 2) 内嵌 Hopet 风格的桌面宠物 — 用 Rust + React 自有栈实现, 不引入 Swift. 核心: hook → HMAC HTTP → Rust EventBus broadcast → Tauri 多窗口 React 渲染. 5 commit 节奏 (c1-c5) 落地. 7 项决策: D34 整体 / D34.1 嵌入式窗口 / D34.2 HTTP 19847 替代 UDS / D34.3 HMAC-SHA256 secret / D34.4 5 commit 节奏 / D34.5 v1 非目标 / D34.6 不写 KV 表 (D10 延伸) / D34.7 install_status_hooks 新函数不直接复用 create_hook. spec 在 docs/superpowers/specs/2026-08-03-cc-pet-integration-design.md.",
+        "capturedAt": "2026-08-03T12:30:00.000Z",
+        "sourceRid": "2026-08-03-rid-cc-pet",
+        "sourceSession": "2026-08-03-session-mentor",
+        "relatedFiles": [
+          "docs/superpowers/specs/2026-08-03-cc-pet-integration-design.md",
+          ".peaks/memory/2026-08-03-cc-pet-design.md",
+          "src-tauri/src/repo/hooks_writer.rs",
+          "src-tauri/src/repo/hooks_scanner.rs",
+          "src-tauri/src/util/atomic_write.rs",
+          "src-tauri/src/util/settings_reader.rs",
+          "src-tauri/src/types.rs",
+          "src-tauri/src/lib.rs",
+          "CLAUDE.md"
+        ]
+      },
       {
         "id": "v4-tauri-commit-16-17-handed-off",
         "title": "v4.0 Tauri 2 D18 mock cleanup 闭环 (commits 16-17)",
