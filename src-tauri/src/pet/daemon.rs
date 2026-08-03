@@ -19,7 +19,6 @@ use tauri::Emitter;
 
 pub struct PetStateDaemon {
     /// Stored for Task 5 frontend event emission. Unused in Task 4.
-    #[allow(dead_code)]
     pub(crate) app: Option<tauri::AppHandle>,
     pub(crate) sessions: Mutex<HashMap<String, AgentStateEvent>>,
     pub(crate) broadcast: broadcast::Sender<AgentStateEvent>,

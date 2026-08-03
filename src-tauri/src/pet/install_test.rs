@@ -3,6 +3,11 @@
 use std::fs;
 use tempfile::TempDir;
 
+use crate::pet::install;
+use crate::pet::install::uninstall_status_hooks;
+use crate::pet::state::InstallResult;
+use crate::repo::hooks_scanner::HOOK_EVENTS;
+
 #[test]
 fn test_install_writes_env_and_six_hooks() {
     let dir = TempDir::new().unwrap();
@@ -145,11 +150,6 @@ fn test_uninstall_removes_only_cc_status_emit_hooks() {
     assert!(!raw.contains("CC_PET_SECRET"));
     assert!(raw.contains("OTHER_VAR"));
 }
-
-use crate::pet::install;
-use crate::pet::install::uninstall_status_hooks;
-use crate::pet::state::InstallResult;
-use crate::repo::hooks_scanner::HOOK_EVENTS;
 
 // Helper signatures — defined in install.rs
 //

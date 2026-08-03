@@ -54,7 +54,7 @@
 | `src-tauri/src/lib.rs` | c1: add `pub mod pet;`. c2: register 5 IPC handlers in `tauri::generate_handler!` macro. |
 | `src/api-tauri.ts` | c5: add 5 wrappers (`petInstallStatusHook`, `petUninstallStatusHook`, `petWindowOpen`, `petWindowClose`, `petGetStatus`). |
 | `src/App.tsx` | c5: add 'pet' to TAB_KEYS array, PetModule import + Tabs.TabPane. |
-| `vite.config.ts` | c5: add `build.rollupOptions.input` with second entry `pet: 'src/pet.html'`. |
+| `vite.config.ts` | c5: add `build.rollupOptions.input` with second entry `pet: './pet.html'` (lives at repo root, not `src/`). |
 
 ### Files NOT Touched
 
@@ -892,19 +892,51 @@ fn test_install_writes_env_and_six_hooks() {
 fn test_install_skips_already_installed_hooks() {
     let dir = TempDir::new().unwrap();
     let settings_path = dir.path().join("settings.json");
-    // Pre-existing hook on PreToolUse (not ours — different command)
+    // Pre-existing cc-status-emit hook on PreToolUse — install must detect the
+    // existing command (matched by .contains("cc-status-emit") per install.rs:43-56)
+    // and skip PreToolUse while still installing the other 5 events.
+    let pre = r#"{"hooks":{"PreToolUse":[{"matcher":"","hooks":[{"type":"command","command":"/path/cc-status-emit --event tool-use"}]}]}}"#;
+    fs::write(&settings_path, pre).unwrap();
+
+    let emit_path = dir.path().join("cc-status-emit.exe");
+    let result = install_status_hooks_impl(&settings_path, "secret", &emit_path).unwrap();
+
+    assert_eq!(result.installed, 5);  // 5 other events installed
+    assert_eq!(result.skipped, 1);    // PreToolUse already had cc-status-emit
+
+    // PreToolUse still has exactly one entry, and it's the original cc-status-emit
+    // (we did not push a duplicate alongside the existing one).
+    let raw = fs::read_to_string(&settings_path).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&raw).unwrap();
+    let pre_entries = parsed["hooks"]["PreToolUse"].as_array().unwrap();
+    assert_eq!(pre_entries.len(), 1, "PreToolUse should keep its single existing entry, not get a duplicate");
+    assert!(pre_entries[0]["hooks"][0]["command"].as_str().unwrap().contains("cc-status-emit"));
+}
+
+#[test]
+fn test_install_preserves_unrelated_hook_on_same_event() {
+    let dir = TempDir::new().unwrap();
+    let settings_path = dir.path().join("settings.json");
+    // Pre-existing PreToolUse hook is some unrelated tool (not cc-status-emit).
+    // Per install.rs:43-56, the skip check looks for a "cc-status-emit" substring,
+    // so other-tool does NOT count as "already installed" — our hook should still
+    // be added alongside it, and the unrelated hook must be preserved.
     let pre = r#"{"hooks":{"PreToolUse":[{"matcher":"","hooks":[{"type":"command","command":"other-tool"}]}]}}"#;
     fs::write(&settings_path, pre).unwrap();
 
     let emit_path = dir.path().join("cc-status-emit.exe");
     let result = install_status_hooks_impl(&settings_path, "secret", &emit_path).unwrap();
 
-    assert_eq!(result.installed, 5);  // PreToolUse skipped (other-tool), 5 others installed
-    assert_eq!(result.skipped, 1);
+    assert_eq!(result.installed, 6);  // all 6 events installed
+    assert_eq!(result.skipped, 0);    // none skipped — other-tool is not "ours"
 
-    // PreToolUse still has other-tool (we didn't overwrite)
     let raw = fs::read_to_string(&settings_path).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&raw).unwrap();
+    let pre_entries = parsed["hooks"]["PreToolUse"].as_array().unwrap();
+    assert_eq!(pre_entries.len(), 2, "PreToolUse should now have both other-tool and cc-status-emit");
+    // both commands present
     assert!(raw.contains("other-tool"));
+    assert!(raw.contains("cc-status-emit"));
 }
 
 #[test]
@@ -976,7 +1008,7 @@ fn install_status_hooks_impl(
     secret: &str,
     emit_path: &std::path::Path,
 ) -> Result<InstallResult, String> {
-    install::install_status_hooks(settings_path, secret, emit_path, &HOOK_EVENTS_REAL[..])
+    install::install_status_hooks(settings_path, secret, emit_path, crate::repo::hooks_scanner::HOOK_EVENTS)
 }
 
 fn install_status_hooks_with_events(
@@ -2057,7 +2089,7 @@ Modify `vite.config.ts`, replace `build:` block (line 38-41):
     rollupOptions: {
       input: {
         main: 'index.html',
-        pet: 'src/pet.html',
+        pet: './pet.html',
       },
     },
   },
@@ -2202,7 +2234,7 @@ git commit -m "feat(pet): D34 c5 — 前端 PetModule + PetWindow + capabilities
 - src/api-tauri.ts: 加 5 wrapper (petInstallStatusHook/petUninstallStatusHook/petWindowOpen/petWindowClose/petGetStatus)
 - src/types.ts: 加 InstallResult / UninstallResult / PetState / AgentStateEvent 类型
 - src/App.tsx: TAB_KEYS 加 'pet' + TAB_LABELS 加 '宠物' + 渲染 <PetModule />
-- vite.config.ts: build.rollupOptions.input 加 'pet: src/pet.html' (v1.2 §8.3 多入口)
+- vite.config.ts: build.rollupOptions.input 加 'pet: ./pet.html' (v1.2 §8.3 多入口; pet.html 在 repo 根)
 - daemon.rs: 加 app_handle: tauri::AppHandle 字段 + emit('agent-state-event', &event) 让前端 listen 收到
 
 ⚠️ v1.2 §5.3 §9.3 第 9 步待真机手验:
@@ -2235,7 +2267,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - §7 错误处理 E1-E5 — covered: E1 Task 3 (exit 0 silent drop), E2 Task 4 (401), E3 Task 4 (400), E4 Task 4 (E5 mention), E5 Task 2 (window builder returns Err)
 - §8.1 Cargo.toml — Task 3 + Task 4 + Task 5
 - §8.2 tauri.conf.json — **not modified** (correct per spec §8.2)
-- §8.3 vite.config.ts — Task 5 Step 7
+- §8.3 vite.config.ts — Task 5 Step 7 (`pet.html` lives at repo root, not `src/` — D34 plan drift fix M4)
 - §8.4 capabilities/pet.json — Task 5 Step 6
 - §9.1-9.4 验证计划 — covered by global constraints + commit messages
 - §10 T1-T3 数据流 — covered by Task 4 install.rs + daemon.rs + http.rs + Task 3 cc-status-emit
