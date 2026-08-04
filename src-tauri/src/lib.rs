@@ -34,6 +34,25 @@ pub fn run() {
       });
       app.manage(daemon);
       let _ = secret; // kept for future direct IPC use
+
+      // D37: main window destroyed → auto-close pet webview.
+      // Tauri 2 默认主 webview 退出时不关兄弟 webview, 透明 always-on-top
+      // 窗口会"残留"在屏幕上 (cc-session-manager.exe 进程也还在), 用户
+      // 以为关了实际没关。监听主窗口 CloseRequested, 主窗口准备关时
+      // 主动 close pet webview, 整套 app 真退出。
+      let app_handle_for_event = app.handle().clone();
+      if let Some(main_window) = app.get_webview_window("main") {
+        main_window.on_window_event(move |event| {
+          if let tauri::WindowEvent::CloseRequested { .. } = event {
+            if let Some(pet) = app_handle_for_event.get_webview_window("pet") {
+              let _ = pet.close();
+            }
+            // 同时清理 HTTP receiver: daemon 里没显式 stop, 但
+            // 进程退出时 OS 回收 19847 端口 — 跟 v3.1 Electron 行为一致。
+          }
+        });
+      }
+
       Ok(())
     })
     .invoke_handler(tauri::generate_handler![
