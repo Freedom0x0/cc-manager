@@ -3,13 +3,20 @@
 // src/pet-main.tsx 独立 React 入口(对应 src/pet.html),挂在 Tauri 启动时
 // 建的 "pet" webview(无装饰 / 透明 / always-on-top)。listen 监听 daemon
 // 广播的 'agent-state-event'(Rust 侧 daemon.rs handle_event 用
-// tauri::Emitter::emit 触发),切换 sprite + bubble 文案。
+// tauri::Emitter::emit 触发),切换 sprite。
 //
-// sprite 用 7 个 emoji 占位 — 真像素 GIF 待 v4.1 找来源(spec §13 待办 1)。
-// bubble 文案优先级: 调用 Skill > 调用 MCP > 调用 tool > 状态标签。
+// D35: 容器 = sprite 大小 (80×80), 避免透明 webview 吃屏幕点击。
+// D38: 拖动用 Tauri 2 原生 startDragging() ——
+//   之前的 D36 方案 (mousedown + document mousemove + setPosition) 失败:
+//   transparent + always-on-top 窗口 mouse hover 出 webview 后,
+//   document mousemove 不再触发 (OS 当无焦点浮窗处理)。
+//   startDragging() 是 OS 原生拖动, 不依赖 webview DOM 事件, 跨平台稳。
+// D37: 右键 sprite → 关宠物窗口。
 
 import React, { useEffect, useState } from 'react';
 import { listen } from '@tauri-apps/api/event';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import { api } from '../../api-tauri';
 import type { AgentStateEvent, PetState } from '../../types';
 
 // 7 state → sprite (asset paths, see §13 待办 1: 像素 GIF 来源待定)
@@ -24,18 +31,11 @@ const SPRITE_MAP: Record<PetState, string> = {
   'error-interrupted': '❌',
 };
 
-const STATE_LABELS: Record<PetState, string> = {
-  'idle': '空闲',
-  'responding': '正在回复…',
-  'thinking': '思考中…',
-  'tool-use': '调用工具',
-  'ask-user': '需要你介入',
-  'completed': '已完成',
-  'error-interrupted': '中断',
-};
+const PET_SIZE = 80; // 容器和 sprite 同尺寸 (D35)
 
 export function PetWindow() {
   const [current, setCurrent] = useState<AgentStateEvent | null>(null);
+  const [dragging, setDragging] = useState(false);
 
   useEffect(() => {
     // Listen to daemon broadcast events
@@ -47,22 +47,47 @@ export function PetWindow() {
     };
   }, []);
 
+  // D38: Tauri 2 原生拖动 — mousedown 触发 OS 拖动, 不依赖 webview mousemove。
+  // startDragging() 内部调用 SetWindowPos (Win) / [WinWindow move] (mac),
+  // mouse hover 出 webview 仍继续响应。
+  //
+  // ⚠️ D38 v2 修复: startDragging() 返回的 Promise 在调用期间不阻塞, 一旦
+  // resolve .finally 立刻 setDragging(false) 会抢跑 — cursor 闪 grabbing
+  // 又回 grab, 视觉上看不到变化, 拖动期间也没法切 grabbing。 改成 mouseup
+  // 显式清: dragging=true 后 document mouseup 触发 setDragging(false)。
+  // dragging 也保留作 useEffect 触发 cursor 切到 grabbing 的方式 (CSS).
+  useEffect(() => {
+    if (!dragging) return;
+    const onUp = () => setDragging(false);
+    document.addEventListener('mouseup', onUp);
+    return () => document.removeEventListener('mouseup', onUp);
+  }, [dragging]);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // 左键才拖, 中键右键留给系统菜单
+    if (e.button !== 0) return;
+    e.preventDefault();
+    setDragging(true);
+    getCurrentWindow()
+      .startDragging()
+      .catch((err) => console.error('[pet] startDragging failed:', err));
+  };
+
+  // D37: 右键 sprite → 关闭宠物窗口。
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    api.petWindowClose().catch(() => {});
+  };
+
   const state: PetState = current?.state ?? 'idle';
   const sprite = SPRITE_MAP[state];
-  const label = STATE_LABELS[state];
-  const bubble =
-    current?.skill_name ? `调用 Skill: ${current.skill_name}` :
-    current?.mcp_server ? `调用 MCP: ${current.mcp_server}` :
-    current?.tool_name ? `调用 ${current.tool_name}` :
-    label;
 
   return (
     <div
       style={{
-        width: '100vw',
-        height: '100vh',
+        width: PET_SIZE,
+        height: PET_SIZE,
         display: 'flex',
-        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
         background: 'transparent',
@@ -70,23 +95,16 @@ export function PetWindow() {
         userSelect: 'none',
       }}
     >
-      <div style={{
-        background: 'rgba(255,255,255,0.92)',
-        borderRadius: 12,
-        padding: '8px 14px',
-        marginBottom: 8,
-        fontSize: 13,
-        maxWidth: 220,
-        textAlign: 'center',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-      }}>
-        {bubble}
-      </div>
-      <div style={{ fontSize: 80, lineHeight: 1, cursor: 'grab' }}>
+      <div
+        onMouseDown={handleMouseDown}
+        onContextMenu={handleContextMenu}
+        style={{
+          fontSize: PET_SIZE,
+          lineHeight: 1,
+          cursor: dragging ? 'grabbing' : 'grab',
+        }}
+      >
         {sprite}
-      </div>
-      <div style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
-        {current?.session_id?.slice(0, 8) ?? '—'}
       </div>
     </div>
   );
