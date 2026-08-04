@@ -430,3 +430,41 @@ cc-session-manager/
 ## 16. 改这个文件
 
 任何时候发现本文档有错漏、或新形成的约束应该写进来，**直接 Edit 这个文件**。这是项目级宪法，不是只读文档。
+
+---
+
+## 17. 桌面宠物 / 透明 always-on-top 窗口事件穿透
+
+**D35 (2026-08-04)**：用户报"打开宠物窗口后整屏幕点击无响应、电脑卡死"。根因 = `transparent(true) + always_on_top(true) + 100vw×100vh 容器 + 默认 pointer-events: auto` 4 重叠加，WebView2 host 占满整个窗口矩形吃掉所有鼠标事件，看起来像"卡死"（实际只是事件被吞）。
+
+**修复**（src/modules/pet/PetWindow.tsx, 1 文件 +26/-5）：外层容器加 `pointerEvents: 'none'`、bubble/session_id 容器也 `none`、只在 sprite div 上 `auto`（保留 cursor: grab 拖动）。透明窗口的"鼠标穿透"靠前端 CSS 实现，比改 Tauri 配置 / WebView2 hit-test 跨平台稳定。
+
+**教训**：
+1. 透明 + 无边框 + always-on-top 窗口是事件吞噬重灾区。前端 `pointer-events: none` 是性价比最高的修法（CSS 标准、跨平台、零依赖）。
+2. "卡死"先区分是 CPU 满载还是事件被吞——两种 root cause 完全不同修法。Phase 1 systematic-debugging 用 AskUserQuestion 让用户报症状（点不动 vs 慢 vs 风扇转），比猜根因快 10 倍。
+3. 用户报"电脑卡死"几乎都是事件被吞（Web 透明浮窗 / 系统级 modal / 全屏 alert），CPU 真卡死占比极小。**先查事件再查 CPU**。
+4. v4.0 验证 3 步 (cargo check + tsc + build:vite) 全过但漏"真机手验透明窗口事件穿透"——单元测试 / 类型检查覆盖不到 WRY / WebView2 hit-test 行为。**透明窗口类功能必须真机手验 mouse click 穿透**。
+
+---
+
+## 18. 多 webview 生命周期与关闭 UX
+
+**D37 (2026-08-04)**：用户报"关了 cc-manager 后宠物窗口没关" + "不知道怎么关宠物"。根因 = Tauri 2 多 webview 行为：`WebviewWindowBuilder` 建的兄弟 webview **不**跟随主 webview 退出而关闭，加上 `decorations(false)` 没标题栏关闭按钮。
+
+**修复**（2 文件）：
+
+1. **`src-tauri/src/lib.rs` setup hook (+18 行)**：监听主窗口 `WindowEvent::CloseRequested` → 主动 `pet.close()`。`tauri.conf.json` 主窗口 label 默认 `"main"`，跟能力文件 `windows: ["main"]` 一致。注释说明 HTTP receiver 端口 19847 由进程退出时 OS 自动回收，**不需要显式 stop daemon**（跟 v3.1 Electron 行为一致）。
+
+2. **`src/modules/pet/PetWindow.tsx` (+11 行)**：
+   - 顶部 `import { api } from '../../api-tauri'`（复用 v4 commit 2 已落的 invoke wrapper）
+   - `handleContextMenu` 阻止默认 → 调 `api.petWindowClose()` (api-tauri.ts:190 已存在)
+   - sprite div 绑 `onContextMenu`
+   - **右键 sprite** = 关闭宠物窗口
+
+**验证**：tsc 0 错 + cargo check 0 错（D30 dead_code 旧 warning 无关）+ build:vite 13.27s 成功。
+
+**教训**：
+1. **Tauri 2 多 webview 不自动联动生命周期**。文档说"主 webview 关闭会清理资源"但**不**包括兄弟 webview。需要主动 `on_window_event` 监听 + close。
+2. **多 webview 应用的关闭 UX** 必须每个 webview 单独考虑：标题栏 / 任务栏右键 / 自定义右键菜单 / 全局快捷键。`decorations(false) + skip_taskbar(true)` 让用户没有任何系统级入口，必须自定义。
+3. **错误日志里的 CloseRequested 不是"已被关闭"而是"准备关闭"**。要插关闭逻辑就这里 hook，**不要**在 `Destroyed`（已经关了）。区别：CloseRequested 是 cancelable，Destroyed 是既成事实。
+4. 监听挂在 `app.get_webview_window("main")` 上而不是 `Builder::on_window_event` 全局——后者会被所有 webview 触发，**需要 `if window.label() == "main"` 过滤**。直接挂到主窗口引用上等价但更清晰。
