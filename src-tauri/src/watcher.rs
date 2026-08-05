@@ -43,28 +43,73 @@ fn set_state(db: &DB, key: &str, value: &str) -> rusqlite::Result<()> {
     Ok(())
 }
 
+fn now_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
+}
+
+fn clear_error(db: &DB) -> rusqlite::Result<()> {
+    set_state(db, "last_error", "")
+}
+
+pub fn record_error(db: &DB, error: &str) {
+    let _ = set_state(db, "last_error", error);
+    let _ = set_state(db, "status", "error");
+}
+
+/// 手动全量扫描，同时维护 UI 所读取的 watcher 状态。
+pub fn rescan_all(db: &DB) -> rusqlite::Result<crate::importer::ImportStats> {
+    set_state(db, "status", "scanning")?;
+    match crate::importer::rescan_all(db) {
+        Ok(stats) => {
+            clear_error(db)?;
+            set_state(db, "status", "idle")?;
+            Ok(stats)
+        }
+        Err(error) => {
+            record_error(db, &error.to_string());
+            Err(error)
+        }
+    }
+}
+
+/// Tauri 托管该值以保活 notify handle；handle 被 drop 后系统监听会立即停止。
+pub struct WatcherHandle {
+    _watcher: Mutex<Option<RecommendedWatcher>>,
+}
+
+impl WatcherHandle {
+    pub fn new(watcher: Option<RecommendedWatcher>) -> Self {
+        Self {
+            _watcher: Mutex::new(watcher),
+        }
+    }
+}
+
 /// 在 source_dir 上挂 notify 监听,事件路由到 watcher_state KV 表。
 /// 返回 watcher handle (持有期间持续监听, drop 时自动卸载)。
-pub fn start_watcher(db: Arc<Mutex<DB>>, source_dir: &Path) -> rusqlite::Result<RecommendedWatcher> {
-    set_state(&db.lock().unwrap(), "status", "starting")?;
+pub fn start_watcher(db: Arc<Mutex<DB>>, source_dir: &Path) -> Result<RecommendedWatcher, String> {
+    {
+        let db = db.lock().map_err(|e| e.to_string())?;
+        set_state(&db, "status", "starting").map_err(|e| e.to_string())?;
+        clear_error(&db).map_err(|e| e.to_string())?;
+    }
 
     let (tx, rx) = channel();
-    let mut watcher = notify::recommended_watcher(tx).map_err(|e| {
-        rusqlite::Error::FromSqlConversionFailure(
-            0,
-            rusqlite::types::Type::Text,
-            Box::new(std::io::Error::new(std::io::ErrorKind::Other, format!("notify init: {}", e))),
-        )
-    })?;
-    watcher.watch(source_dir, RecursiveMode::Recursive).map_err(|e| {
-        rusqlite::Error::FromSqlConversionFailure(
-            0,
-            rusqlite::types::Type::Text,
-            Box::new(std::io::Error::new(std::io::ErrorKind::Other, format!("notify watch: {}", e))),
-        )
-    })?;
+    let mut watcher = notify::recommended_watcher(tx).map_err(|e| format!("notify init: {e}"))?;
+    watcher
+        .watch(source_dir, RecursiveMode::Recursive)
+        .map_err(|e| format!("notify watch {}: {e}", source_dir.display()))?;
+
+    {
+        let db = db.lock().map_err(|e| e.to_string())?;
+        set_state(&db, "status", "idle").map_err(|e| e.to_string())?;
+    }
 
     // 后台线程处理事件,debounce 200ms (沿用 v3.1 awaitWriteFinish 阈值)
+    let watched_dir = source_dir.to_path_buf();
     std::thread::spawn(move || {
         let mut last_event: HashMap<PathBuf, Instant> = HashMap::new();
         for res in rx {
@@ -74,6 +119,9 @@ pub fn start_watcher(db: Arc<Mutex<DB>>, source_dir: &Path) -> rusqlite::Result<
                 {
                     let db_clone = Arc::clone(&db);
                     for p in paths {
+                        if p.extension().and_then(|ext| ext.to_str()) != Some("jsonl") {
+                            continue;
+                        }
                         let now = Instant::now();
                         let should_emit = last_event
                             .get(&p)
@@ -85,14 +133,18 @@ pub fn start_watcher(db: Arc<Mutex<DB>>, source_dir: &Path) -> rusqlite::Result<
                                 EventKind::Remove(_) => "unlink",
                                 _ => continue,
                             };
-                            let event_json = format!(
-                                "{{\"type\":\"{}\",\"path\":{:?}}}",
-                                kind_str,
-                                p.to_string_lossy()
-                            );
                             if let Ok(db_guard) = db_clone.lock() {
-                                let _ = set_state(&db_guard, "last_event", &event_json);
-                                let _ = set_state(&db_guard, "status", "idle");
+                                let _ = set_state(&db_guard, "status", "scanning");
+                                let _ = set_state(&db_guard, "last_event_type", kind_str);
+                                let _ = set_state(&db_guard, "last_event_path", &p.to_string_lossy());
+                                let _ = set_state(&db_guard, "last_event_at", &now_ms().to_string());
+                                match crate::importer::rescan_source_dir(&db_guard, &watched_dir) {
+                                    Ok(_) => {
+                                        let _ = clear_error(&db_guard);
+                                        let _ = set_state(&db_guard, "status", "idle");
+                                    }
+                                    Err(error) => record_error(&db_guard, &error.to_string()),
+                                }
                             }
                             last_event.insert(p, now);
                         }
@@ -112,17 +164,15 @@ pub fn start_watcher(db: Arc<Mutex<DB>>, source_dir: &Path) -> rusqlite::Result<
     Ok(watcher)
 }
 
-/// 平移自 v3.1 electron/repo/watcher-state.ts:getState 多键聚合
-/// 返 { state, last_event?, last_error? } 三选一(有值才返)。
+/// 平移自 v3.1 electron/repo/watcher-state.ts:getState 多键聚合。
 pub fn get_status(db: &DB) -> crate::types::WatcherStatus {
     let status = get_state(db, "status").unwrap_or_else(|| "starting".to_string());
-    let _last_event = get_state(db, "last_event");
     let last_error = get_state(db, "last_error");
 
     crate::types::WatcherStatus {
-        state: status,
-        last_event_at: None, // v3.1 不存 epoch, 暂留 None
-        last_event_path: None,
+        status,
+        last_event_at: get_state(db, "last_event_at").and_then(|s| s.parse().ok()),
+        last_event_path: get_state(db, "last_event_path").filter(|s| !s.is_empty()),
         last_error: last_error.filter(|s| !s.is_empty()),
     }
 }

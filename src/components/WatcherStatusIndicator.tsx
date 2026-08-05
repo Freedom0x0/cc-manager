@@ -7,6 +7,7 @@ type BadgeStatus = 'default' | 'success' | 'processing' | 'warning' | 'error';
 
 const statusToBadge: Record<WatcherStatus['status'], BadgeStatus> = {
   starting: 'processing',
+  scanning: 'processing',
   idle: 'success',
   error: 'error',
 };
@@ -18,7 +19,7 @@ export const WatcherStatusIndicator: React.FC = () => {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    const refresh = async () => {
       try {
         const s = await api.watcherGetStatus();
         if (cancelled) return;
@@ -30,9 +31,12 @@ export const WatcherStatusIndicator: React.FC = () => {
           setErrorMsg(undefined);
         }
       }
-    })();
+    };
+    void refresh();
+    const timer = window.setInterval(refresh, 5000);
     return () => {
       cancelled = true;
+      window.clearInterval(timer);
     };
   }, []);
 
@@ -56,6 +60,8 @@ export const WatcherStatusIndicator: React.FC = () => {
   const label =
     status === 'starting'
       ? 'watcher: 未启动'
+      : status === 'scanning'
+        ? 'watcher: 扫描中'
       : status === 'idle'
         ? 'watcher: 运行中'
         : `watcher: 错误${errorMsg ? ` (${errorMsg})` : ''}`;

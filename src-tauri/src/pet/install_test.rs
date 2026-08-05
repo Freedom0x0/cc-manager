@@ -34,24 +34,28 @@ fn test_install_writes_env_and_six_hooks() {
         assert_eq!(entries.len(), 1, "expected 1 entry for {}", event);
         let cmd = entries[0]["hooks"][0]["command"].as_str().unwrap();
         assert!(cmd.contains("cc-status-emit"), "hook command should reference cc-status-emit: {}", cmd);
+        assert!(
+            cmd.ends_with(&format!("--event {}", event)),
+            "hook command must pass the hook event name, got: {}",
+            cmd
+        );
     }
 }
 
 #[test]
-fn test_install_skips_already_installed_hooks() {
+fn test_install_repairs_old_status_hook_commands() {
     let dir = TempDir::new().unwrap();
     let settings_path = dir.path().join("settings.json");
-    // Pre-existing cc-status-emit hook on PreToolUse — install must detect the
-    // existing command (matched by .contains("cc-status-emit") per install.rs:43-56)
-    // and skip PreToolUse while still installing the other 5 events.
+    // Old versions passed a state value instead of the Claude Code event name.
+    // Reinstall must repair it rather than treating it as already correct.
     let pre = r#"{"hooks":{"PreToolUse":[{"matcher":"","hooks":[{"type":"command","command":"/path/cc-status-emit --event tool-use"}]}]}}"#;
     fs::write(&settings_path, pre).unwrap();
 
     let emit_path = dir.path().join("cc-status-emit.exe");
     let result = install_status_hooks_impl(&settings_path, "secret", &emit_path).unwrap();
 
-    assert_eq!(result.installed, 5);  // 5 other events installed
-    assert_eq!(result.skipped, 1);    // PreToolUse already had cc-status-emit
+    assert_eq!(result.installed, 6);  // 5 new + 1 repaired
+    assert_eq!(result.skipped, 0);
 
     // PreToolUse still has exactly one entry, and it's the original cc-status-emit
     // (we did not push a duplicate alongside the existing one).
@@ -59,7 +63,39 @@ fn test_install_skips_already_installed_hooks() {
     let parsed: serde_json::Value = serde_json::from_str(&raw).unwrap();
     let pre_entries = parsed["hooks"]["PreToolUse"].as_array().unwrap();
     assert_eq!(pre_entries.len(), 1, "PreToolUse should keep its single existing entry, not get a duplicate");
-    assert!(pre_entries[0]["hooks"][0]["command"].as_str().unwrap().contains("cc-status-emit"));
+    let command = pre_entries[0]["hooks"][0]["command"].as_str().unwrap();
+    assert!(command.ends_with("--event PreToolUse"), "old command was not repaired: {}", command);
+}
+
+#[test]
+fn test_install_quotes_emit_path_with_spaces() {
+    let dir = TempDir::new().unwrap();
+    let settings_path = dir.path().join("settings.json");
+    fs::write(&settings_path, "{}").unwrap();
+
+    let emit_path = dir.path().join("cc manager").join("cc-status-emit");
+    install_status_hooks_with_events(&settings_path, "secret", &emit_path, &["Stop"]).unwrap();
+
+    let raw = fs::read_to_string(&settings_path).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&raw).unwrap();
+    let command = parsed["hooks"]["Stop"][0]["hooks"][0]["command"].as_str().unwrap();
+    let expected_quote = if cfg!(windows) { '"' } else { '\'' };
+    assert!(command.starts_with(expected_quote), "path should be shell quoted: {}", command);
+    assert!(command.ends_with("--event Stop"));
+}
+
+#[test]
+fn test_install_is_idempotent_when_commands_are_current() {
+    let dir = TempDir::new().unwrap();
+    let settings_path = dir.path().join("settings.json");
+    fs::write(&settings_path, "{}").unwrap();
+    let emit_path = dir.path().join("cc-status-emit");
+
+    install_status_hooks_impl(&settings_path, "secret", &emit_path).unwrap();
+    let result = install_status_hooks_impl(&settings_path, "secret", &emit_path).unwrap();
+
+    assert_eq!(result.installed, 0);
+    assert_eq!(result.skipped, 6);
 }
 
 #[test]

@@ -27,7 +27,7 @@ fn test_cc_status_emit_signs_body_with_hmac() {
     // Pipe stdin JSON
     let mut child = Command::new(bin)
         .arg("--event")
-        .arg("tool-use")
+        .arg("PreToolUse")
         .arg("--secret")
         .arg(secret)
         .arg("--dry-run") // c3 feature: dry-run prints signed body, doesn't POST
@@ -73,6 +73,30 @@ fn test_cc_status_emit_maps_event_to_state() {
         stdout.contains("\"state\":\"completed\""),
         "expected state=completed, got: {}", stdout
     );
+}
+
+#[test]
+fn test_cc_status_emit_repairs_old_event_argument_from_stdin() {
+    let bin = env!("CARGO_BIN_EXE_cc-status-emit");
+    let mut child = Command::new(bin)
+        .arg("--event")
+        .arg("tool-use")
+        .arg("--secret")
+        .arg("dummy-secret")
+        .arg("--dry-run")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    child.stdin.as_mut().unwrap().write_all(
+        br#"{"session_id":"legacy","hook_event_name":"PreToolUse","tool_name":"Skill","tool_input":{"skill":"code-review"}}"#,
+    ).unwrap();
+    let output = child.wait_with_output().unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(stdout.contains("\"state\":\"tool-use\""), "expected fallback to stdin event: {}", stdout);
+    assert!(stdout.contains("\"skill_name\":\"code-review\""), "expected promoted skill name: {}", stdout);
 }
 
 #[test]

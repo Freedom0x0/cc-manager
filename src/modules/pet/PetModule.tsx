@@ -12,6 +12,7 @@
 // src/types.ts 的 D34 注释 + 本文件末尾 commit message 备注。
 import React, { useEffect, useState } from 'react';
 import { Button, List, Space, Typography, Tag, notification } from 'antd';
+import { listen } from '@tauri-apps/api/event';
 import { api } from '../../api-tauri';
 import type { AgentStateEvent, InstallResult, PetState } from '../../types';
 
@@ -37,13 +38,49 @@ const STATE_LABELS: Record<PetState, string> = {
   'error-interrupted': '出错中断',
 };
 
+function mergeEvents(...groups: AgentStateEvent[][]): AgentStateEvent[] {
+  const latest = new Map<string, AgentStateEvent>();
+  for (const group of groups) {
+    for (const event of group) {
+      const previous = latest.get(event.session_id);
+      if (!previous || event.timestamp_ms >= previous.timestamp_ms) {
+        latest.set(event.session_id, event);
+      }
+    }
+  }
+  return [...latest.values()].sort((a, b) => b.timestamp_ms - a.timestamp_ms);
+}
+
 export function PetModule() {
   const [installed, setInstalled] = useState<boolean | null>(null);
   const [events, setEvents] = useState<AgentStateEvent[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    api.petGetStatus().then(setEvents).catch(() => setEvents([]));
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+
+    listen<AgentStateEvent>('agent-state-event', (event: { payload: AgentStateEvent }) => {
+      if (!disposed) {
+        setEvents((current) => mergeEvents(current, [event.payload]));
+      }
+    }).then((stop: () => void) => {
+      if (disposed) stop();
+      else unlisten = stop;
+    }).catch(() => {});
+
+    api.petGetStatus()
+      .then((snapshot) => {
+        if (!disposed) {
+          setEvents((current) => mergeEvents(snapshot, current));
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
   }, []);
 
   const handleInstall = async () => {

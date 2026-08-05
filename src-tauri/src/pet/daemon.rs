@@ -100,12 +100,8 @@ impl PetStateDaemon {
 
         // 3. Spawn synthetic idle if Completed (per §11.3)
         if state == PetState::Completed {
-            let bcast = self.broadcast.clone();
-            // D34 fix (c5 review C2): clone AppHandle so spawned closure can
-            //   also emit to frontend. Without this, only broadcast fires
-            //   (which has no production subscribers) — PetWindow listen()
-            //   never sees the synthetic Idle.
-            let app = self.app.clone();
+            let daemon = self.clone();
+            let completed_at = event.timestamp_ms;
             tauri::async_runtime::spawn(async move {
                 tokio::time::sleep(Duration::from_secs(5)).await;
                 let idle = AgentStateEvent {
@@ -122,8 +118,28 @@ impl PetStateDaemon {
                         .unwrap_or(0),
                     payload: serde_json::json!(null),
                 };
-                let _ = bcast.send(idle.clone());
-                if let Some(app) = app.as_ref() {
+                // Keep the in-memory snapshot consistent with what listeners
+                // see; the previous implementation only emitted the idle
+                // event and left cmd_pet_get_status stuck on "completed".
+                let should_emit = {
+                    let mut sessions = daemon.sessions.lock();
+                    let still_completed = sessions
+                        .get(&session_id)
+                        .map(|current| {
+                            current.state == PetState::Completed
+                                && current.timestamp_ms == completed_at
+                        })
+                        .unwrap_or(false);
+                    if still_completed {
+                        sessions.insert(session_id, idle.clone());
+                    }
+                    still_completed
+                };
+                if !should_emit {
+                    return;
+                }
+                let _ = daemon.broadcast.send(idle.clone());
+                if let Some(app) = daemon.app.as_ref() {
                     let _ = app.emit("agent-state-event", &idle);
                 }
             });

@@ -17,7 +17,7 @@ use sha2::Sha256;
 // Single source of truth for the hook→state mapping (spec §5.2): the lib
 // crate's pet::state module. The lib target is named `app_lib` in Cargo.toml,
 // hence the import path below rather than the package name.
-use app_lib::pet::state::event_name_to_state_str;
+use app_lib::pet::state::{event_name_to_state_str, state_for_hook};
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -26,7 +26,7 @@ const TARGET_PATH: &str = "/agent-event";
 
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().collect();
-    let event_name = parse_arg(&args, "--event").unwrap_or_default();
+    let cli_event_name = parse_arg(&args, "--event");
     let cli_secret = parse_arg(&args, "--secret");
     let dry_run = args.iter().any(|a| a == "--dry-run");
 
@@ -47,18 +47,79 @@ fn main() -> ExitCode {
         Err(_) => return ExitCode::SUCCESS,  // bad JSON → silent drop
     };
 
-    // Map event to PetState via shared module; unknown events (e.g. the
-    // non-existent PermissionRequest) fall back to "idle".
+    // Prefer a valid CLI hook name, but recover old installations that wrote
+    // state values such as `--event tool-use`: Claude Code also includes the
+    // real event name in stdin as hook_event_name.
+    let payload_event_name = event
+        .get("hook_event_name")
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_owned);
+    let event_name = cli_event_name
+        .filter(|name| state_for_hook(name).is_some())
+        .or(payload_event_name)
+        .unwrap_or_default();
+
+    let raw_payload = event.clone();
     let state_str = serde_json::json!(event_name_to_state_str(&event_name));
     if let Some(obj) = event.as_object_mut() {
         obj.insert("state".to_string(), state_str);
-        if !obj.contains_key("timestamp_ms") {
+        if obj
+            .get("timestamp_ms")
+            .and_then(serde_json::Value::as_i64)
+            .is_none()
+        {
             let ms = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_millis() as i64)
                 .unwrap_or(0);
             obj.insert("timestamp_ms".to_string(), serde_json::json!(ms));
         }
+
+        // Preserve the original Claude Code hook data for future UI features,
+        // while also promoting the fields the current pet UI displays.
+        obj.entry("payload".to_string()).or_insert(raw_payload);
+
+        let tool_name = obj
+            .get("tool_name")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned);
+        if !obj.contains_key("skill_name") && tool_name.as_deref() == Some("Skill") {
+            let skill_name = obj
+                .get("tool_input")
+                .and_then(|input| input.get("skill"))
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned);
+            if let Some(skill_name) = skill_name {
+                obj.insert("skill_name".to_string(), serde_json::json!(skill_name));
+            }
+        }
+        if !obj.contains_key("mcp_server") {
+            if let Some(server) = tool_name
+                .as_deref()
+                .and_then(|name| name.strip_prefix("mcp__"))
+                .and_then(|name| name.split_once("__").map(|(server, _)| server))
+            {
+                obj.insert("mcp_server".to_string(), serde_json::json!(server));
+            }
+        }
+
+        // Keep the wire schema compact. PostToolUse payloads can be large;
+        // retaining the original fields both at top level and under payload
+        // would double every hook request.
+        obj.retain(|key, _| {
+            matches!(
+                key.as_str(),
+                "session_id"
+                    | "cwd"
+                    | "state"
+                    | "tool_name"
+                    | "skill_name"
+                    | "mcp_server"
+                    | "elapsed_ms"
+                    | "timestamp_ms"
+                    | "payload"
+            )
+        });
     }
 
     // Serialize body

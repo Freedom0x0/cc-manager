@@ -9,3 +9,4 @@ release/
 .peaks/_runtime/
 .peaks/PROJECT.md
 .claude/worktrees/
+src-tauri/binaries/

@@ -95,7 +95,7 @@ pub struct ResumeCommand {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WatcherStatus {
-    pub state: String, // "starting" | "idle" | "error" | "scanning"
+    pub status: String, // "starting" | "idle" | "error" | "scanning"
     #[serde(rename = "lastEventAt", skip_serializing_if = "Option::is_none")]
     pub last_event_at: Option<i64>,
     #[serde(rename = "lastEventPath", skip_serializing_if = "Option::is_none")]

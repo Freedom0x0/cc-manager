@@ -63,6 +63,7 @@ async fn test_daemon_synthetic_idle_after_completed() {
     let idle = second.expect("recv failed");
     assert_eq!(idle.state, PetState::Idle);
     assert_eq!(idle.session_id, "s1");
+    assert_eq!(daemon.snapshot()[0].state, PetState::Idle);
 }
 
 #[tokio::test]

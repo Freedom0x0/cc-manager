@@ -52,8 +52,9 @@ export interface SearchHit {
 }
 
 export interface WatcherStatus {
-  status: 'starting' | 'idle' | 'error';
-  lastEvent?: string;
+  status: 'starting' | 'scanning' | 'idle' | 'error';
+  lastEventAt?: number;
+  lastEventPath?: string;
   lastError?: string;
 }
 

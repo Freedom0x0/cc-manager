@@ -10,6 +10,25 @@ use crate::util::atomic_write::atomic_write_json;
 use serde_json::{json, Value};
 use std::path::Path;
 
+fn is_status_hook(hook: &Value) -> bool {
+    hook.get("command")
+        .and_then(Value::as_str)
+        .map(|command| command.contains("cc-status-emit"))
+        .unwrap_or(false)
+}
+
+fn hook_command(emit_path: &Path, event: &str) -> String {
+    let path = emit_path.to_string_lossy();
+
+    #[cfg(windows)]
+    let quoted_path = format!("\"{}\"", path.replace('"', "\\\""));
+
+    #[cfg(not(windows))]
+    let quoted_path = format!("'{}'", path.replace('\'', "'\\''"));
+
+    format!("{} --event {}", quoted_path, event)
+}
+
 pub fn install_status_hooks(
     settings_path: &Path,
     secret: &str,
@@ -34,41 +53,52 @@ pub fn install_status_hooks(
     let hooks_map = obj.entry("hooks".to_string()).or_insert(json!({}));
     let hooks_obj = hooks_map.as_object_mut().ok_or("hooks not an object")?;
 
-    let emit_path_str = emit_path.to_string_lossy().to_string();
-
     for event in events {
         let entries = hooks_obj.entry(event.to_string()).or_insert(json!([]));
         let arr = entries.as_array_mut().ok_or_else(|| format!("hooks.{} not array", event))?;
 
-        // Check if cc-status-emit hook already exists (idempotent install)
-        let already_installed = arr.iter().any(|entry| {
-            entry["hooks"]
-                .as_array()
-                .and_then(|hooks| hooks.first())
-                .and_then(|h| h["command"].as_str())
-                .map(|cmd| cmd.contains("cc-status-emit"))
-                .unwrap_or(false)
-        });
+        // --event must be the Claude Code hook event name. cc-status-emit owns
+        // the event -> PetState mapping; passing "tool-use"/"completed" here
+        // made every installed hook fall back to idle.
+        let command = hook_command(emit_path, event);
 
-        if already_installed {
-            skipped += 1;
-            continue;
+        // Reinstall is also an upgrade path: repair old commands in place when
+        // the event argument or the app path changed. Merely skipping any
+        // command containing cc-status-emit leaves previously broken installs
+        // broken forever.
+        let mut found = false;
+        let mut changed = false;
+        for entry in arr.iter_mut() {
+            let Some(hooks) = entry.get_mut("hooks").and_then(Value::as_array_mut) else {
+                continue;
+            };
+            for hook in hooks.iter_mut().filter(|hook| is_status_hook(hook)) {
+                found = true;
+                if hook.get("command").and_then(Value::as_str) != Some(command.as_str()) {
+                    hook["command"] = json!(command.clone());
+                    changed = true;
+                }
+                if hook.get("type").and_then(Value::as_str) != Some("command") {
+                    hook["type"] = json!("command");
+                    changed = true;
+                }
+            }
         }
 
-        // Map event to PetState for --event flag value
-        let state_arg = match event.as_ref() {
-            "PreToolUse" | "PostToolUse" => "tool-use",
-            "Stop" | "SubagentStop" => "completed",
-            "Notification" => "ask-user",
-            "UserPromptSubmit" => "responding",
-            _ => unreachable!("validated above"),
-        };
+        if found {
+            if changed {
+                installed += 1;
+            } else {
+                skipped += 1;
+            }
+            continue;
+        }
 
         arr.push(json!({
             "matcher": "",
             "hooks": [{
                 "type": "command",
-                "command": format!("{} --event {}", emit_path_str, state_arg)
+                "command": command
             }]
         }));
         installed += 1;
@@ -100,9 +130,7 @@ pub fn uninstall_status_hooks(settings_path: &Path) -> Result<UninstallResult, S
                 arr.retain(|entry| {
                     let is_ours = entry["hooks"]
                         .as_array()
-                        .and_then(|hooks| hooks.first())
-                        .and_then(|h| h["command"].as_str())
-                        .map(|cmd| cmd.contains("cc-status-emit"))
+                        .map(|hooks| hooks.iter().any(is_status_hook))
                         .unwrap_or(false);
                     !is_ours
                 });

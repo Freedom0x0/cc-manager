@@ -411,7 +411,13 @@ pub fn default_source_dir() -> std::path::PathBuf {
 
 /// 全量扫所有 project folder + 入库(单文件版本,cmd_watcher_rescan_all 调用)
 pub fn rescan_all(db: &DB) -> rusqlite::Result<ImportStats> {
-    let folders = scan_project_folders(&default_source_dir());
+    rescan_source_dir(db, &default_source_dir())
+}
+
+/// 扫描指定 Claude projects 目录。watcher 使用该入口，测试和非默认目录不会
+/// 意外回退到当前用户的 ~/.claude/projects。
+pub fn rescan_source_dir(db: &DB, source_dir: &Path) -> rusqlite::Result<ImportStats> {
+    let folders = scan_project_folders(source_dir);
     let mut total = ImportStats::default();
     for folder in &folders {
         let stats = import_project_folder(db, folder)?;

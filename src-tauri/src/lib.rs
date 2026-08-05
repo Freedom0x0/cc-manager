@@ -6,13 +6,47 @@ pub fn run() {
       use tauri::Manager;
       let app_data_dir = app.path().app_data_dir()?;
       let db = crate::db::init_db(&app_data_dir)?;
+      let db_state = crate::db::DbState::new(db);
+      let source_dir = crate::importer::default_source_dir();
+      let watcher = match std::fs::create_dir_all(&source_dir) {
+        Ok(()) => match crate::watcher::start_watcher(
+          std::sync::Arc::clone(&db_state.0),
+          &source_dir,
+        ) {
+          Ok(watcher) => Some(watcher),
+          Err(error) => {
+            eprintln!("[startup] watcher failed: {}", error);
+            if let Ok(db) = db_state.0.lock() {
+              crate::watcher::record_error(&db, &error);
+            }
+            None
+          }
+        },
+        Err(error) => {
+          let error = format!("create watcher directory {}: {}", source_dir.display(), error);
+          eprintln!("[startup] {}", error);
+          if let Ok(db) = db_state.0.lock() {
+            crate::watcher::record_error(&db, &error);
+          }
+          None
+        }
+      };
       // commit 24 修 D26: 启动后立即 rescan 一次,把 ~/.claude/projects/ 下
       // 现有 jsonl 导入 DB。否则前端 SessionsPane 空 — D20 类缺口的延伸(commit 4
       // 写 'watcher 集成' 但实际只完成 notify 事件路由, importer 解析 + 启动触发漏)。
-      if let Err(e) = crate::importer::rescan_all(&db) {
-        eprintln!("[startup] rescan_all failed: {}", e);
+      if let Ok(db) = db_state.0.lock() {
+        let scan_result = if watcher.is_some() {
+          crate::watcher::rescan_all(&db)
+        } else {
+          // 保留 watcher 启动失败的 error 状态；扫描成功不能伪装成监听正常。
+          crate::importer::rescan_all(&db)
+        };
+        if let Err(e) = scan_result {
+          eprintln!("[startup] rescan_all failed: {}", e);
+        }
       }
-      app.manage(crate::db::DbState::new(db));
+      app.manage(db_state);
+      app.manage(crate::watcher::WatcherHandle::new(watcher));
       // v1.2 c4: PetStateDaemon (real wiring with AppHandle so Task 5 can
       // emit "agent-state-event" to the frontend without changing the
       // signature again) + HTTP receiver on 127.0.0.1:19847.
@@ -244,7 +278,7 @@ fn cmd_resume_session(
 #[tauri::command]
 fn cmd_watcher_rescan_all(state: tauri::State<crate::db::DbState>) -> Result<crate::importer::ImportStats, String> {
     let db = state.0.lock().map_err(|e| e.to_string())?;
-    crate::importer::rescan_all(&db).map_err(|e| e.to_string())
+    crate::watcher::rescan_all(&db).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -679,6 +713,13 @@ async fn cmd_pet_install_status_hook(app: tauri::AppHandle) -> Result<crate::pet
         .parent()
         .map(|p| p.join(if cfg!(windows) { "cc-status-emit.exe" } else { "cc-status-emit" }))
         .ok_or_else(|| "exe parent dir not found".to_string())?;
+
+    if !emit_path.is_file() {
+        return Err(format!(
+            "Agent Status Hook 辅助程序缺失: {}。请重新安装完整的 cc-manager 安装包。",
+            emit_path.display()
+        ));
+    }
 
     crate::pet::install::install_status_hooks(
         &settings_path,
