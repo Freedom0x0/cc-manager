@@ -753,7 +753,7 @@ async fn cmd_pet_window_open(app: tauri::AppHandle) -> Result<(), String> {
         tauri::WebviewUrl::App("pet.html".into()),
     )
     .title("cc-pet")
-    .inner_size(280.0, 320.0)
+    .inner_size(224.0, 252.0)
     .decorations(false)
     .always_on_top(true)
     .skip_taskbar(true)

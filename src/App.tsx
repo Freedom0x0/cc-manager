@@ -11,7 +11,8 @@ import { SubAgentsManager } from './modules/sub_agents/SubAgentsManager';
 import { HooksManager } from './modules/hooks/HooksManager';
 import { PluginsManager } from './modules/plugins/PluginsManager';
 import { ProfileManager } from './modules/profiles/ProfileManager';
-import { AnalyticsModule } from './modules/analytics/AnalyticsModule';
+// 用量分析暂时下线，保留模块代码与后端 IPC，后续可直接恢复入口。
+// import { AnalyticsModule } from './modules/analytics/AnalyticsModule';
 import { PetModule } from './modules/pet/PetModule';
 
 const { Header, Sider, Content } = Layout;
@@ -25,7 +26,7 @@ const TAB_KEYS = [
   'hooks',
   'plugins',
   'profiles',
-  'usage',
+  // 'usage',
   'pet',
 ] as const;
 
@@ -40,7 +41,6 @@ const TAB_LABELS: Record<TabKey, string> = {
   hooks: 'Hooks',
   plugins: '插件',
   profiles: 'Profiles',
-  usage: '用量分析',
   pet: '宠物',
 };
 
@@ -63,7 +63,6 @@ const TAB_WAVES: Record<TabKey, number> = {
   hooks: 2,
   plugins: 2,
   profiles: 3,
-  usage: 3,
   pet: 4,
 };
 
@@ -116,8 +115,7 @@ function App() {
             <PluginsManager />
           ) : activeTab === 'profiles' ? (
             <ProfileManager />
-          ) : activeTab === 'usage' ? (
-            <AnalyticsModule />
+          // 用量分析暂时隐藏。
           ) : activeTab === 'pet' ? (
             <PetModule />
           ) : (

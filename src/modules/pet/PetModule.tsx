@@ -136,9 +136,9 @@ export function PetModule() {
                 <Space>
                   <Tag color={STATE_COLORS[item.state]}>{STATE_LABELS[item.state]}</Tag>
                   <Text code>{item.session_id.slice(0, 8)}</Text>
-                  {item.tool_name && <Text>tool: {item.tool_name}</Text>}
-                  {item.skill_name && <Text type="success">skill: {item.skill_name}</Text>}
-                  {item.mcp_server && <Text type="warning">mcp: {item.mcp_server}</Text>}
+                  {item.tool_name && <Tag>TOOL · {item.tool_name}</Tag>}
+                  {item.skill_name && <Tag color="green">SKILL · {item.skill_name}</Tag>}
+                  {item.mcp_server && <Tag color="gold">MCP · {item.mcp_server}</Tag>}
                   {item.cwd && <Text type="secondary" style={{ fontSize: 12 }}>{item.cwd}</Text>}
                 </Space>
               </List.Item>
